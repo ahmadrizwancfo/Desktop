@@ -1,0 +1,66 @@
+// Previous content remains unchanged...
+// Adding new FinancialMetrics model at the end
+
+model FinancialMetrics {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  
+  // Document Metadata
+  documentType   String   // "Balance Sheet", "P&L", "Cash Flow", etc.
+  period         String?
+  currency       String   @default("INR")
+  sourceFile     String   // Original filename
+  confidence     String   // "high", "medium", "low"
+  
+  // Balance Sheet Metrics
+  totalAssets       Decimal?  @db.Decimal(20, 2)
+  totalLiabilities  Decimal?  @db.Decimal(20, 2)
+  totalEquity       Decimal?  @db.Decimal(20, 2)
+  currentAssets     Decimal?  @db.Decimal(20, 2)
+  currentLiabilities Decimal? @db.Decimal(20, 2)
+  currentRatio      Decimal?  @db.Decimal(10, 4)
+  debtToEquity      Decimal?  @db.Decimal(10, 4)
+  
+  // P&L Metrics
+  revenue           Decimal?  @db.Decimal(20, 2)
+  totalExpenses     Decimal?  @db.Decimal(20, 2)
+  netProfit         Decimal?  @db.Decimal(20, 2)
+  grossProfit       Decimal?  @db.Decimal(20, 2)
+  ebitda            Decimal?  @db.Decimal(20, 2)
+  profitMargin      Decimal?  @db.Decimal(10, 4)
+  
+  // Cash Flow Metrics
+  operatingCashFlow Decimal?  @db.Decimal(20, 2)
+  investingCashFlow Decimal?  @db.Decimal(20, 2)
+  financingCashFlow Decimal?  @db.Decimal(20, 2)
+  netCashFlow       Decimal?  @db.Decimal(20, 2)
+  
+  // Burn & Runway
+  monthlyBurn       Decimal?  @db.Decimal(20, 2)
+  cashRunway        Int?
+  
+  // Bank Statement Metrics
+  openingBalance    Decimal?  @db.Decimal(20, 2)
+  closingBalance    Decimal?  @db.Decimal(20, 2)
+  totalCredits      Decimal?  @db.Decimal(20, 2)
+  totalDebits       Decimal?  @db.Decimal(20, 2)
+  
+  // GST Metrics
+  gstLiability      Decimal?  @db.Decimal(20, 2)
+  inputTaxCredit    Decimal?  @db.Decimal(20, 2)
+  netGstPayable     Decimal?  @db.Decimal(20, 2)
+  
+  // Invoice Metrics
+  totalInvoiceValue Decimal?  @db.Decimal(20, 2)
+  pendingReceivables Decimal? @db.Decimal(20, 2)
+  
+  // Analysis Metadata
+  extractedFields   String[] // Array of successfully extracted field names
+  warnings          String[] // Array of warnings/limitations
+  
+  uploadedAt        DateTime @default(now())
+  
+  @@index([organizationId])
+  @@index([uploadedAt])
+}
