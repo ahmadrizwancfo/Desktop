@@ -155,4 +155,4 @@ Proprietary - All rights reserved
 
 ## 🤝 Support
 
-For issues, contact: support@foundercfo.com
+For issues, contact: support@foundercfo.in
