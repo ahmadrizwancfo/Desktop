@@ -50,6 +50,14 @@ export class AiMetricsService {
      * Record an AI API call
      */
     async recordUsage(record: Omit<AiUsageRecord, 'id' | 'timestamp'>): Promise<void> {
+        // ── Guard: skip records with missing or invalid organizationId ──
+        if (!record.organizationId || record.organizationId === 'undefined' || record.organizationId === 'null') {
+            this.logger.warn(
+                `Skipping AI usage record: invalid organizationId="${record.organizationId}" for endpoint=${record.endpoint}`,
+            );
+            return;
+        }
+
         const fullRecord: AiUsageRecord = {
             ...record,
             timestamp: new Date(),
@@ -59,7 +67,7 @@ export class AiMetricsService {
 
         // Log for monitoring
         this.logger.log(
-            `AI Call: ${record.endpoint} | Model: ${record.model} | Tokens: ${record.totalTokens} | Cost: $${record.cost.toFixed(4)} | Latency: ${record.latencyMs}ms | Cached: ${record.cached}`
+            `AI Call: ${record.endpoint} | Model: ${record.model} | Tokens: ${record.totalTokens} | Cost: $${record.cost.toFixed(4)} | Latency: ${record.latencyMs}ms | Cached: ${record.cached} | Org: ${record.organizationId}`,
         );
 
         // Flush if memory limit reached
@@ -222,11 +230,32 @@ export class AiMetricsService {
         const recordsToFlush = [...this.usageRecords];
         this.usageRecords = [];
 
+        // ── Filter out records with invalid organizationId before DB write ──
+        const validRecords = recordsToFlush.filter((r) => {
+            if (!r.organizationId || r.organizationId === 'undefined' || r.organizationId === 'null') {
+                this.logger.warn(
+                    `Discarding buffered AI usage record with invalid organizationId="${r.organizationId}" (endpoint=${r.endpoint})`,
+                );
+                return false;
+            }
+            return true;
+        });
+
+        if (validRecords.length === 0) {
+            this.logger.log('All buffered AI usage records had invalid data — nothing to flush');
+            return;
+        }
+
+        const discardedCount = recordsToFlush.length - validRecords.length;
+        if (discardedCount > 0) {
+            this.logger.warn(`Discarded ${discardedCount} AI usage records with invalid organizationId`);
+        }
+
         try {
             await this.prisma.aiUsage.createMany({
-                data: recordsToFlush.map((r) => ({
+                data: validRecords.map((r) => ({
                     organizationId: r.organizationId,
-                    userId: r.userId,
+                    userId: r.userId || undefined,
                     endpoint: r.endpoint,
                     model: r.model,
                     inputTokens: r.inputTokens,
@@ -241,13 +270,26 @@ export class AiMetricsService {
                 })),
                 skipDuplicates: true,
             });
-            this.logger.log(`Flushed ${recordsToFlush.length} AI usage records to database`);
+            this.logger.log(`Flushed ${validRecords.length} AI usage records to database`);
         } catch (error) {
-            // If table doesn't exist, keep in memory
-            this.logger.warn(`Failed to flush AI usage records: ${error.message}`);
-            this.usageRecords = [...recordsToFlush, ...this.usageRecords].slice(
+            const prismaCode = (error as any)?.code;
+
+            // P2003 = Foreign key constraint violation
+            // These records have organizationIds that don't exist in the Organization table.
+            // Re-buffering them would cause infinite failures — discard them.
+            if (prismaCode === 'P2003') {
+                this.logger.error(
+                    `FK constraint violation flushing ${validRecords.length} AI usage records — discarding to prevent infinite retry. ` +
+                    `Unique orgIds: [${[...new Set(validRecords.map((r) => r.organizationId))].join(', ')}]`,
+                );
+                return; // DO NOT re-buffer
+            }
+
+            // For other errors (table missing, connection issue), re-buffer safely
+            this.logger.warn(`Failed to flush AI usage records (will retry): ${error.message}`);
+            this.usageRecords = [...validRecords, ...this.usageRecords].slice(
                 0,
-                this.maxRecordsInMemory
+                this.maxRecordsInMemory,
             );
         }
     }

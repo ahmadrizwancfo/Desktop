@@ -100,6 +100,26 @@ export class AuthService {
                 },
             });
         }
+
+        // Ensure user has an organization (fix for null organizationId → FK failures in AiUsage)
+        if (!user.organizationId) {
+            const orgName = user.name ? `${user.name}'s Organization` : 'My Organization';
+            const organization = await this.prisma.organization.create({
+                data: {
+                    name: orgName,
+                    industry: 'Technology',
+                    country: 'IN',
+                    currency: 'INR',
+                    users: { connect: { id: user.id } },
+                },
+            });
+
+            user = await this.prisma.user.update({
+                where: { id: user.id },
+                data: { organizationId: organization.id },
+            });
+        }
+
         return user;
     }
 }
