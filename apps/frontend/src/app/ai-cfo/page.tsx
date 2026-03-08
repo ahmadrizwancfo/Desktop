@@ -11,7 +11,7 @@ import {
     BrainCircuit, Send, Sparkles, Loader2, AlertCircle, Info,
     TrendingDown, TrendingUp, Shield, Zap, MessageCircle,
     ThumbsUp, ThumbsDown, Copy, Check, ChevronRight,
-    Users, Wallet, Clock, Target, ArrowRight
+    Users, Wallet, Clock, Target, ArrowRight, Flame, BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -71,6 +71,15 @@ const DECISION_CARDS = [
     },
 ];
 
+const DOMAIN_STYLES: Record<string, { icon: any; color: string; bg: string }> = {
+    SURVIVAL: { icon: Flame, color: 'text-rose-400', bg: 'bg-rose-500/15' },
+    EFFICIENCY: { icon: BarChart3, color: 'text-blue-400', bg: 'bg-blue-500/15' },
+    GROWTH: { icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/15' },
+    HIRING: { icon: Users, color: 'text-sky-400', bg: 'bg-sky-500/15' },
+    FUNDRAISING: { icon: Wallet, color: 'text-violet-400', bg: 'bg-violet-500/15' },
+    COMPLIANCE: { icon: Shield, color: 'text-amber-400', bg: 'bg-amber-500/15' },
+};
+
 // ── Main AI CFO Content ───────────────────────────────────────────────────────
 
 function AICFOContent() {
@@ -92,6 +101,18 @@ function AICFOContent() {
         queryFn: async () => {
             const res = await apiClient.get('/recommendations/prompts');
             return res.data as string[];
+        },
+        enabled: !!user?.organizationId,
+    });
+
+    // Fetch CFO engine decisions for domain pills
+    const { data: engineDecisions } = useQuery({
+        queryKey: ['cfo-engine-decisions', user?.organizationId],
+        queryFn: async () => {
+            try {
+                const res = await apiClient.get('/cfo-engine/decisions');
+                return res.data || [];
+            } catch { return []; }
         },
         enabled: !!user?.organizationId,
     });
@@ -283,10 +304,10 @@ function AICFOContent() {
                                 <BrainCircuit className="w-6 h-6 text-primary" />
                             </div>
                             <div>
-                                <h3 className="text-white font-bold">AI CFO</h3>
+                                <h3 className="text-white font-bold">AI CFO — Decision Engine</h3>
                                 <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
                                     <div className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
-                                    Opinionated • Context-Aware
+                                    6 Engines • Opinionated
                                 </span>
                             </div>
                         </div>
@@ -301,6 +322,39 @@ function AICFOContent() {
                             )}
                         </div>
                     </div>
+
+                    {/* Decision Engine Domain Pills */}
+                    {engineDecisions && engineDecisions.length > 0 && (
+                        <div className="px-4 py-3 border-b border-white/5 bg-white/[0.01]">
+                            <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest mb-2">Decision Engine Results</p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {Object.entries(
+                                    (engineDecisions as any[]).reduce((acc: Record<string, string>, d: any) => {
+                                        if (!acc[d.decisionDomain] || d.severity === 'CRITICAL') acc[d.decisionDomain] = d.severity;
+                                        return acc;
+                                    }, {})
+                                ).map(([domain, severity]) => {
+                                    const style = DOMAIN_STYLES[domain] || DOMAIN_STYLES.SURVIVAL;
+                                    const Icon = style.icon;
+                                    return (
+                                        <span
+                                            key={domain}
+                                            className={cn(
+                                                'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border',
+                                                style.bg, style.color,
+                                                severity === 'CRITICAL' ? 'border-rose-500/40' : 'border-white/10',
+                                            )}
+                                        >
+                                            <Icon className="w-3 h-3" />
+                                            {domain}
+                                            {severity === 'CRITICAL' && <AlertCircle className="w-2.5 h-2.5 text-rose-400" />}
+                                            {severity === 'HIGH' && <AlertCircle className="w-2.5 h-2.5 text-amber-400" />}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Strategic Decision Cards (above messages when no conversation or at start) */}
                     {messages.length <= 1 && (

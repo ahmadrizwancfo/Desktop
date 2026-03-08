@@ -19,13 +19,14 @@ import {
     BrainCircuit,
     Target,
     Calculator,
-    Zap
+    Mail
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Decisions', href: '/ai-cfo', icon: BrainCircuit, premium: true },
+    { name: 'AI CFO', href: '/ai-cfo', icon: BrainCircuit, premium: true },
+    { name: 'Weekly Brief', href: '/weekly-brief', icon: Mail, premium: true },
     { name: 'Scenario Simulator', href: '/simulator', icon: TrendingUp, premium: true },
     { name: 'Investor Readiness', href: '/investor-readiness', icon: Target, premium: true },
     { name: 'Unit Economics', href: '/unit-economics', icon: Calculator, premium: true },

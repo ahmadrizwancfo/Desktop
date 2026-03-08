@@ -241,20 +241,85 @@ Risk Level: ${cashFlow.riskLevel}
 
         for (const user of users) {
             try {
-                const report = await this.aiService.generateBoardReport(organizationId);
-
-                await this.send({
-                    userId: user.id,
-                    title: '📊 Weekly CFO Report',
-                    message: 'Your weekly financial summary is ready. Check the dashboard for the full report.',
-                    type: 'INFO',
-                    channels: ['IN_APP', 'EMAIL'],
-                    data: { report },
-                });
+                await this.sendFounderBrief(organizationId, user.id);
             } catch (error) {
                 this.logger.error(`Failed to send weekly report to user ${user.id}: ${error.message}`);
             }
         }
+    }
+
+    /**
+     * Send a concise Founder Brief to a single user.
+     * Called by the weekly-brief controller for "Send Now" and by the weekly scheduler.
+     */
+    async sendFounderBrief(organizationId: string, userId: string): Promise<void> {
+        // Get profile for context
+        const profile = await this.prisma.startupProfile.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const bankAccounts = await this.prisma.bankAccount.findMany({
+            where: { organizationId },
+        });
+        const totalCash = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+
+        const monthlyRevenue = Number(profile?.monthlyRevenue || 0);
+        const monthlyExpenses = Number(profile?.monthlyExpenses || 0);
+        const netBurn = monthlyExpenses - monthlyRevenue;
+        const runway = netBurn > 0 ? totalCash / netBurn : 999;
+
+        const formatINR = (n: number) => {
+            if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
+            if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+            if (n >= 1000) return `₹${(n / 1000).toFixed(0)}K`;
+            return `₹${n}`;
+        };
+
+        // Get top decision
+        let topDecision: any = null;
+        try {
+            topDecision = await this.prisma.cfoDecision.findFirst({
+                where: { startupProfile: { userId }, severity: { in: ['CRITICAL', 'HIGH'] } },
+                orderBy: { createdAt: 'desc' },
+            });
+        } catch { /* table might not exist */ }
+
+        const riskLine = topDecision
+            ? `⚠️ Biggest Risk: ${topDecision.decisionType?.replace(/_/g, ' ')} (${topDecision.decisionDomain})`
+            : '✅ No critical risks detected';
+
+        const actionLine = topDecision?.recommendedActions?.[0]
+            || 'Continue optimizing operations';
+
+        const briefMessage = [
+            `📊 FounderCFO Weekly Brief`,
+            ``,
+            `Runway: ${runway >= 999 ? 'Profitable' : `${runway.toFixed(1)} months`}`,
+            `Burn: ${formatINR(monthlyExpenses)}/mo`,
+            `Cash: ${formatINR(totalCash)}`,
+            ``,
+            riskLine,
+            ``,
+            `💡 Recommendation: ${actionLine}`,
+        ].join('\n');
+
+        await this.send({
+            userId,
+            title: '📊 FounderCFO Weekly Brief',
+            message: briefMessage,
+            type: 'INFO',
+            channels: ['IN_APP', 'EMAIL'],
+            data: {
+                runway: Math.round(runway * 10) / 10,
+                burn: monthlyExpenses,
+                cash: totalCash,
+                risk: riskLine,
+                recommendation: actionLine,
+            },
+        });
+
+        this.logger.log(`Founder Brief sent to user ${userId}`);
     }
 
     // ==================== Compliance Alerts ====================
