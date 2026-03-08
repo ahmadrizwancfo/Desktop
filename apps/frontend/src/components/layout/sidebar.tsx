@@ -18,13 +18,15 @@ import {
     ShieldCheck,
     BrainCircuit,
     Target,
-    Calculator
+    Calculator,
+    Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Simulator', href: '/simulator', icon: TrendingUp, premium: true },
+    { name: 'Decisions', href: '/ai-cfo', icon: BrainCircuit, premium: true },
+    { name: 'Scenario Simulator', href: '/simulator', icon: TrendingUp, premium: true },
     { name: 'Investor Readiness', href: '/investor-readiness', icon: Target, premium: true },
     { name: 'Unit Economics', href: '/unit-economics', icon: Calculator, premium: true },
     { name: 'Accounts', href: '/accounts', icon: Wallet },
@@ -32,7 +34,6 @@ const navItems = [
     { name: 'Expenses', href: '/expenses', icon: Receipt },
     { name: 'Customers & Vendors', href: '/customers-vendors', icon: Users },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'AI CFO', href: '/ai-cfo', icon: BrainCircuit, premium: true },
     { name: 'Compliance', href: '/compliance', icon: ShieldCheck },
 ];
 

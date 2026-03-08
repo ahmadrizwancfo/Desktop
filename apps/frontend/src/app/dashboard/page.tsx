@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { StatsCard } from '@/components/dashboard/stats-card';
@@ -17,36 +17,96 @@ import { AICFOPrompts } from '@/components/dashboard/ai-cfo-prompts';
 import { QuickInvoice } from '@/components/dashboard/quick-invoice';
 import { AddTransactionForm } from '@/components/dashboard/add-transaction-form';
 import {
-    DollarSign,
-    TrendingUp,
-    Activity,
-    Zap,
-    Clock,
-    ExternalLink,
     BrainCircuit,
-    Sliders
+    Sliders,
+    Upload,
+    Link2,
+    FlaskConical,
+    Loader2,
+    ArrowRight,
+    Sparkles,
+    Users,
+    TrendingUp,
+    Wallet,
+    Target,
+    FileText,
+    CheckCircle2,
+    Clock,
 } from 'lucide-react';
-
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { financialService } from '@/services/financial-service';
 import { useAuthStore } from '@/store/auth-store';
 import { useStartupProfileStore } from '@/store/startup-profile-store';
 import { apiClient } from '@/lib/api-client';
-import { Loader2 } from 'lucide-react';
+import { seedDemoData } from '@/lib/demo-data';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
+
+// ── Strategic Questions (driven by profile) ────────────────────────────────────
+
+interface StrategicQuestion {
+    question: string;
+    icon: React.ReactNode;
+    color: string;
+    bgColor: string;
+    condition: (goal: string, runway: number) => boolean;
+}
+
+const STRATEGIC_QUESTIONS: StrategicQuestion[] = [
+    {
+        question: 'Should I hire now?',
+        icon: <Users className="w-4 h-4" />,
+        color: 'text-sky-400',
+        bgColor: 'bg-sky-500/10 border-sky-500/20',
+        condition: (_, runway) => runway > 6,
+    },
+    {
+        question: 'Should I raise funding?',
+        icon: <Wallet className="w-4 h-4" />,
+        color: 'text-violet-400',
+        bgColor: 'bg-violet-500/10 border-violet-500/20',
+        condition: (goal) => goal === 'RAISE',
+    },
+    {
+        question: 'Can I survive 12 months?',
+        icon: <Clock className="w-4 h-4" />,
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10 border-amber-500/20',
+        condition: () => true,
+    },
+    {
+        question: 'Should I cut costs?',
+        icon: <TrendingUp className="w-4 h-4" />,
+        color: 'text-rose-400',
+        bgColor: 'bg-rose-500/10 border-rose-500/20',
+        condition: (_, runway) => runway < 12,
+    },
+    {
+        question: 'Am I profitable in 6 months?',
+        icon: <Target className="w-4 h-4" />,
+        color: 'text-emerald-400',
+        bgColor: 'bg-emerald-500/10 border-emerald-500/20',
+        condition: () => true,
+    },
+];
+
+// ── Main Dashboard Page ────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
     const user = useAuthStore((state) => state.user);
     const queryClient = useQueryClient();
     const router = useRouter();
     const { setProfile, clearProfile, showInvestorMetrics } = useStartupProfileStore();
+    const profile = useStartupProfileStore((s) => s.profile);
     const [profileChecked, setProfileChecked] = React.useState(false);
 
+    // Demo data loading state
+    const [isDemoLoading, setIsDemoLoading] = React.useState(false);
+    const [showUploadPanel, setShowUploadPanel] = React.useState(false);
+
     // ── Onboarding Gate ──────────────────────────────────────────────────────
-    // Always verify with the API on mount — never trust localStorage alone.
-    // Zustand persist can hold a stale profile from a previous session.
-    // If the API returns 404 → no profile exists → redirect to /onboarding.
     useEffect(() => {
         apiClient.get('/startup-profile/me')
             .then((res) => {
@@ -54,11 +114,11 @@ export default function DashboardPage() {
                 setProfileChecked(true);
             })
             .catch(() => {
-                clearProfile();           // wipe stale localStorage cache
+                clearProfile();
                 router.push('/onboarding');
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // intentionally run once on mount only
+    }, []);
 
     const showInvestor = showInvestorMetrics();
 
@@ -68,7 +128,7 @@ export default function DashboardPage() {
         enabled: !!user?.organizationId && profileChecked,
     });
 
-    // Spinner while profile API check is in flight OR stats loading
+    // Loading spinner
     if (!profileChecked || isLoading) {
         return (
             <DashboardLayout>
@@ -79,27 +139,198 @@ export default function DashboardPage() {
         );
     }
 
-    // Show empty state if no stats loaded or hasData is false
+    // ── Handle Demo Data Seed ─────────────────────────────────────────────────
+    const handleDemoSeed = async () => {
+        setIsDemoLoading(true);
+        const result = await seedDemoData(apiClient);
+        if (result.success) {
+            // Refresh everything
+            queryClient.invalidateQueries({ queryKey: ['financial-stats'] });
+            // Refetch profile
+            try {
+                const res = await apiClient.get('/startup-profile/me');
+                setProfile(res.data);
+            } catch { /* profile was just created, will load */ }
+            // Slight delay so engine generates decisions
+            setTimeout(() => {
+                setIsDemoLoading(false);
+                window.location.reload(); // Full reload to pick up all new data
+            }, 2000);
+        } else {
+            setIsDemoLoading(false);
+            alert(`Demo setup failed: ${result.error}`);
+        }
+    };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // EMPTY STATE: 3-Option Launcher
+    // ════════════════════════════════════════════════════════════════════════════
+
     if (!stats || stats.hasData === false) {
         return (
             <DashboardLayout>
-                <div className="flex flex-col gap-8 max-w-7xl mx-auto">
-                    <div className="glass-card rounded-3xl p-12 text-center">
-                        <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                            <BrainCircuit className="w-10 h-10 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-bold text-white">Welcome to FounderCFO</h3>
-                        <p className="text-slate-400 mt-2 max-w-md mx-auto">
-                            Upload your first financial document to unlock your AI-powered CFO dashboard.
+                <div className="flex flex-col gap-8 max-w-4xl mx-auto mt-8">
+                    {/* Header */}
+                    <div className="text-center">
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="inline-flex items-center gap-3 mb-6"
+                        >
+                            <div className="w-14 h-14 bg-gradient-to-br from-primary to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/30">
+                                <BrainCircuit className="w-8 h-8 text-white" />
+                            </div>
+                        </motion.div>
+                        <h2 className="text-3xl font-bold text-white tracking-tight">
+                            Start Your CFO Dashboard
+                        </h2>
+                        <p className="text-slate-400 mt-2 max-w-lg mx-auto">
+                            Choose how to get started. Your AI CFO will analyze your data and generate
+                            strategic decisions within seconds.
                         </p>
-                        <div className="mt-8">
-                            <FileUpload onSuccess={() => queryClient.invalidateQueries({ queryKey: ['financial-stats'] })} />
+                    </div>
+
+                    {/* 3-Option Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        {/* Option 1: Upload Financial Files */}
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.1 }}
+                            className={cn(
+                                "glass-card rounded-3xl p-6 border cursor-pointer transition-all duration-300 group relative overflow-hidden",
+                                showUploadPanel
+                                    ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                                    : "border-white/10 hover:border-primary/30 hover:bg-white/[0.03]"
+                            )}
+                            onClick={() => setShowUploadPanel(!showUploadPanel)}
+                        >
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 blur-3xl rounded-full pointer-events-none" />
+                            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <Upload className="w-6 h-6 text-primary" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-1">Upload Financial Files</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                                P&L statements, bank statements, CSV, or Excel files
+                            </p>
+                            <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-wider">
+                                <span>{showUploadPanel ? 'Close' : 'Upload'}</span>
+                                <ArrowRight className="w-3 h-3" />
+                            </div>
+                        </motion.div>
+
+                        {/* Option 2: Connect Accounting Software */}
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.2 }}
+                            className="glass-card rounded-3xl p-6 border border-white/10 relative overflow-hidden opacity-80"
+                        >
+                            <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+                                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Coming Soon</span>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4">
+                                <Link2 className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-1">Connect Software</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                                Zoho Books · Tally · QuickBooks
+                            </p>
+                            <div className="flex gap-3 mt-2">
+                                {['Zoho', 'Tally', 'QB'].map((name) => (
+                                    <div key={name} className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                        {name}
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+
+                        {/* Option 3: Try Demo Data */}
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.3 }}
+                            onClick={!isDemoLoading ? handleDemoSeed : undefined}
+                            className={cn(
+                                "glass-card rounded-3xl p-6 border cursor-pointer transition-all duration-300 group relative overflow-hidden",
+                                isDemoLoading
+                                    ? "border-emerald-500/30 bg-emerald-500/5"
+                                    : "border-white/10 hover:border-emerald-500/30 hover:bg-emerald-500/[0.03]"
+                            )}
+                        >
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
+                            {/* Recommended badge */}
+                            <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30">
+                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" /> Recommended
+                                </span>
+                            </div>
+
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <FlaskConical className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <h3 className="text-lg font-bold text-white mb-1">Try Demo Data</h3>
+                            <p className="text-sm text-slate-400 leading-relaxed mb-4">
+                                See how FounderCFO works instantly with sample startup data
+                            </p>
+
+                            {isDemoLoading ? (
+                                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Setting up demo startup...</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                                    <span>Launch Demo</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+
+                    {/* Upload Panel (slides open) */}
+                    <AnimatePresence>
+                        {showUploadPanel && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="glass-card rounded-3xl p-8 border border-primary/20">
+                                    <FileUpload onSuccess={() => queryClient.invalidateQueries({ queryKey: ['financial-stats'] })} />
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Trust signals */}
+                    <div className="flex items-center justify-center gap-8 text-slate-500 text-xs">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Bank-grade encryption</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>No data sharing</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Delete anytime</span>
                         </div>
                     </div>
                 </div>
             </DashboardLayout>
         );
     }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    // POPULATED DASHBOARD: Full CFO View
+    // ════════════════════════════════════════════════════════════════════════════
+
+    const runwayMonths = stats.cashRunway ? parseFloat(stats.cashRunway.replace(/[^0-9.]/g, '')) : 7.2;
+    const primaryGoal = profile?.primaryGoal || 'SCALE';
+    const relevantQuestions = STRATEGIC_QUESTIONS.filter(q => q.condition(primaryGoal, runwayMonths)).slice(0, 3);
 
     return (
         <DashboardLayout>
@@ -111,9 +342,15 @@ export default function DashboardPage() {
                         <p className="text-slate-400 mt-1">Good morning, {user?.name || 'Founder'}. Here is your financial health decision matrix.</p>
                     </div>
                     <div className="flex gap-3">
+                        {showInvestor && (
+                            <Link href="/investor-readiness" className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-bold hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-violet-600/20">
+                                <FileText className="w-4 h-4" />
+                                Investor Report
+                            </Link>
+                        )}
                         <Link href="/simulator" className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-indigo-600 transition-all flex items-center gap-2">
                             <Sliders className="w-4 h-4" />
-                            What-If Simulator
+                            Scenario Simulator
                         </Link>
                         <Link href="/ai-cfo" className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all flex items-center gap-2">
                             <BrainCircuit className="w-4 h-4 text-primary" />
@@ -125,13 +362,13 @@ export default function DashboardPage() {
                 {/* 1. The Decision Assistant (North Star) */}
                 <CFOSummaryCard
                     status="WATCH"
-                    runwayMonths={stats.cashRunway ? parseFloat(stats.cashRunway.replace(/[^0-9.]/g, '')) : 7.2}
+                    runwayMonths={runwayMonths}
                     monthlyBurn={stats.monthlyBurn || 240000}
                     safeToHire={false}
                     message="Burn rate increased by 18% this month, reducing runway by 0.5 months."
                 />
 
-                {/* 2. Why Drill-Down Metrics - Click to see WHY */}
+                {/* 2. Why Drill-Down Metrics */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <WhyDrillDown
                         metric="burn"
@@ -161,10 +398,43 @@ export default function DashboardPage() {
 
                 {/* 3. Decision Intelligence Hub */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left: Decision Cards + Cash Flow */}
+                    {/* Left: Decision Cards + Strategic Questions + Cash Flow */}
                     <div className="lg:col-span-2 flex flex-col gap-6">
                         {/* CFO Recommendations */}
                         <DecisionCards />
+
+                        {/* Strategic Questions — Ask AI CFO */}
+                        <div className="glass-card rounded-3xl p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4 text-primary" />
+                                    Strategic Decisions
+                                </h3>
+                                <Link href="/ai-cfo" className="text-[10px] font-bold text-primary uppercase tracking-wider hover:underline">
+                                    Ask anything →
+                                </Link>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {relevantQuestions.map((q, i) => (
+                                    <Link
+                                        key={i}
+                                        href={`/ai-cfo?q=${encodeURIComponent(q.question)}`}
+                                        className={cn(
+                                            "p-4 rounded-xl border transition-all hover:scale-[1.02] group",
+                                            q.bgColor
+                                        )}
+                                    >
+                                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-2", q.bgColor)}>
+                                            {q.icon}
+                                        </div>
+                                        <p className="text-sm font-bold text-white">{q.question}</p>
+                                        <p className={cn("text-[10px] font-bold uppercase tracking-wider mt-1 flex items-center gap-1", q.color)}>
+                                            Ask AI CFO <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </p>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
 
                         {/* Cash Flow Chart */}
                         <div className="glass-card rounded-3xl p-8 relative overflow-hidden">

@@ -1,14 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
+import { useStartupProfileStore } from '@/store/startup-profile-store';
 import { useQuery } from '@tanstack/react-query';
 import {
     BrainCircuit, Send, Sparkles, Loader2, AlertCircle, Info,
     TrendingDown, TrendingUp, Shield, Zap, MessageCircle,
-    ThumbsUp, ThumbsDown, Copy, Check, ChevronRight
+    ThumbsUp, ThumbsDown, Copy, Check, ChevronRight,
+    Users, Wallet, Clock, Target, ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,14 +34,57 @@ interface FinancialContext {
     cashFlowScore: number;
 }
 
+// ── Strategic Decision Cards ──────────────────────────────────────────────────
+
+const DECISION_CARDS = [
+    {
+        question: 'Should I hire now?',
+        subtitle: 'Analyze headcount vs runway impact',
+        icon: <Users className="w-5 h-5" />,
+        color: 'text-sky-400',
+        bgColor: 'bg-sky-500/10',
+        borderColor: 'border-sky-500/20 hover:border-sky-500/40',
+    },
+    {
+        question: 'Should I raise funding?',
+        subtitle: 'Check investor readiness & timing',
+        icon: <Wallet className="w-5 h-5" />,
+        color: 'text-violet-400',
+        bgColor: 'bg-violet-500/10',
+        borderColor: 'border-violet-500/20 hover:border-violet-500/40',
+    },
+    {
+        question: 'Can I survive 12 months?',
+        subtitle: 'Runway analysis with current burn',
+        icon: <Clock className="w-5 h-5" />,
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10',
+        borderColor: 'border-amber-500/20 hover:border-amber-500/40',
+    },
+    {
+        question: 'Should I cut costs?',
+        subtitle: 'Identify savings without hurting growth',
+        icon: <Target className="w-5 h-5" />,
+        color: 'text-rose-400',
+        bgColor: 'bg-rose-500/10',
+        borderColor: 'border-rose-500/20 hover:border-rose-500/40',
+    },
+];
+
+// ── Main AI CFO Content ───────────────────────────────────────────────────────
+
 function AICFOContent() {
     const user = useAuthStore((state) => state.user);
+    const profile = useStartupProfileStore((s) => s.profile);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const searchParams = useSearchParams();
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const userName = user?.name || profile?.companyName || 'Founder';
 
     // Get contextual prompts from API
     const { data: contextPrompts } = useQuery({
@@ -50,18 +96,36 @@ function AICFOContent() {
         enabled: !!user?.organizationId,
     });
 
-    // Get financial context for AI personality
+    // Get real financial context
     const { data: context } = useQuery({
         queryKey: ['financial-context', user?.organizationId],
         queryFn: async () => {
-            // Mock for now - in production would come from recommendations API
-            return {
-                runway: 7.2,
-                burnTrend: 'increasing',
-                revenueGrowth: 18,
-                topRisk: 'Runway < 6 months in 45 days',
-                cashFlowScore: 84,
-            } as FinancialContext;
+            try {
+                const res = await apiClient.get('/recommendations');
+                const data = res.data;
+                return {
+                    runway: data.runway || 7.2,
+                    burnTrend: data.burnTrend || 'stable',
+                    revenueGrowth: data.revenueGrowth || 0,
+                    topRisk: data.topRisk || 'No critical risks detected',
+                    cashFlowScore: data.cashFlowScore || 75,
+                } as FinancialContext;
+            } catch {
+                // Fallback to profile-derived context
+                const cashInBank = profile?.cashInBank || 2800000;
+                const burn = profile?.monthlyExpenses || 550000;
+                const revenue = profile?.monthlyRevenue || 320000;
+                const netBurn = burn - revenue;
+                const runway = netBurn > 0 ? cashInBank / netBurn : 999;
+
+                return {
+                    runway: Math.min(runway, 99),
+                    burnTrend: 'stable' as const,
+                    revenueGrowth: 0,
+                    topRisk: runway < 6 ? `Runway critically low at ${runway.toFixed(1)} months` : 'Monitor burn rate',
+                    cashFlowScore: Math.min(Math.round((runway / 18) * 100), 100),
+                } as FinancialContext;
+            }
         },
         enabled: !!user?.organizationId,
     });
@@ -81,6 +145,17 @@ function AICFOContent() {
         }
     }, [context, messages.length]);
 
+    // Handle pre-filled question from URL (?q=...)
+    useEffect(() => {
+        const prefilled = searchParams.get('q');
+        if (prefilled && messages.length > 0 && !isTyping) {
+            // Small delay so greeting renders first
+            const timer = setTimeout(() => handleSend(prefilled), 800);
+            return () => clearTimeout(timer);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages.length, searchParams]);
+
     // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -88,12 +163,12 @@ function AICFOContent() {
 
     const getContextualGreeting = (ctx: FinancialContext): string => {
         if (ctx.runway < 6) {
-            return `⚠️ Nishant, your runway is at ${ctx.runway.toFixed(1)} months — this is critical. I recommend we focus on burn reduction immediately. Ask me "How do I extend runway by 3 months?" and I'll give you a concrete action plan.`;
+            return `⚠️ ${userName}, your runway is at ${ctx.runway.toFixed(1)} months — this is critical. I recommend we focus on burn reduction immediately. Ask me "How do I extend runway by 3 months?" and I'll give you a concrete action plan.`;
         }
         if (ctx.burnTrend === 'increasing') {
-            return `Good morning, Nishant. Your burn is trending up but revenue grew ${ctx.revenueGrowth}% — net positive, but we should monitor. Your runway is ${ctx.runway.toFixed(1)} months. What would you like to explore today?`;
+            return `Good morning, ${userName}. Your burn is trending up but revenue grew ${ctx.revenueGrowth}% — net positive, but we should monitor. Your runway is ${ctx.runway.toFixed(1)} months. What would you like to explore today?`;
         }
-        return `Greetings, Nishant. Your finances look healthy with ${ctx.runway.toFixed(1)} months runway. Cash flow score: ${ctx.cashFlowScore}/100. Ready to analyze any aspect of your business.`;
+        return `Greetings, ${userName}. Your finances look healthy with ${ctx.runway.toFixed(1)} months runway. Cash flow score: ${ctx.cashFlowScore}/100. Ready to analyze any aspect of your business.`;
     };
 
     const handleSend = async (overrideInput?: string) => {
@@ -113,14 +188,13 @@ function AICFOContent() {
         try {
             const response = await apiClient.post('/ai/chat', { message: msgText });
 
-            // Enhance response with opinionated framing
             const aiResponse: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
                 content: response.data.response,
                 timestamp: 'Now',
                 opinion: determineOpinion(response.data.response),
-                confidence: Math.floor(Math.random() * 20) + 75, // 75-95%
+                confidence: Math.floor(Math.random() * 20) + 75,
                 actions: extractActions(msgText),
             };
 
@@ -153,18 +227,19 @@ function AICFOContent() {
     const extractActions = (question: string): { label: string; href: string }[] | undefined => {
         const lower = question.toLowerCase();
 
-        if (lower.includes('runway') || lower.includes('burn')) {
+        if (lower.includes('runway') || lower.includes('burn') || lower.includes('survive') || lower.includes('cut costs')) {
             return [
                 { label: 'Open Simulator', href: '/simulator?preset=survival-mode' },
                 { label: 'View Expenses', href: '/expenses' },
             ];
         }
-        if (lower.includes('saas') || lower.includes('subscription')) {
+        if (lower.includes('raise') || lower.includes('funding') || lower.includes('investor')) {
             return [
-                { label: 'Review SaaS Spend', href: '/expenses?category=saas' },
+                { label: 'Investor Readiness', href: '/investor-readiness' },
+                { label: 'Simulate Raise', href: '/simulator?preset=raise-bridge' },
             ];
         }
-        if (lower.includes('hire') || lower.includes('headcount')) {
+        if (lower.includes('hire') || lower.includes('headcount') || lower.includes('team')) {
             return [
                 { label: 'Simulate Hiring', href: '/simulator?preset=hire-2-engineers' },
             ];
@@ -208,7 +283,7 @@ function AICFOContent() {
                                 <BrainCircuit className="w-6 h-6 text-primary" />
                             </div>
                             <div>
-                                <h3 className="text-white font-bold">AI CFO v2</h3>
+                                <h3 className="text-white font-bold">AI CFO</h3>
                                 <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
                                     <div className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
                                     Opinionated • Context-Aware
@@ -227,6 +302,37 @@ function AICFOContent() {
                         </div>
                     </div>
 
+                    {/* Strategic Decision Cards (above messages when no conversation or at start) */}
+                    {messages.length <= 1 && (
+                        <div className="p-4 border-b border-white/5 bg-white/[0.01]">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3 text-primary" />
+                                Strategic Decisions — click to analyze
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {DECISION_CARDS.map((card, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleSend(card.question)}
+                                        className={cn(
+                                            "p-3 rounded-xl border transition-all text-left hover:scale-[1.01] group",
+                                            card.borderColor, card.bgColor
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <div className={card.color}>{card.icon}</div>
+                                            <div>
+                                                <p className="text-xs font-bold text-white">{card.question}</p>
+                                                <p className="text-[10px] text-slate-500">{card.subtitle}</p>
+                                            </div>
+                                            <ArrowRight className={cn("w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity", card.color)} />
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
                         <AnimatePresence>
@@ -244,7 +350,6 @@ function AICFOContent() {
                                             msg.role === 'ai' ? "self-start" : "self-end items-end"
                                         )}
                                     >
-                                        {/* Opinion badge for AI */}
                                         {msg.role === 'ai' && badge && BadgeIcon && (
                                             <div className={`flex items-center gap-2 px-2 py-1 rounded-full ${badge.bg} self-start`}>
                                                 <BadgeIcon className={`w-3 h-3 ${badge.text}`} />
@@ -268,7 +373,6 @@ function AICFOContent() {
                                             {msg.content}
                                         </div>
 
-                                        {/* Actions for AI messages */}
                                         {msg.role === 'ai' && msg.actions && (
                                             <div className="flex flex-wrap gap-2 mt-1">
                                                 {msg.actions.map((action, i) => (
@@ -284,7 +388,6 @@ function AICFOContent() {
                                             </div>
                                         )}
 
-                                        {/* Footer actions */}
                                         <div className="flex items-center gap-3">
                                             <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
                                                 {msg.timestamp}
@@ -315,7 +418,6 @@ function AICFOContent() {
                             })}
                         </AnimatePresence>
 
-                        {/* Typing indicator */}
                         {isTyping && (
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -382,13 +484,13 @@ function AICFOContent() {
                             Cash Flow Score
                         </h4>
                         <div className="flex items-end gap-2 mb-2">
-                            <span className="text-4xl font-black text-white">{context?.cashFlowScore || 84}</span>
+                            <span className="text-4xl font-black text-white">{context?.cashFlowScore || 75}</span>
                             <span className="text-emerald-500 font-bold text-sm mb-1">/100</span>
                         </div>
                         <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
-                                style={{ width: `${context?.cashFlowScore || 84}%` }}
+                                style={{ width: `${context?.cashFlowScore || 75}%` }}
                             />
                         </div>
                     </div>
@@ -441,11 +543,23 @@ function AICFOContent() {
                                     +{context?.revenueGrowth || 0}%
                                 </span>
                             </div>
+                            {profile && (
+                                <>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">Stage</span>
+                                        <span className="text-sm font-bold text-primary">{profile.stage}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">Goal</span>
+                                        <span className="text-sm font-bold text-white">{profile.primaryGoal}</span>
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         <div className="mt-6 pt-4 border-t border-white/10">
                             <p className="text-[10px] text-slate-500 leading-relaxed">
-                                AI CFO v2 uses your real financial data to provide <span className="text-primary font-bold">opinionated advice</span> instead of generic answers. Confidence levels indicate data quality.
+                                AI CFO uses your real financial data to provide <span className="text-primary font-bold">opinionated advice</span> instead of generic answers. Confidence levels indicate data quality.
                             </p>
                         </div>
                     </div>

@@ -131,6 +131,39 @@ const PRESET_SCENARIOS: PresetScenario[] = [
         changes: { currentCash: 5000000 }, // Add to current
         category: 'strategic',
     },
+    // ── Startup-Specific Scenarios ──────────────────────
+    {
+        id: 'revenue-15-mom',
+        name: 'Revenue +15% MoM',
+        description: 'What if revenue grows 15% monthly?',
+        icon: <TrendingUp className="w-4 h-4" />,
+        changes: { monthlyRevenue: 1.15 },
+        category: 'revenue',
+    },
+    {
+        id: 'raise-5cr',
+        name: 'Raise ₹5 Cr',
+        description: 'Fundraise at Series A',
+        icon: <DollarSign className="w-4 h-4" />,
+        changes: { currentCash: 50000000 },
+        category: 'strategic',
+    },
+    {
+        id: 'cac-doubles',
+        name: 'CAC Doubles',
+        description: 'What if acquisition costs 2x?',
+        icon: <Megaphone className="w-4 h-4" />,
+        changes: { marketingSpend: 2 },
+        category: 'growth',
+    },
+    {
+        id: 'lose-top-client',
+        name: 'Lose Top Client',
+        description: 'Largest client churns (-30%)',
+        icon: <AlertTriangle className="w-4 h-4" />,
+        changes: { monthlyRevenue: 0.7 },
+        category: 'cut',
+    },
 ];
 
 export default function SimulatorPage() {
@@ -355,9 +388,9 @@ export default function SimulatorPage() {
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center">
                                 <Layers className="w-6 h-6 text-white" />
                             </div>
-                            Decision Simulator v2
+                            Startup Scenario Simulator
                         </h1>
-                        <p className="text-slate-400 mt-2">Model scenarios, see risk impact, calculate break-even</p>
+                        <p className="text-slate-400 mt-2">Model scenarios, see risk impact, calculate break-even — what happens if?</p>
                     </div>
 
                     <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
@@ -859,6 +892,60 @@ export default function SimulatorPage() {
                                                 </div>
                                             );
                                         })}
+                                    </div>
+                                </div>
+
+                                {/* Startup Metrics — Valuation, Hiring, Profit */}
+                                <div className="glass-card rounded-3xl p-6">
+                                    <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-4">Startup Metrics</h3>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xs text-slate-500 uppercase">Implied Valuation</p>
+                                                <p className="text-[10px] text-slate-600">10x ARR (SaaS standard)</p>
+                                            </div>
+                                            <p className="text-lg font-bold text-primary">
+                                                {formatCurrency((values.monthlyRevenue * 12) * 10)}
+                                            </p>
+                                        </div>
+                                        <div className="h-px bg-white/5" />
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xs text-slate-500 uppercase">Hiring Capacity</p>
+                                                <p className="text-[10px] text-slate-600">Affordable hires at current avg salary</p>
+                                            </div>
+                                            <p className="text-lg font-bold text-sky-400">
+                                                {values.avgSalary > 0 ? Math.floor((result?.netBurn || 0) < 0 ? Math.abs(result?.netBurn || 0) / values.avgSalary : 0) : 0}
+                                                <span className="text-xs text-slate-500 ml-1">people</span>
+                                            </p>
+                                        </div>
+                                        <div className="h-px bg-white/5" />
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xs text-slate-500 uppercase">Months to Profit</p>
+                                                <p className="text-[10px] text-slate-600">When revenue {'>'} expenses</p>
+                                            </div>
+                                            {(() => {
+                                                const netBurn = result?.netBurn || 0;
+                                                if (netBurn <= 0) return <p className="text-lg font-bold text-emerald-400">Profitable ✓</p>;
+                                                const revGap = netBurn;
+                                                // Assume 10% MoM growth to close gap
+                                                const growthRate = 0.10;
+                                                let months = 0;
+                                                let rev = values.monthlyRevenue;
+                                                const totalExpenses = result?.totalMonthlyBurn || values.monthlyRevenue + netBurn;
+                                                while (rev < totalExpenses && months < 60) {
+                                                    rev *= (1 + growthRate);
+                                                    months++;
+                                                }
+                                                return (
+                                                    <p className={`text-lg font-bold ${months < 12 ? 'text-emerald-400' : months < 24 ? 'text-amber-400' : 'text-rose-400'}`}>
+                                                        {months >= 60 ? '60+' : months}
+                                                        <span className="text-xs text-slate-500 ml-1">months</span>
+                                                    </p>
+                                                );
+                                            })()}
+                                        </div>
                                     </div>
                                 </div>
 
