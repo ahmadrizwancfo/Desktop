@@ -75,6 +75,7 @@ model Organization {
   chatThreads       ChatThread[]
   startupProfiles   StartupProfile[]
   AiUsage           AiUsage[]
+  financialSnapshots FinancialSnapshot[]
 }
 
 model AuditLog {
@@ -516,7 +517,71 @@ enum DecisionStatus {
   RESOLVED
 }
 
-// ─── NEW: Budget vs Actuals ───────────────────────────────────────────────────
+// ─── Financial Snapshots (point-in-time state) ────────────────────────────────
+
+model FinancialSnapshot {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  snapshotDate   DateTime     @default(now())
+  revenue        Decimal      @db.Decimal(20, 2)
+  expenses       Decimal      @db.Decimal(20, 2)
+  cashBalance    Decimal      @db.Decimal(20, 2)
+  burn           Decimal      @db.Decimal(20, 2)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, snapshotDate])
+  @@index([userId])
+}
+
+// ─── Weekly Briefs (persisted) ────────────────────────────────────────────────
+
+model WeeklyBrief {
+  id                String   @id @default(uuid())
+  userId            String
+  organizationId    String
+  weekStart         DateTime
+  summaryText       String   @db.Text
+  topRisk           String
+  topRecommendation String
+  metricsJson       Json     // runway, burn, cash, burnTrend
+  createdAt         DateTime @default(now())
+
+  @@index([userId, weekStart])
+  @@index([organizationId])
+}
+
+// ─── Alerts (linked to decisions) ─────────────────────────────────────────────
+
+enum AlertChannel {
+  IN_APP
+  EMAIL
+  WHATSAPP
+  SLACK
+}
+
+enum AlertStatus {
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Alert {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  decisionId     String?
+  alertType      String       // e.g. "CFO_ALERT_RUNWAY_RISK"
+  channel        AlertChannel @default(IN_APP)
+  status         AlertStatus  @default(SENT)
+  sentAt         DateTime     @default(now())
+
+  @@index([userId, alertType, sentAt])
+  @@index([decisionId])
+  @@index([organizationId])
+}
 
 model Budget {
   id             String       @id @default(uuid())

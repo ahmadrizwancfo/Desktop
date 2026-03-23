@@ -37,7 +37,7 @@ export class WeeklyBriefController {
 
     /**
      * POST /weekly-brief/send
-     * Sends the brief immediately to the founder.
+     * Sends the brief immediately to the founder AND persists it.
      */
     @Post('send')
     async sendNow(@GetUser() user: any) {
@@ -47,12 +47,45 @@ export class WeeklyBriefController {
         }
 
         try {
+            // Send notification
             await this.notificationsService.sendFounderBrief(organizationId, user.id);
-            return { success: true, message: 'Founder Brief sent!' };
+
+            // Persist to DB for history
+            const briefData = await this.buildBriefData(organizationId, user.id);
+            const weekStart = new Date();
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
+            weekStart.setHours(0, 0, 0, 0);
+
+            await this.prisma.weeklyBrief.create({
+                data: {
+                    userId: user.id,
+                    organizationId,
+                    weekStart,
+                    summaryText: `Runway: ${briefData.metrics.runway} months | Burn: ₹${briefData.metrics.monthlyBurn} | Cash: ₹${briefData.metrics.cashInBank}`,
+                    topRisk: briefData.biggestRisk?.type || 'No critical risks',
+                    topRecommendation: briefData.recommendation,
+                    metricsJson: briefData.metrics,
+                },
+            });
+
+            return { success: true, message: 'Founder Brief sent and saved!' };
         } catch (error) {
             this.logger.error(`Failed to send brief: ${error.message}`);
             return { success: false, error: error.message };
         }
+    }
+
+    /**
+     * GET /weekly-brief/history
+     * Returns past weekly briefs.
+     */
+    @Get('history')
+    async getHistory(@GetUser() user: any) {
+        return this.prisma.weeklyBrief.findMany({
+            where: { userId: user.id },
+            orderBy: { weekStart: 'desc' },
+            take: 12,
+        });
     }
 
     /**

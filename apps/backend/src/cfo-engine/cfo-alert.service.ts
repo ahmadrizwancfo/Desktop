@@ -77,6 +77,26 @@ export class CfoAlertService {
                 channels: ['IN_APP', 'EMAIL'],
             });
 
+            // Persist to Alert table for audit trail
+            const user = await this.prisma.user.findUnique({
+                where: { id: userId },
+                select: { organizationId: true },
+            });
+            if (user?.organizationId) {
+                await this.prisma.alert.create({
+                    data: {
+                        userId,
+                        organizationId: user.organizationId,
+                        decisionId: decision.id,
+                        alertType: notificationType,
+                        channel: 'IN_APP',
+                        status: 'SENT',
+                    },
+                }).catch((err: any) =>
+                    this.logger.warn(`Alert persist failed: ${err.message}`),
+                );
+            }
+
             this.logger.log(`Alert sent: ${notificationType} → user ${userId} (${decision.severity})`);
         }
     }
