@@ -75,26 +75,30 @@ export class CfoEngineService {
             country: profile.country,
         };
 
-        // Run all 6 domain engines, collect non-null results
-        const results: DecisionResult[] = [
+        // Run all 6 domain engines
+        // Growth engine is async (queries FinancialSnapshot time-series)
+        const syncResults: (DecisionResult | null)[] = [
             this.runSurvival(snap),
             this.runEfficiency(snap),
-            this.runGrowth(snap),
             this.runHiring(snap),
             this.runFundraising(snap),
             this.runCompliance(snap),
-        ].filter(Boolean) as DecisionResult[];
+        ];
+        const growthResult = await this.runGrowth(snap);
+        syncResults.push(growthResult);
 
-        // Persist to DB
+        const results = syncResults.filter(Boolean) as DecisionResult[];
+
+        // Upsert to DB (update existing OPEN decisions, don't duplicate)
         const saved = await Promise.all(
-            results.map((r) => this.saveDecision(profileId, r)),
+            results.map((r) => this.upsertDecision(profileId, r)),
         );
 
         this.logger.log(
-            `CFO engine: ${saved.length} decisions saved for profile ${profileId}`,
+            `CFO engine: ${saved.length} decisions upserted for profile ${profileId}`,
         );
 
-        // Fire HIGH/CRITICAL alerts (non-blocking, 24h dedup)
+        // Fire HIGH/CRITICAL alerts (non-blocking, 24h dedup + escalation)
         if (userId) {
             this.alertService.checkAndAlert(saved, userId).catch((err) =>
                 this.logger.error(`Alert dispatch failed: ${err.message}`),
@@ -246,18 +250,92 @@ export class CfoEngineService {
         };
     }
 
-    // ─── 3. GROWTH — Revenue Slowdown ────────────────────────────────────────
+    // ─── 3. GROWTH — Revenue Trend (Time-Series Powered) ───────────────────────
 
-    private runGrowth(s: StartupSnapshot): DecisionResult | null {
-        // Without historical data, use revenue-to-expense coverage as proxy.
-        // If revenue < 5% of expenses, it's an early-stage slowdown signal.
+    private async runGrowth(s: StartupSnapshot): Promise<DecisionResult | null> {
         if (s.monthlyRevenue <= 0) return null; // pre-revenue skip
 
-        const coverage = s.monthlyRevenue / s.monthlyExpenses;
+        // Query FinancialSnapshot for time-series data
+        const snapshots = await this.prisma.financialSnapshot.findMany({
+            where: { userId: s.userId },
+            orderBy: { snapshotDate: 'desc' },
+            take: 2,
+        });
 
-        // Signal revenue slowdown if coverage is very low relative to burn
-        // This is the best deterministic approximation without time-series data
-        const isSlowSignal = coverage < 0.3; // revenue less than 30% of expenses
+        // If we have 2+ snapshots, use actual month-over-month growth
+        if (snapshots.length >= 2) {
+            const currentRevenue = Number(snapshots[0].revenue);
+            const previousRevenue = Number(snapshots[1].revenue);
+
+            if (previousRevenue > 0) {
+                const growthRate = ((currentRevenue - previousRevenue) / previousRevenue) * 100;
+                const roundedRate = Math.round(growthRate * 10) / 10;
+
+                let trendDirection: 'up' | 'flat' | 'down';
+                let severity: Severity;
+                let confidence = 0.92;
+
+                if (growthRate > 10) {
+                    trendDirection = 'up';
+                    severity = 'LOW';
+                } else if (growthRate >= 0) {
+                    trendDirection = 'flat';
+                    severity = 'MEDIUM';
+                } else if (growthRate > -20) {
+                    trendDirection = 'down';
+                    severity = 'HIGH';
+                } else {
+                    trendDirection = 'down';
+                    severity = 'CRITICAL';
+                    confidence = 0.95;
+                }
+
+                // Healthy growth — no decision needed
+                if (severity === 'LOW') return null;
+
+                const actions: string[] =
+                    severity === 'CRITICAL'
+                        ? [
+                            'Revenue is contracting rapidly — investigate root cause immediately',
+                            'Pause all non-essential spending until revenue stabilizes',
+                            'Review churn data and customer feedback urgently',
+                            'Consider pivoting pricing or product strategy',
+                        ]
+                        : severity === 'HIGH'
+                            ? [
+                                'Revenue is declining — identify which channels or products are underperforming',
+                                'Review pricing strategy and consider targeted promotions',
+                                'Increase outbound sales effort to offset decline',
+                                'Cut non-performing marketing spend',
+                            ]
+                            : [
+                                'Revenue growth is flat — explore new acquisition channels',
+                                'Evaluate upsell opportunities with existing customers',
+                                'Consider launching a referral or partnership program',
+                            ];
+
+                return {
+                    domain: 'GROWTH',
+                    decisionType: 'REVENUE_SLOWDOWN',
+                    severity,
+                    confidence,
+                    facts: {
+                        growth_rate: roundedRate,
+                        trend_direction: trendDirection,
+                        current_revenue: currentRevenue,
+                        previous_revenue: previousRevenue,
+                        monthly_expenses: s.monthlyExpenses,
+                        stage: s.stage,
+                        data_source: 'time_series',
+                    },
+                    recommendedActions: actions,
+                };
+            }
+        }
+
+        // FALLBACK: No time-series data — use ratio-based approximation
+        const coverage = s.monthlyRevenue / s.monthlyExpenses;
+        const isSlowSignal = coverage < 0.3;
         if (!isSlowSignal && s.stage !== 'GROWTH' && s.stage !== 'SME') return null;
 
         const severity: Severity = coverage < 0.1 ? 'HIGH' : 'MEDIUM';
@@ -272,7 +350,7 @@ export class CfoEngineService {
                 monthly_expenses: s.monthlyExpenses,
                 revenue_coverage_ratio: Math.round(coverage * 100) / 100,
                 stage: s.stage,
-                signal: 'Revenue is significantly below expense base',
+                data_source: 'ratio_fallback',
             },
             recommendedActions: [
                 'Review pricing strategy — could you charge more?',
@@ -389,9 +467,38 @@ export class CfoEngineService {
         };
     }
 
-    // ─── Private: Save Decision ───────────────────────────────────────────────
+    // ─── Private: Upsert Decision (Step 4 — dedup, never duplicate) ────────────
 
-    private async saveDecision(profileId: string, r: DecisionResult) {
+    private async upsertDecision(profileId: string, r: DecisionResult) {
+        // Look for an existing OPEN or ACKNOWLEDGED decision of the same type
+        const existing = await this.prisma.cfoDecision.findFirst({
+            where: {
+                startupProfileId: profileId,
+                decisionType: r.decisionType,
+                status: { in: ['OPEN', 'ACKNOWLEDGED'] },
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (existing) {
+            // Update existing decision with fresh data
+            this.logger.debug(
+                `Updating existing ${r.decisionType} decision (${existing.id}): ${existing.severity} → ${r.severity}`,
+            );
+            return this.prisma.cfoDecision.update({
+                where: { id: existing.id },
+                data: {
+                    severity: r.severity,
+                    confidence: r.confidence,
+                    facts: r.facts,
+                    recommendedActions: r.recommendedActions,
+                    // Keep status as-is (don't reset ACKNOWLEDGED → OPEN)
+                    // updatedAt auto-updates via Prisma
+                },
+            });
+        }
+
+        // No existing → create new decision
         return this.prisma.cfoDecision.create({
             data: {
                 startupProfileId: profileId,

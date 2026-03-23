@@ -117,14 +117,19 @@ export class WeeklyBriefController {
             orderBy: { createdAt: 'desc' },
         });
 
-        // Get latest CFO decisions
+        // Get latest CFO decisions — sorted by severity for reliable ranking
+        const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
         let decisions: any[] = [];
         try {
             decisions = await this.prisma.cfoDecision.findMany({
                 where: { startupProfile: { userId } },
                 orderBy: { createdAt: 'desc' },
-                take: 6,
+                take: 10,
             });
+            // Sort by severity (CRITICAL first)
+            decisions.sort((a: any, b: any) =>
+                SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity),
+            );
         } catch {
             // Table might not exist yet
         }
@@ -175,26 +180,57 @@ export class WeeklyBriefController {
         const netBurn = monthlyExpenses - monthlyRevenue;
         const runway = netBurn > 0 ? totalCash / netBurn : 999;
 
-        // Find biggest risk from decisions
-        const criticalDecision = decisions.find(
-            (d) => d.severity === 'CRITICAL' || d.severity === 'HIGH',
-        );
-        const biggestRisk = criticalDecision
+        // ── HIGHEST-SEVERITY RISK (sorted above — first item is worst) ────────
+        const topDecision = decisions[0] || null;
+        const biggestRisk = topDecision
             ? {
-                domain: criticalDecision.decisionDomain,
-                type: criticalDecision.decisionType?.replace(/_/g, ' '),
-                summary: this.extractFactSummary(criticalDecision),
+                domain: topDecision.decisionDomain,
+                type: topDecision.decisionType?.replace(/_/g, ' '),
+                severity: topDecision.severity,
+                summary: this.extractFactSummary(topDecision),
             }
-            : { domain: 'NONE', type: 'No critical risks', summary: 'All systems healthy' };
+            : { domain: 'NONE', type: 'No critical risks', severity: 'LOW', summary: 'All systems healthy' };
 
-        // Top recommendation
-        const topRecommendation = criticalDecision?.recommendedActions?.[0]
+        // Top recommendation from highest-severity decision
+        const topRecommendation = topDecision?.recommendedActions?.[0]
             || 'Continue optimizing operations';
+
+        // ── COMPARE VS LAST WEEK ──────────────────────────────────────────────
+        let changeVsLastWeek: any = null;
+        try {
+            const lastBrief = await this.prisma.weeklyBrief.findFirst({
+                where: { userId },
+                orderBy: { weekStart: 'desc' },
+            });
+            if (lastBrief?.metricsJson) {
+                const lastMetrics = lastBrief.metricsJson as any;
+                const runwayDelta = Math.round((runway - (lastMetrics.runway || 0)) * 10) / 10;
+                const burnDelta = monthlyExpenses - (lastMetrics.monthlyBurn || 0);
+                changeVsLastWeek = {
+                    runwayDelta, // positive = improved, negative = worsened
+                    runwayDirection: runwayDelta > 0 ? 'improved' : runwayDelta < 0 ? 'worsened' : 'unchanged',
+                    burnDelta,
+                    burnDirection: burnDelta > 0 ? 'increased' : burnDelta < 0 ? 'decreased' : 'unchanged',
+                    lastTopRisk: lastBrief.topRisk,
+                    riskChanged: lastBrief.topRisk !== biggestRisk.type,
+                };
+            }
+        } catch {
+            // First brief — no comparison available
+        }
+
+        // ── COMPACT 3-LINE SUMMARY ────────────────────────────────────────────
+        const runwayLine = `Runway: ${Math.round(runway * 10) / 10} months${changeVsLastWeek ? ` (${changeVsLastWeek.runwayDirection} by ${Math.abs(changeVsLastWeek.runwayDelta)}mo)` : ''}`;
+        const burnLine = `Burn: ₹${(monthlyExpenses / 100000).toFixed(1)}L/mo${burnTrend !== 0 ? ` (${burnTrend > 0 ? '↑' : '↓'}${Math.abs(Math.round(burnTrend))}% vs last month)` : ''}`;
+        const riskLine = biggestRisk.severity !== 'LOW'
+            ? `⚠️ ${biggestRisk.type} [${biggestRisk.severity}]: ${biggestRisk.summary}`
+            : '✅ No critical risks detected';
 
         return {
             companyName: profile?.companyName || 'Your Startup',
             generatedAt: now.toISOString(),
             weekOf: `${now.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} — ${new Date(now.getTime() + 6 * 86400000).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+            summary: `${runwayLine}\n${burnLine}\n${riskLine}`,
             metrics: {
                 runway: Math.round(runway * 10) / 10,
                 runwayStatus: runway < 6 ? 'CRITICAL' : runway < 12 ? 'WARNING' : 'HEALTHY',
@@ -206,6 +242,7 @@ export class WeeklyBriefController {
             },
             biggestRisk,
             recommendation: topRecommendation,
+            changeVsLastWeek,
             decisionsCount: decisions.length,
             decisions: decisions.slice(0, 3).map((d) => ({
                 domain: d.decisionDomain,
@@ -221,6 +258,7 @@ export class WeeklyBriefController {
 
         if (f.runway_months) return `Runway at ${f.runway_months} months`;
         if (f.burn_ratio) return `Burn ratio ${f.burn_ratio}x revenue`;
+        if (f.growth_rate !== undefined) return `Revenue ${f.trend_direction === 'down' ? 'declined' : 'grew'} ${Math.abs(f.growth_rate)}%`;
         if (f.revenue_coverage_ratio)
             return `Revenue covers ${Math.round(f.revenue_coverage_ratio * 100)}% of expenses`;
         if (f.post_hire_runway_months)
@@ -229,3 +267,4 @@ export class WeeklyBriefController {
         return decision.decisionType?.replace(/_/g, ' ') || 'Review recommended';
     }
 }
+

@@ -569,14 +569,18 @@ enum AlertStatus {
 }
 
 model Alert {
-  id             String       @id @default(uuid())
-  userId         String
-  organizationId String
-  decisionId     String?
-  alertType      String       // e.g. "CFO_ALERT_RUNWAY_RISK"
-  channel        AlertChannel @default(IN_APP)
-  status         AlertStatus  @default(SENT)
-  sentAt         DateTime     @default(now())
+  id               String       @id @default(uuid())
+  userId           String
+  organizationId   String
+  decisionId       String?
+  alertType        String       // e.g. "CFO_ALERT_RUNWAY_RISK"
+  channel          AlertChannel @default(IN_APP)
+  status           AlertStatus  @default(SENT)
+  severity         String?      // current severity when alert was sent
+  previousSeverity String?      // severity from last alert (for escalation detection)
+  firstDetectedAt  DateTime     @default(now()) // when this alert type was first raised
+  lastSentAt       DateTime     @default(now()) // last time this alert was sent
+  sentAt           DateTime     @default(now())
 
   @@index([userId, alertType, sentAt])
   @@index([decisionId])
