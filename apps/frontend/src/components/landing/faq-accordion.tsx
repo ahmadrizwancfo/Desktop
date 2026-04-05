@@ -25,6 +25,10 @@ export function FAQAccordion() {
         {
             question: "Can I cancel anytime?",
             answer: "Yes, there are no long-term contracts for the monthly plan. You can export all your data before cancelling."
+        },
+        {
+            question: "Can this replace a CFO?",
+            answer: "Not entirely — but it gives you 80% of a CFO’s insights instantly, at a fraction of the cost."
         }
     ];
 
@@ -73,16 +77,16 @@ export function FAQAccordion() {
                 ))}
             </div>
 
-            {/* Footer CTA */}
-            <div className="mt-20 p-12 rounded-3xl bg-gradient-to-br from-primary via-indigo-600 to-purple-700 text-center shadow-2xl shadow-primary/20 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
-                <h2 className="text-3xl md:text-4xl font-black text-white mb-6 relative z-10">Ready to automate your finance?</h2>
-                <p className="text-white/80 mb-8 max-w-xl mx-auto relative z-10">Join 500+ founders who sleep better at night knowing their finances are sorted.</p>
+            {/* Final Conversion CTA */}
+            <div className="mt-24 p-12 rounded-[3rem] bg-gradient-to-br from-indigo-600 via-primary to-violet-700 text-center shadow-2xl shadow-primary/30 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity blur-3xl" />
+                <h2 className="text-3xl md:text-5xl font-black text-white mb-6 editorial tracking-tight relative z-10">Know your runway <br /> before it’s too late</h2>
+                <p className="text-white/70 mb-10 max-w-xl mx-auto relative z-10 font-light text-lg">Join founders who don’t guess their finances.</p>
                 <Link
                     href="/register"
-                    className="inline-flex py-4 px-8 rounded-xl bg-white text-primary font-bold shadow-xl hover:scale-105 transition-transform relative z-10"
+                    className="inline-flex py-5 px-12 rounded-2xl bg-white text-primary font-black shadow-2xl hover:scale-[1.05] hover:shadow-white/20 transition-all duration-300 relative z-10 text-lg uppercase tracking-wider"
                 >
-                    Get Started For Free
+                    See My Runway
                 </Link>
             </div>
         </section>

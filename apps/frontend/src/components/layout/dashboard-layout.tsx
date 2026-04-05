@@ -4,18 +4,21 @@ import React from 'react';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { KeyboardShortcuts } from '../ui/keyboard-shortcuts';
+import { PageTransition } from './page-transition';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="min-h-screen bg-background text-foreground flex">
+        <div className="min-h-screen bg-[#020617] text-foreground flex overflow-hidden">
             {/* Sidebar - Desktop */}
             <Sidebar />
 
             {/* Main Content */}
-            <main className="flex-1 ml-64 flex flex-col">
+            <main className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
                 <Header />
-                <div className="p-8 pb-16 overflow-y-auto h-[calc(100vh-64px)]">
-                    {children}
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 p-10">
+                    <PageTransition>
+                        {children}
+                    </PageTransition>
                 </div>
             </main>
 

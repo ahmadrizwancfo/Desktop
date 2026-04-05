@@ -2,16 +2,27 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Bell, Search, Keyboard, ChevronDown, Users, Briefcase, Building2 } from 'lucide-react';
+import { Bell, Search, Keyboard, ChevronDown, Users, Briefcase, Building2, Clock, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useRoleViewStore, roleConfig, UserRole } from '@/store/role-view-store';
-import { cn } from '@/lib/utils';
+import { cn, timeAgo, isStale } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { financialService } from '@/services/financial-service';
 
 export function Header() {
     const user = useAuthStore((state) => state.user);
     const { currentRole, setRole } = useRoleViewStore();
     const [showRoleMenu, setShowRoleMenu] = useState(false);
+
+    const { data: stats } = useQuery({
+        queryKey: ['financial-stats', user?.organizationId],
+        queryFn: () => financialService.getStats(user?.organizationId || ''),
+        enabled: !!user?.organizationId,
+    });
+
+    const lastUpdatedAt = stats?.lastUpdatedAt;
+    const stale = isStale(lastUpdatedAt);
 
     const roles: { id: UserRole; icon: any }[] = [
         { id: 'founder', icon: Users },
@@ -22,23 +33,44 @@ export function Header() {
     const currentRoleConfig = roleConfig[currentRole];
 
     return (
-        <header className="h-16 border-b border-white/5 bg-background/50 backdrop-blur-md sticky top-0 z-40 px-8 flex items-center justify-between">
-            <div className="flex items-center gap-4 w-96">
-                <div className="relative w-full group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+        <header className="h-20 border-b border-white/5 bg-background/30 backdrop-blur-xl sticky top-0 z-40 px-10 flex items-center justify-between group/header transition-all duration-500 hover:bg-background/40">
+            {/* Subtle Header Bottom Glow */}
+            <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover/header:opacity-100 transition-opacity duration-700" />
+            <div className="flex items-center gap-6 w-[450px]">
+                <div className="relative w-full group/search">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within/search:text-primary transition-colors duration-300" />
                     <input
                         type="text"
-                        placeholder="Search transactions, invoices..."
-                        className="w-full bg-slate-400/10 border-transparent focus:bg-white/5 focus:ring-1 focus:ring-primary/50 focus:border-primary/50 rounded-full py-1.5 pl-10 pr-4 text-sm transition-all outline-none text-white"
+                        placeholder="Search Intelligence Command..."
+                        className="w-full bg-white/[0.03] border border-white/5 focus:bg-white/[0.05] focus:ring-1 focus:ring-primary/20 focus:border-primary/20 rounded-2xl py-2.5 pl-12 pr-4 text-[13px] transition-all duration-300 outline-none text-white placeholder:text-slate-600 shadow-inner"
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-white/5 px-1.5 py-0.5 rounded border border-white/10">
-                        <Keyboard className="w-3 h-3 text-slate-500" />
-                        <span className="text-[10px] text-slate-500 font-bold tracking-tighter">CMD+K</span>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg border border-white/10 opacity-40 group-focus-within/search:opacity-100 transition-opacity">
+                        <Keyboard className="w-3 h-3 text-slate-400" />
+                        <span className="text-[9px] text-slate-400 font-black tracking-widest">⌘ K</span>
                     </div>
                 </div>
             </div>
 
             <div className="flex items-center gap-6">
+                {/* Data Freshness Indicator */}
+                {lastUpdatedAt && (
+                    <div className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider transition-all",
+                        stale 
+                            ? "bg-rose-500/10 border-rose-500/30 text-rose-400 group relative cursor-help" 
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    )}>
+                        {stale ? <AlertTriangle className="w-3 h-3 animate-pulse" /> : <Clock className="w-3 h-3" />}
+                        <span className="font-black">Command Sync: {timeAgo(lastUpdatedAt)}</span>
+                        
+                        {stale && (
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 p-2 bg-slate-900 border border-white/10 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 normal-case font-medium text-slate-300">
+                                Warning: Data is more than 24h old. Please sync account.
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Role Selector */}
                 <div className="relative">
                     <button

@@ -29,6 +29,8 @@ import { UnitEconomicsModule } from './unit-economics/unit-economics.module';
 import { StartupProfileModule } from './startup-profile/startup-profile.module';
 import { CfoEngineModule } from './cfo-engine/cfo-engine.module';
 import { AiExplainerModule } from './ai-explainer/ai-explainer.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 @Module({
   imports: [
@@ -76,6 +78,8 @@ import { AiExplainerModule } from './ai-explainer/ai-explainer.module';
     StartupProfileModule,
     CfoEngineModule,
     AiExplainerModule,
+    IntegrationsModule,
+    ContactsModule,
   ],
   controllers: [AppController],
   providers: [

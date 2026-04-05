@@ -47,6 +47,8 @@ model User {
   aiUsage        AiUsage[] // FIX: proper relation
   startupProfile StartupProfile?
   chatThreads    ChatThread[]
+  integrationConnections IntegrationConnection[]
+  rawImports     RawImport[]
 }
 
 model Organization {
@@ -76,6 +78,8 @@ model Organization {
   startupProfiles   StartupProfile[]
   AiUsage           AiUsage[]
   financialSnapshots FinancialSnapshot[]
+  integrationConnections IntegrationConnection[]
+  rawImports        RawImport[]
 }
 
 model AuditLog {
@@ -139,6 +143,11 @@ model Transaction {
   invoiceId     String?
   invoice       Invoice?        @relation(fields: [invoiceId], references: [id])
   metadata      Json?
+  
+  // Integration Sync Tracking
+  source        String?         // e.g. "CSV_UPLOAD", "ZOHO", "BANKING_API_SYNC"
+  externalId    String?         // source unique identifier for dedup
+
   // FIX: Soft delete
   deletedAt     DateTime?
   createdAt     DateTime        @default(now())
@@ -147,6 +156,8 @@ model Transaction {
   @@index([bankAccountId, date])
   @@index([bankAccountId, type, date])
   @@index([date])
+  // Deduplication: same external transaction can't be imported twice per account
+  @@unique([bankAccountId, externalId])
 }
 
 model Invoice {
@@ -751,4 +762,34 @@ enum InvoiceStatus {
   PAID
   OVERDUE
   CANCELLED
+}
+
+// ─── Integrations ────────────────────────────────────────────────────────────
+
+model IntegrationConnection {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  provider       String       // e.g., 'CSV_MANUAL', 'ZOHO', 'STRIPE'
+  status         String       // e.g., 'ACTIVE', 'ERROR', 'DISCONNECTED'
+  accessMetadata Json?
+  lastSyncedAt   DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, provider])
+}
+
+model RawImport {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  provider       String
+  sourceType     String       // e.g., 'BANK_STATEMENT', 'REVENUE_CSV'
+  rawPayload     Json
+  status         String
+  importedAt     DateTime     @default(now())
 }

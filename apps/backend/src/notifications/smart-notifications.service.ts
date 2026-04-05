@@ -72,7 +72,7 @@ export class SmartNotificationsService {
     }
 
     /**
-     * Send email notification (mock implementation - integrate with actual email service)
+     * Send email notification via Resend API
      */
     private async sendEmail(payload: NotificationPayload): Promise<void> {
         const user = await this.prisma.user.findUnique({
@@ -85,25 +85,31 @@ export class SmartNotificationsService {
             return;
         }
 
-        const emailConfig: EmailConfig = {
-            to: user.email,
-            subject: payload.title,
-            html: this.generateEmailHtml(payload, user.name || 'User'),
-            text: payload.message,
-        };
+        const apiKey = this.configService.get<string>('RESEND_API_KEY');
+        if (!apiKey || apiKey.startsWith('PASTE') || apiKey.startsWith('YOUR')) {
+            this.logger.log(`📧 Simulation Mode: Email for ${user.email} -> ${payload.title}`);
+            return;
+        }
 
-        // TODO: Integrate with actual email service (e.g., SendGrid, AWS SES, Resend)
-        // For now, we'll log the email
-        this.logger.log(`📧 Email would be sent to ${emailConfig.to}: ${emailConfig.subject}`);
-
-        // Example integration with Resend:
-        // const resend = new Resend(this.configService.get('RESEND_API_KEY'));
-        // await resend.emails.send({
-        //     from: 'FounderCFO <notifications@foundercfo.in>',
-        //     to: emailConfig.to,
-        //     subject: emailConfig.subject,
-        //     html: emailConfig.html,
-        // });
+        try {
+            const html = this.generateEmailHtml(payload, user.name || 'User');
+            // @ts-ignore
+            const axios = require('axios');
+            await axios.post('https://api.resend.com/emails', {
+                from: 'FounderCFO <notifications@foundercfo.in>',
+                to: [user.email],
+                subject: payload.title,
+                html: html,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                }
+            });
+            this.logger.log(`✅ Email sent to ${user.email} via Resend`);
+        } catch (error) {
+            this.logger.error(`❌ Failed to send email to ${user.email}: ${error.response?.data?.message || error.message}`);
+        }
     }
 
     /**

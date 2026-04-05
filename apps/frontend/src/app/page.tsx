@@ -4,10 +4,11 @@ import React from 'react';
 import Link from 'next/link';
 import { TrendingUp } from 'lucide-react';
 import { HeroSection } from '@/components/landing/hero-section';
-import { SocialProof } from '@/components/landing/social-proof';
+import { DashboardPreview } from '@/components/landing/dashboard-preview';
+import { HowItWorks } from '@/components/landing/how-it-works';
+import { BackgroundSystem } from '@/components/landing/background-system';
 import { FeatureShowcase } from '@/components/landing/feature-showcase';
 import { ProblemSolution } from '@/components/landing/problem-solution';
-import { Testimonials } from '@/components/landing/testimonials';
 import { PricingTable } from '@/components/landing/pricing-table';
 import { FAQAccordion } from '@/components/landing/faq-accordion';
 
@@ -31,15 +32,42 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      <main className="relative">
-        <HeroSection />
-        <SocialProof />
-        <FeatureShowcase />
-        <ProblemSolution />
-        <Testimonials />
-        <PricingTable />
-        <FAQAccordion />
-      </main>
+      <BackgroundSystem>
+        <main className="relative flex flex-col items-center">
+          <div className="w-full">
+            <HeroSection />
+          </div>
+          
+          <div className="w-full py-16 relative">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+            <DashboardPreview />
+          </div>
+
+          <div className="w-full py-16 relative">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+            <HowItWorks />
+          </div>
+
+          <div className="w-full py-16 relative bg-[#060b1e]/30">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+            <ProblemSolution />
+          </div>
+
+          <div className="w-full py-16 relative">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-indigo-500/10 to-transparent" />
+            <FeatureShowcase />
+          </div>
+
+          <div className="w-full py-16 relative bg-[#0f172a]/50">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+            <PricingTable />
+          </div>
+
+          <div className="w-full py-16 mb-20">
+            <FAQAccordion />
+          </div>
+        </main>
+      </BackgroundSystem>
 
       {/* Footer */}
       <footer className="border-t border-white/5 py-12 px-6 sm:px-10 bg-[#0f172a]">

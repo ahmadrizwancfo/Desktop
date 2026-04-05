@@ -96,10 +96,10 @@ const DECISION_LABELS: Record<DecisionType, string> = {
 };
 
 const SEVERITY_CARD: Record<Severity, string> = {
-    CRITICAL: 'border-rose-500/40 bg-rose-950/20',
-    HIGH: 'border-amber-500/40 bg-amber-950/20',
-    MEDIUM: 'border-sky-500/30  bg-sky-950/10',
-    LOW: 'border-white/10    bg-white/5',
+    CRITICAL: 'border-rose-500/30 bg-rose-500/[0.02] shadow-[0_0_40px_-15px_rgba(244,63,94,0.1)]',
+    HIGH: 'border-amber-500/30 bg-amber-500/[0.02]',
+    MEDIUM: 'border-sky-500/20  bg-sky-500/[0.01]',
+    LOW: 'border-white/5 bg-white/[0.01]',
 };
 
 const SEVERITY_BADGE: Record<Severity, string> = {
@@ -120,23 +120,22 @@ const STATUS_STYLES: Record<Status, string> = {
 
 function DecisionSkeleton() {
     return (
-        <div className="space-y-3">
+        <div className="space-y-4">
             {[0, 1, 2].map((i) => (
                 <div
                     key={i}
-                    className="rounded-2xl p-5 border border-white/10 bg-white/5 animate-pulse"
+                    className="rounded-3xl p-6 border border-white/5 glass-premium animate-pulse"
                     style={{ opacity: 1 - i * 0.25 }}
                 >
                     <div className="flex gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-white/10 flex-shrink-0" />
-                        <div className="flex-1 space-y-2">
+                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex-shrink-0" />
+                        <div className="flex-1 space-y-3">
                             <div className="flex gap-2">
-                                <div className="h-4 w-16 rounded-full bg-white/10" />
-                                <div className="h-4 w-12 rounded-full bg-white/10" />
+                                <div className="h-4 w-16 rounded-full bg-white/5" />
+                                <div className="h-4 w-12 rounded-full bg-white/5" />
                             </div>
-                            <div className="h-3 w-32 rounded bg-white/10" />
-                            <div className="h-3 w-full rounded bg-white/10" />
-                            <div className="h-3 w-3/4 rounded bg-white/10" />
+                            <div className="h-4 w-48 rounded-lg bg-white/5" />
+                            <div className="h-3 w-full rounded bg-white/5" />
                         </div>
                     </div>
                 </div>
@@ -279,32 +278,56 @@ const DecisionCard = memo(function DecisionCard({
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, x: -80 }}
-            transition={{ delay: index * 0.07, type: 'spring', stiffness: 300, damping: 30 }}
-            className={cn('rounded-2xl p-5 border relative overflow-hidden', SEVERITY_CARD[decision.severity])}
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
+            transition={{ 
+                delay: index * 0.05, 
+                type: 'spring', 
+                stiffness: 200, 
+                damping: 25 
+            }}
+            className={cn(
+                'rounded-3xl p-6 border transition-all duration-500 glass-premium group/card relative', 
+                SEVERITY_CARD[decision.severity],
+                expanded && 'ring-1 ring-primary/20 bg-primary/[0.01]'
+            )}
             role="article"
             aria-label={`${decisionLabel} — ${decision.severity} severity`}
         >
-            {/* Critical pulse glow */}
+            {/* Ambient Shadow on expansion */}
+            {expanded && (
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent pointer-events-none" />
+            )}
+            {/* Severity-based accent glow */}
             {decision.severity === 'CRITICAL' && (
-                <div className="absolute top-0 right-0 w-28 h-28 bg-rose-500/15 rounded-full blur-2xl pointer-events-none" />
+                <motion.div 
+                    animate={{ opacity: [0.05, 0.15, 0.05] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute top-0 right-0 w-40 h-40 bg-rose-500 blur-[80px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none z-0" 
+                />
+            )}
+            {decision.severity === 'HIGH' && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none z-0" />
             )}
 
             <div className="relative flex items-start gap-4">
-                {/* Domain icon */}
-                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', domain?.bg ?? 'bg-white/5')}>
-                    <DomainIcon className={cn('w-5 h-5', domain?.color ?? 'text-slate-400')} aria-hidden />
+                {/* Domain icon panel */}
+                <div className={cn(
+                    'w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border shadow-inner transition-transform group-hover/card:scale-110 duration-500', 
+                    domain?.bg ?? 'bg-white/5',
+                    'border-white/5'
+                )}>
+                    <DomainIcon className={cn('w-6 h-6', domain?.color ?? 'text-slate-400')} aria-hidden />
                 </div>
 
                 <div className="flex-1 min-w-0">
                     {/* Header row */}
                     <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider', domain?.bg, domain?.color)}>
+                        <span className={cn('px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border', domain?.bg, domain?.color, 'border-white/5')}>
                             {domain?.label}
                         </span>
-                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider', SEVERITY_BADGE[decision.severity])}>
+                        <span className={cn('px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border', SEVERITY_BADGE[decision.severity], 'border-white/5')}>
                             {decision.severity}
                         </span>
                         {/* FIX: Confidence bar instead of just text */}
@@ -315,16 +338,16 @@ const DecisionCard = memo(function DecisionCard({
                     </div>
 
                     {/* Decision title */}
-                    <h3 className="font-bold text-white text-sm leading-tight mb-1">{decisionLabel}</h3>
+                    <h3 className="font-bold text-white text-base leading-tight mb-2 text-editorial tracking-tight">{decisionLabel}</h3>
 
                     {/* Explanation or prompt */}
                     {explanation ? (
-                        <p className={cn('text-xs text-slate-400 mb-3', !expanded && 'line-clamp-2')}>
+                        <p className={cn('text-sm text-slate-400 mb-4 leading-relaxed font-light', !expanded && 'line-clamp-2')}>
                             {explanation}
                         </p>
                     ) : (
-                        <p className="text-xs text-slate-500 mb-3 italic">
-                            Expand to load AI explanation
+                        <p className="text-[10px] text-slate-500 mb-4 italic font-medium uppercase tracking-widest">
+                            Expand for CFO Intelligence Insight
                         </p>
                     )}
 
@@ -341,15 +364,15 @@ const DecisionCard = memo(function DecisionCard({
                             >
                                 {/* Key numbers */}
                                 {factEntries.length > 0 && (
-                                    <div className="mb-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Key Numbers</p>
-                                        <div className="grid grid-cols-2 gap-y-1.5 gap-x-4">
+                                    <div className="mb-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 shadow-inner">
+                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Supporting Data</p>
+                                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-3 gap-x-6">
                                             {factEntries.map(([key, val]) => (
-                                                <div key={key} className="flex items-center justify-between gap-2">
-                                                    <span className="text-[10px] text-slate-500 truncate capitalize">
+                                                <div key={key} className="flex flex-col gap-0.5">
+                                                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold truncate">
                                                         {key.replace(/_/g, ' ')}
                                                     </span>
-                                                    <span className="text-[10px] font-bold text-white tabular-nums">
+                                                    <span className="text-sm font-black text-white tabular-nums tracking-tight">
                                                         {formatFactValue(key, val as string | number | boolean)}
                                                     </span>
                                                 </div>

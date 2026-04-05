@@ -32,6 +32,7 @@ import {
     FileText,
     CheckCircle2,
     Clock,
+    AlertTriangle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,7 +43,7 @@ import { apiClient } from '@/lib/api-client';
 import { seedDemoData } from '@/lib/demo-data';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { cn, isStale } from '@/lib/utils';
 
 // ── Strategic Questions (driven by profile) ────────────────────────────────────
 
@@ -144,18 +145,14 @@ export default function DashboardPage() {
         setIsDemoLoading(true);
         const result = await seedDemoData(apiClient);
         if (result.success) {
-            // Refresh everything
+            // Refresh everything seamlessly
             queryClient.invalidateQueries({ queryKey: ['financial-stats'] });
-            // Refetch profile
-            try {
-                const res = await apiClient.get('/startup-profile/me');
-                setProfile(res.data);
-            } catch { /* profile was just created, will load */ }
-            // Slight delay so engine generates decisions
+            
+            // Redirect to the CFO decision feed natively without a hard page reload
             setTimeout(() => {
                 setIsDemoLoading(false);
-                window.location.reload(); // Full reload to pick up all new data
-            }, 2000);
+                router.push('/ai-cfo');
+            }, 1000); // Small psychological delay to show success
         } else {
             setIsDemoLoading(false);
             alert(`Demo setup failed: ${result.error}`);
@@ -169,8 +166,8 @@ export default function DashboardPage() {
     if (!stats || stats.hasData === false) {
         return (
             <DashboardLayout>
-                <div className="flex flex-col gap-8 max-w-4xl mx-auto mt-8">
-                    {/* Header */}
+                <div className="flex flex-col gap-8 max-w-4xl mx-auto mt-8 px-4">
+                    {/* Header — Founder Pain */}
                     <div className="text-center">
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0 }}
@@ -181,22 +178,93 @@ export default function DashboardPage() {
                                 <BrainCircuit className="w-8 h-8 text-white" />
                             </div>
                         </motion.div>
-                        <h2 className="text-3xl font-bold text-white tracking-tight">
-                            Start Your CFO Dashboard
+                        <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+                            See Your Runway in 30 Seconds
                         </h2>
-                        <p className="text-slate-400 mt-2 max-w-lg mx-auto">
-                            Choose how to get started. Your AI CFO will analyze your data and generate
-                            strategic decisions within seconds.
+                        <p className="text-slate-400 mt-3 max-w-lg mx-auto text-lg">
+                            Upload your data. Your AI CFO will analyze your business instantly.
                         </p>
                     </div>
 
-                    {/* 3-Option Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        {/* Option 1: Upload Financial Files */}
+                    {/* ══════════════════════════════════════════════════════════════ */}
+                    {/* HERO: Try Demo — Zero Friction Entry */}
+                    {/* ══════════════════════════════════════════════════════════════ */}
+                    <motion.div
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.1 }}
+                        onClick={!isDemoLoading ? handleDemoSeed : undefined}
+                        className={cn(
+                            "rounded-3xl p-8 border-2 cursor-pointer transition-all duration-300 group relative overflow-hidden",
+                            isDemoLoading
+                                ? "border-emerald-500/40 bg-emerald-500/10"
+                                : "border-emerald-500/30 bg-gradient-to-br from-emerald-500/[0.08] to-transparent hover:border-emerald-400/50 hover:shadow-[0_0_60px_-12px_rgba(16,185,129,0.25)]"
+                        )}
+                    >
+                        {/* Glow Effects */}
+                        <div className="absolute -top-20 -right-20 w-60 h-60 bg-emerald-500/15 blur-[80px] rounded-full pointer-events-none" />
+                        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-500/10 blur-[60px] rounded-full pointer-events-none" />
+
+                        <div className="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
+                            {/* Left: CTA Content */}
+                            <div className="flex-1">
+                                {/* Recommended badge */}
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 mb-4">
+                                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Recommended</span>
+                                </div>
+
+                                <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                    <FlaskConical className="w-7 h-7 text-emerald-400" />
+                                </div>
+
+                                <h3 className="text-2xl font-bold text-white mb-2">Try Demo Data</h3>
+                                <p className="text-slate-400 leading-relaxed mb-5 max-w-md">
+                                    See how FounderCFO works instantly with realistic sample startup data. Zero setup needed.
+                                </p>
+
+                                {isDemoLoading ? (
+                                    <div className="flex items-center gap-3 text-emerald-400 font-bold">
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <span>Setting up your demo startup...</span>
+                                    </div>
+                                ) : (
+                                    <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold transition-all group-hover:shadow-lg group-hover:shadow-emerald-500/20">
+                                        <span>👉 See it in action (30 seconds)</span>
+                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Right: Outcome Preview */}
+                            <div className="md:w-64 shrink-0">
+                                <div className="bg-white/[0.04] backdrop-blur-sm border border-white/10 rounded-2xl p-5 space-y-3.5">
+                                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">What you&apos;ll get</p>
+                                    {[
+                                        { label: 'Runway: 5.2 months', color: 'text-emerald-400' },
+                                        { label: 'Burn analysis', color: 'text-sky-400' },
+                                        { label: 'Hiring risk assessment', color: 'text-amber-400' },
+                                        { label: 'Weekly CFO report', color: 'text-violet-400' },
+                                    ].map((item) => (
+                                        <div key={item.label} className="flex items-center gap-2.5">
+                                            <CheckCircle2 className={`w-4 h-4 ${item.color} shrink-0`} />
+                                            <span className="text-sm text-slate-300 font-medium">{item.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* ══════════════════════════════════════════════════════════════ */}
+                    {/* SECONDARY: Upload + Connect */}
+                    {/* ══════════════════════════════════════════════════════════════ */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {/* Upload Financial Files */}
                         <motion.div
                             initial={{ y: 20, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.1 }}
+                            transition={{ delay: 0.2 }}
                             className={cn(
                                 "glass-card rounded-3xl p-6 border cursor-pointer transition-all duration-300 group relative overflow-hidden",
                                 showUploadPanel
@@ -219,11 +287,11 @@ export default function DashboardPage() {
                             </div>
                         </motion.div>
 
-                        {/* Option 2: Connect Accounting Software */}
+                        {/* Connect Accounting Software */}
                         <motion.div
                             initial={{ y: 20, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.2 }}
+                            transition={{ delay: 0.3 }}
                             className="glass-card rounded-3xl p-6 border border-white/10 relative overflow-hidden opacity-80"
                         >
                             <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
@@ -243,48 +311,6 @@ export default function DashboardPage() {
                                     </div>
                                 ))}
                             </div>
-                        </motion.div>
-
-                        {/* Option 3: Try Demo Data */}
-                        <motion.div
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.3 }}
-                            onClick={!isDemoLoading ? handleDemoSeed : undefined}
-                            className={cn(
-                                "glass-card rounded-3xl p-6 border cursor-pointer transition-all duration-300 group relative overflow-hidden",
-                                isDemoLoading
-                                    ? "border-emerald-500/30 bg-emerald-500/5"
-                                    : "border-white/10 hover:border-emerald-500/30 hover:bg-emerald-500/[0.03]"
-                            )}
-                        >
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
-                            {/* Recommended badge */}
-                            <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30">
-                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                                    <Sparkles className="w-3 h-3" /> Recommended
-                                </span>
-                            </div>
-
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                <FlaskConical className="w-6 h-6 text-emerald-400" />
-                            </div>
-                            <h3 className="text-lg font-bold text-white mb-1">Try Demo Data</h3>
-                            <p className="text-sm text-slate-400 leading-relaxed mb-4">
-                                See how FounderCFO works instantly with sample startup data
-                            </p>
-
-                            {isDemoLoading ? (
-                                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Setting up demo startup...</span>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-                                    <span>Launch Demo</span>
-                                    <ArrowRight className="w-3 h-3" />
-                                </div>
-                            )}
                         </motion.div>
                     </div>
 
@@ -334,42 +360,86 @@ export default function DashboardPage() {
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col gap-8 max-w-7xl mx-auto">
+            <div className="relative flex flex-col gap-10 max-w-7xl mx-auto pb-20">
+                {/* Cinematic Background Elements */}
+                <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full h-[500px] pointer-events-none z-0">
+                    <div className="absolute top-0 left-1/4 w-[400px] h-[400px] bg-primary/5 blur-[120px] rounded-full opacity-50" />
+                    <div className="absolute top-[20%] right-1/4 w-[300px] h-[300px] bg-indigo-500/5 blur-[100px] rounded-full opacity-30" />
+                </div>
+
+                {/* Stale Data Warning */}
+                {isStale(stats.lastUpdatedAt) && (
+                    <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        className="relative z-10 bg-rose-500/5 border border-rose-500/10 rounded-[1.5rem] p-5 flex items-center gap-5 glass-premium group"
+                    >
+                        <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center shrink-0 border border-rose-500/20 shadow-inner">
+                            <AlertTriangle className="w-6 h-6 text-rose-400" />
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="text-sm font-black text-rose-400 uppercase tracking-[0.2em]">Synchronization Required</h4>
+                            <p className="text-xs text-rose-300/60 mt-1 font-medium italic">"Decisions are only as good as the data they're built on." Your data is stale.</p>
+                        </div>
+                        <Link 
+                            href="/integrations" 
+                            className="px-6 py-2.5 bg-rose-500 hover:bg-rose-400 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-rose-500/20"
+                        >
+                            Sync Engine
+                        </Link>
+                    </motion.div>
+                )}
+
                 {/* Welcome Section */}
-                <div className="flex justify-between items-end">
-                    <div>
-                        <h2 className="text-3xl font-bold text-white tracking-tight">Financial Overview</h2>
-                        <p className="text-slate-400 mt-1">Good morning, {user?.name || 'Founder'}. Here is your financial health decision matrix.</p>
+                <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6"
+                >
+                    <div className="space-y-1">
+                        <h2 className="text-4xl font-black text-white tracking-tight text-editorial">
+                            Financial <span className="text-gradient">Intelligence</span>
+                        </h2>
+                        <p className="text-slate-500 text-sm font-medium uppercase tracking-[0.1em]">
+                            Command Center • {user?.name || 'Founder'} • {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        </p>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                         {showInvestor && (
-                            <Link href="/investor-readiness" className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-bold hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-violet-600/20">
-                                <FileText className="w-4 h-4" />
+                            <Link href="/investor-readiness" className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 group/btn">
+                                <FileText className="w-4 h-4 text-violet-400 group-hover/btn:scale-110 transition-transform" />
                                 Investor Report
                             </Link>
                         )}
-                        <Link href="/simulator" className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-indigo-600 transition-all flex items-center gap-2">
-                            <Sliders className="w-4 h-4" />
-                            Scenario Simulator
+                        <Link href="/simulator" className="px-5 py-2.5 rounded-2xl bg-primary text-white text-xs font-bold hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-xl shadow-primary/20 group/btn">
+                            <Sliders className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
+                            Simulation Mode
                         </Link>
-                        <Link href="/ai-cfo" className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-bold hover:bg-white/10 transition-all flex items-center gap-2">
-                            <BrainCircuit className="w-4 h-4 text-primary" />
+                        <Link href="/ai-cfo" className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 text-white text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 group/btn">
+                            <BrainCircuit className="w-4 h-4 text-primary group-hover/btn:scale-110 transition-transform" />
                             Ask AI CFO
                         </Link>
                     </div>
-                </div>
+                </motion.div>
 
                 {/* 1. The Decision Assistant (North Star) */}
-                <CFOSummaryCard
-                    status="WATCH"
-                    runwayMonths={runwayMonths}
-                    monthlyBurn={stats.monthlyBurn || 240000}
-                    safeToHire={false}
-                    message="Burn rate increased by 18% this month, reducing runway by 0.5 months."
-                />
+                <div className="relative z-10">
+                    <CFOSummaryCard
+                        status="WATCH"
+                        runwayMonths={runwayMonths}
+                        monthlyBurn={stats.monthlyBurn || 240000}
+                        safeToHire={false}
+                        message="Burn rate increased by 18% this month, reducing runway by 0.5 months."
+                    />
+                </div>
 
                 {/* 2. Why Drill-Down Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6"
+                >
                     <WhyDrillDown
                         metric="burn"
                         label="Monthly Burn"
@@ -388,13 +458,13 @@ export default function DashboardPage() {
                     />
                     <WhyDrillDown
                         metric="expenses"
-                        label="Expenses"
+                        label="Operations"
                         value={`₹${((Number(stats.monthlyBurn) || 0) / 100000).toFixed(1)}L`}
                         change={0}
                         changePercent={0}
                         isPositive={false}
                     />
-                </div>
+                </motion.div>
 
                 {/* 3. Decision Intelligence Hub */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

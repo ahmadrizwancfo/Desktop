@@ -3,216 +3,232 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, Zap, PlayCircle, BarChart3, PieChart, Users, Settings, Bell, Search, TrendingUp, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { 
+    Zap, 
+    ArrowRight, 
+    PlayCircle, 
+    DollarSign, 
+    TrendingUp, 
+    LineChart, 
+    Calculator,
+    CheckCircle2
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// --- Variants ---
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.15,
+            delayChildren: 0.3,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+        opacity: 1, 
+        y: 0,
+        transition: { duration: 0.8, ease: "easeOut" as any }
+    },
+};
 
 export function HeroSection() {
     return (
-        <section className="relative pt-32 pb-20 px-6 sm:px-10 overflow-hidden min-h-[90vh] flex flex-col justify-center">
-            {/* Background Gradients */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
-                <div className="absolute top-[10%] left-[20%] w-[600px] h-[600px] bg-primary/20 blur-[130px] rounded-full mix-blend-screen animate-pulse" />
-                <div className="absolute bottom-[20%] right-[10%] w-[500px] h-[500px] bg-indigo-500/20 blur-[120px] rounded-full mix-blend-screen animate-pulse" style={{ animationDelay: '3s' }} />
-            </div>
+        <section className="relative min-h-[85vh] flex flex-col items-center justify-center pt-28 pb-12 overflow-hidden">
+            {/* Core Content Container */}
+            <div className="w-full flex flex-col items-center z-20">
+                {/* Mid Layer: Floating AI Chips */}
+                <div className="hidden lg:block absolute inset-0 pointer-events-none z-10 max-w-[1600px] mx-auto">
+                    <FloatingChip icon={DollarSign} text="Runway +2.4 Mo" color="emerald" top="10%" left="12%" delay={0.2} />
+                    <FloatingChip icon={TrendingUp} text="Burn Optimized" color="indigo" top="42%" right="10%" delay={0.3} flicker />
+                    <FloatingChip icon={LineChart} text="Q3 Projection" color="violet" bottom="30%" left="15%" delay={0.4} />
+                    <FloatingChip icon={Calculator} text="Tax Ready" color="teal" top="15%" right="18%" delay={0.5} />
+                </div>
 
-            <div className="max-w-7xl mx-auto text-center relative z-10">
+                {/* Foreground Layer: Content */}
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    className="max-w-7xl mx-auto text-center relative z-20 w-full px-6"
                 >
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-primary mb-8 hover:bg-white/10 transition-colors cursor-default backdrop-blur-md">
+                    <motion.div 
+                        variants={itemVariants}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.02] border border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-6 hover:bg-white/[0.05] transition-colors cursor-default backdrop-blur-md relative overflow-hidden group"
+                    >
                         <Zap className="w-3 h-3 fill-primary" />
-                        <span>AI-Powered Financial Intelligence v2.0</span>
-                    </div>
+                        <span>Trusted by 100+ Early Stage Teams</span>
+                    </motion.div>
 
                     {/* Headline */}
-                    <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 bg-gradient-to-b from-white via-white to-slate-400 bg-clip-text text-transparent leading-[1.1]">
-                        The Financial OS for <br className="hidden md:block" />
-                        <span className="text-primary relative inline-block">
-                            Modern Founders
-                            <svg className="absolute w-full h-3 -bottom-1 left-0 text-primary opacity-50" viewBox="0 0 100 10" preserveAspectRatio="none">
-                                <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="2" fill="none" />
-                            </svg>
+                    <motion.h1 
+                        variants={itemVariants}
+                        className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tighter mb-4 text-editorial leading-[1.0] text-white"
+                    >
+                        Your AI CFO <br className="hidden md:block" />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-400 to-violet-400">
+                            for Runway, Burn & Decisions
                         </span>
-                    </h1>
+                    </motion.h1>
 
-                    {/* Subheadline */}
-                    <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-                        Replace your fragmented finance stack with one intelligent platform.
-                        Automate bookkeeping, tax compliance, and runway forecasting in real-time.
-                    </p>
+                    {/* Subheadline & Supporting Lines */}
+                    <motion.div variants={itemVariants} className="mb-8 relative z-10 w-full max-w-2xl mx-auto flex flex-col gap-3">
+                        <p className="text-lg md:text-xl text-slate-300 leading-relaxed font-medium">
+                            See your runway, control burn, and know exactly what to do next — instantly.
+                        </p>
+                        <p className="text-sm md:text-base text-slate-500 font-medium">
+                            Built on your real financial data — not generic AI answers.
+                        </p>
+                        <p className="text-[11px] md:text-xs text-slate-500/60 italic font-light max-w-lg mx-auto leading-relaxed">
+                            "Most startups don’t fail because of bad ideas — they run out of cash without realizing it."
+                        </p>
+                    </motion.div>
 
                     {/* CTAs */}
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-24">
-                        <Link
-                            href="/register"
-                            className="group px-8 py-4 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 w-full sm:w-auto justify-center overflow-hidden relative"
-                        >
-                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                            <span className="relative">Start Free Trial</span>
-                            <ArrowRight className="w-4 h-4 relative group-hover:translate-x-1 transition-transform" />
-                        </Link>
-                        <Link
-                            href="#demo"
-                            className="px-8 py-4 rounded-xl bg-white/5 border border-white/10 text-white font-semibold hover:bg-white/10 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 w-full sm:w-auto justify-center backdrop-blur-sm"
-                        >
-                            <PlayCircle className="w-4 h-4" />
-                            See How It Works
-                        </Link>
-                    </div>
-
-                    {/* Dashboard Preview (High Fidelity Mockup - Narrative Driven) */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 60, rotateX: 15 }}
-                        whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 1, type: "spring", bounce: 0.2 }}
-                        className="relative mx-auto max-w-6xl"
-                        style={{ perspective: '2000px' }}
-                    >
-                        <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-black/50 bg-[#0f172a] ring-1 ring-white/5 text-left">
-                            {/* Dashboard UI Structure */}
-                            <div className="flex h-[600px]">
-
-                                {/* Sidebar */}
-                                <div className="w-64 border-r border-white/5 bg-slate-900/50 p-4 hidden md:flex flex-col gap-1">
-                                    <div className="flex items-center gap-2 px-2 mb-8">
-                                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                                            <TrendingUp className="text-white w-4 h-4" />
-                                        </div>
-                                        <span className="font-bold tracking-tight text-white">FounderCFO</span>
-                                    </div>
-                                    {[
-                                        { icon: BarChart3, label: "Overview", active: true },
-                                        { icon: PieChart, label: "Cash Flow" },
-                                        { icon: Users, label: "Payroll" },
-                                        { icon: TrendingUp, label: "Forecasts" },
-                                        { icon: Settings, label: "Settings" }
-                                    ].map((item, i) => (
-                                        <div key={i} className={cn(
-                                            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-default",
-                                            item.active ? "bg-primary/10 text-primary" : "text-slate-400 hover:text-white hover:bg-white/5"
-                                        )}>
-                                            <item.icon className="w-4 h-4" />
-                                            {item.label}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Main Content */}
-                                <div className="flex-1 flex flex-col bg-[#0f172a] relative">
-                                    {/* Header */}
-                                    <div className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-slate-900/20 backdrop-blur-sm">
-                                        <div className="text-sm font-medium text-slate-400">Dashboard / Overview</div>
-                                        <div className="flex items-center gap-4">
-                                            <Search className="w-4 h-4 text-slate-500" />
-                                            <Bell className="w-4 h-4 text-slate-500" />
-                                            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-xs font-bold text-white">NS</div>
-                                        </div>
-                                    </div>
-
-                                    {/* Dashboard Content */}
-                                    <div className="p-8 overflow-hidden relative flex flex-col gap-6">
-
-                                        {/* CFO Summary Card Simulation */}
-                                        <motion.div
-                                            initial={{ scale: 0.95, opacity: 0 }}
-                                            whileInView={{ scale: 1, opacity: 1 }}
-                                            transition={{ delay: 0.2 }}
-                                            className="w-full rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6"
-                                        >
-                                            <div className="flex justify-between items-center mb-6">
-                                                <div className="flex items-center gap-3">
-                                                    <h2 className="text-lg font-bold text-white">FounderCFO Summary</h2>
-                                                    <span className="text-xs font-bold bg-white/5 text-slate-400 px-2 py-1 rounded">March 2026</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 text-xs font-bold uppercase tracking-wider">
-                                                    <AlertTriangle className="w-3 h-3" />
-                                                    Watch
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-12 gap-6">
-                                                <div className="col-span-8 pr-4">
-                                                    <div className="text-2xl font-light text-slate-300 leading-relaxed">
-                                                        You are likely to run out of cash in <span className="text-white font-bold">7.2 months</span> if marketing spend continues to rise by 18% MoM.
-                                                    </div>
-                                                    <div className="mt-4 flex gap-3">
-                                                        <div className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20">Analyze Spend</div>
-                                                    </div>
-                                                </div>
-                                                <div className="col-span-4 grid grid-cols-1 gap-3">
-                                                    <div className="p-3 bg-[#0f172a]/50 rounded-xl border border-white/5 flex justify-between items-center">
-                                                        <span className="text-xs text-slate-400 font-bold uppercase">Runway</span>
-                                                        <span className="text-lg font-bold text-white">7.2 Mo</span>
-                                                    </div>
-                                                    <div className="p-3 bg-[#0f172a]/50 rounded-xl border border-white/5 flex justify-between items-center">
-                                                        <span className="text-xs text-slate-400 font-bold uppercase">Funding</span>
-                                                        <span className="text-xs font-bold text-amber-500">Start in 60 days</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-
-                                        {/* Narrative Feed Simulation */}
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div className="space-y-4">
-                                                <div className="text-sm font-bold text-slate-500 uppercase tracking-widest">Recent Narratives</div>
-                                                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex gap-4 items-start">
-                                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                                                        <TrendingUp className="w-4 h-4 text-emerald-500" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between w-full mb-1">
-                                                            <div className="text-sm font-bold text-white">Revenue Projection</div>
-                                                            <div className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 rounded-full">On Track</div>
-                                                        </div>
-                                                        <div className="text-xs text-slate-400 leading-relaxed">
-                                                            Based on current pipeline, you are projected to hit $1.5M ARR by Q3 2026.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex gap-4 items-start opacity-60">
-                                                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
-                                                        <Users className="w-4 h-4 text-indigo-500" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between w-full mb-1">
-                                                            <div className="text-sm font-bold text-white">Payroll Update</div>
-                                                        </div>
-                                                        <div className="text-xs text-slate-400 leading-relaxed">
-                                                            Payroll for March has been processed successfully.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Chart Placeholder */}
-                                            <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4 relative overflow-hidden">
-                                                <div className="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-20" />
-                                                <div className="flex items-end justify-between h-32 gap-2 mt-8">
-                                                    {[40, 60, 45, 70, 55, 80, 65, 85].map((h, i) => (
-                                                        <div key={i} className="w-full bg-primary/20 rounded-t-sm" style={{ height: `${h}%` }} />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                </div>
+                    <div className="flex flex-col items-center justify-center w-full mb-12">
+                        {/* Button Row */}
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full mb-6">
+                            {/* Primary Button */}
+                            <div className="relative group/btn w-full sm:w-auto">
+                                <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-blue-600 rounded-2xl blur-lg opacity-40 group-hover/btn:opacity-70 transition duration-500" />
+                                <Link
+                                    href="/register"
+                                    className="relative flex items-center justify-center gap-3 px-10 h-[60px] rounded-xl bg-gradient-to-b from-violet-600 to-blue-600 text-white font-bold hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 w-full sm:w-auto overflow-hidden group/link"
+                                >
+                                    <span className="text-lg tracking-wide whitespace-nowrap relative z-10">See My Runway Now →</span>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover/link:translate-x-full transition-transform duration-1000" />
+                                </Link>
                             </div>
 
-                            {/* Overlay Reflection */}
-                            <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none" />
+                            {/* Secondary Button */}
+                            <Link
+                                href="#demo"
+                                className="group px-8 h-[60px] rounded-xl bg-[#0f172a]/40 border border-white/10 text-white font-semibold hover:bg-white/[0.06] hover:-translate-y-0.5 transition-all flex items-center gap-2 w-full sm:w-auto justify-center backdrop-blur-md"
+                            >
+                                <PlayCircle className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
+                                See How It Works
+                            </Link>
                         </div>
 
-                        {/* Ambient Glow */}
-                        <div className="absolute -bottom-10 left-10 right-10 h-24 bg-primary/20 blur-[100px]" />
+                        {/* Centered Microcopy */}
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1.2 }}
+                            className="text-[10px] text-slate-500/60 font-bold tracking-[0.15em] uppercase whitespace-nowrap"
+                        >
+                            No setup required • Works with CSV, Zoho, QuickBooks
+                        </motion.div>
+                    </div>
+
+                    {/* Ticks Row (Feature Validation) */}
+                    <motion.div 
+                        variants={itemVariants}
+                        className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 mb-8 opacity-60 hover:opacity-100 transition-opacity duration-500"
+                    >
+                        <FeatureTick text="Runway in real-time" />
+                        <FeatureTick text="Burn & cost insights" />
+                        <FeatureTick text="Hiring & fundraising decisions" />
+                        <FeatureTick text="Weekly CFO reports" />
+                    </motion.div>
+
+                    {/* Positioning & Loop Signal */}
+                    <motion.div variants={itemVariants} className="flex flex-col gap-2 relative z-10">
+                        <p className="text-sm text-slate-400 font-medium">
+                            Built for founders and startups who need a CFO but don’t have one.
+                        </p>
+                        <p className="text-xs text-primary/80 font-semibold tracking-wide uppercase">
+                            Get a weekly AI CFO brief — what changed, what matters, what to do next.
+                        </p>
                     </motion.div>
                 </motion.div>
             </div>
+
+            {/* Continuous System Glow Trail */}
+            <motion.div 
+                animate={{ 
+                    y: [0, 8, 0],
+                    opacity: [0.2, 0.4, 0.2]
+                }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-30"
+            >
+                <div className="w-[1px] h-12 bg-gradient-to-b from-primary/60 to-transparent" />
+            </motion.div>
         </section>
+    );
+}
+
+function FeatureTick({ text }: { text: string }) {
+    return (
+        <div className="flex items-center gap-2 group/tick cursor-default">
+            <div className="flex-shrink-0 w-4 h-4 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover/tick:border-emerald-500/40 transition-colors">
+                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+            </div>
+            <span className="text-[11px] md:text-xs font-medium tracking-tight text-slate-300">{text}</span>
+        </div>
+    );
+}
+
+function FloatingChip({ icon: Icon, text, color, top, left, right, bottom, delay, flicker }: any) {
+    const colorClasses: any = {
+        emerald: "bg-[#060b1e]/60 text-emerald-300 border-emerald-500/20",
+        indigo: "bg-[#060b1e]/60 text-indigo-300 border-indigo-500/20",
+        violet: "bg-[#060b1e]/60 text-violet-300 border-violet-500/20",
+        teal: "bg-[#060b1e]/60 text-teal-300 border-teal-500/20",
+    };
+
+    const dotColorClasses: any = {
+        emerald: "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]",
+        indigo: "bg-indigo-400 shadow-[0_0_12px_rgba(129,140,248,0.9)]",
+        violet: "bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]",
+        teal: "bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.9)]",
+    };
+
+    // Random drift offsets
+    const driftX = Math.sin(delay * 10) * 15;
+    const driftY = Math.cos(delay * 10) * 15;
+    const duration = 8 + (delay * 4);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 15, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.8, delay, ease: "easeOut" }}
+            className="absolute z-20"
+            style={{ top, left, right, bottom }}
+        >
+            <motion.div
+                animate={{ 
+                    x: [-driftX, driftX, -driftX],
+                    y: [-driftY, driftY, -driftY],
+                    opacity: [0.85, 1, 0.85]
+                }}
+                transition={{ duration, repeat: Infinity, ease: "easeInOut" }}
+                className={cn(
+                    "px-4 py-2.5 rounded-2xl border backdrop-blur-xl flex items-center gap-2.5 text-[11px] font-black group cursor-default transition-all duration-300 hover:scale-[1.05] hover:border-white/20 relative overflow-hidden",
+                    colorClasses[color]
+                )}
+            >
+                <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-30 pointer-events-none" />
+                
+                {flicker && (
+                    <motion.div 
+                        animate={{ opacity: [1, 0.4, 1, 0.7, 1] }} 
+                        transition={{ duration: 0.2, repeat: Infinity, repeatDelay: Math.random() * 5 }}
+                        className={cn("w-1.5 h-1.5 rounded-full relative z-10", dotColorClasses[color])} 
+                    />
+                )}
+                {!flicker && <div className={cn("w-1.5 h-1.5 rounded-full relative z-10", dotColorClasses[color])} />}
+                
+                <Icon className={cn("w-3.5 h-3.5 relative z-10 transition-transform duration-300 group-hover:scale-110")} />
+                <span className="uppercase tracking-[0.15em] relative z-10">{text}</span>
+            </motion.div>
+        </motion.div>
     );
 }

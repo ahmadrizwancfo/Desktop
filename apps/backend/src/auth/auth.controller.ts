@@ -54,7 +54,7 @@ export class AuthController {
             }
 
             // Find or create user based on Google profile
-            const dbUser = await this.authService.findOrCreateMockUser({
+            const dbUser = await this.authService.findOrCreateUserByOAuth({
                 email: user.email,
                 name: user.name,
                 googleId: user.googleId,

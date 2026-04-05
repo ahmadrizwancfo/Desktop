@@ -31,4 +31,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   get connected(): boolean {
     return this.isConnected;
   }
+
+  async ping(): Promise<boolean> {
+    try {
+      await this.$queryRaw`SELECT 1`;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 }

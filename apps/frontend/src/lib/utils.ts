@@ -19,3 +19,26 @@ export function formatDate(date: string | Date) {
         year: 'numeric',
     }).format(new Date(date));
 }
+
+export function timeAgo(date: Date | string | null): string {
+    if (!date) return 'Never';
+    const now = new Date();
+    const past = new Date(date);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+}
+
+export function isStale(date: Date | string | null): boolean {
+    if (!date) return true;
+    const now = new Date();
+    const past = new Date(date);
+    const diffMs = now.getTime() - past.getTime();
+    return diffMs > 24 * 60 * 60 * 1000;
+}

@@ -1,10 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 import { SkipThrottle } from '@nestjs/throttler';
+import { PrismaService } from './prisma/prisma.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) { }
+  constructor(
+    private readonly appService: AppService,
+    private readonly prisma: PrismaService,
+  ) { }
 
   @Get()
   @SkipThrottle()
@@ -26,13 +30,14 @@ export class AppController {
 
   @Get('health/ready')
   @SkipThrottle()
-  readinessCheck() {
+  async readinessCheck() {
+    const isDbConnected = await this.prisma.ping();
     return {
-      status: 'ready',
+      status: isDbConnected ? 'ready' : 'error',
       timestamp: new Date().toISOString(),
       services: {
         api: 'healthy',
-        database: 'connected', // TODO: Add actual DB health check
+        database: isDbConnected ? 'connected' : 'disconnected',
       }
     };
   }

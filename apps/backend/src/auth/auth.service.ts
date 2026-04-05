@@ -84,7 +84,11 @@ export class AuthService {
         return this.jwtService.signAsync(payload);
     }
 
-    async findOrCreateMockUser(profile: any) {
+    /**
+     * Finds or creates a user after successful OAuth (Google) authentication.
+     * Ensures every user has an associated Organization for platform functionality.
+     */
+    async findOrCreateUserByOAuth(profile: { email: string; name: string; googleId: string }) {
         let user = await this.prisma.user.findUnique({
             where: { email: profile.email },
         });
@@ -94,20 +98,20 @@ export class AuthService {
                 data: {
                     email: profile.email,
                     name: profile.name,
-                    password: '',
+                    password: '', // OAuth users have no password
                     role: 'FOUNDER',
                     googleId: profile.googleId,
                 },
             });
         }
 
-        // Ensure user has an organization (fix for null organizationId → FK failures in AiUsage)
+        // Ensure user has an organization (critical for almost all platform features)
         if (!user.organizationId) {
             const orgName = user.name ? `${user.name}'s Organization` : 'My Organization';
             const organization = await this.prisma.organization.create({
                 data: {
                     name: orgName,
-                    industry: 'Technology',
+                    industry: 'Not Specified',
                     country: 'IN',
                     currency: 'INR',
                     users: { connect: { id: user.id } },

@@ -72,6 +72,17 @@ export class FinancialMetricsService {
             return { hasData: false, message: 'No financial data found. Sync bank accounts or upload statements.' };
         }
 
+        // Compute lastUpdatedAt across all connected integration sources
+        const connections = await this.prisma.integrationConnection.findMany({
+            where: { organizationId },
+            orderBy: { lastSyncedAt: 'desc' },
+            take: 1
+        });
+        let lastUpdatedAt = hasRealData ? new Date() : latestSnapshot?.uploadedAt;
+        if (connections.length > 0 && connections[0].lastSyncedAt) {
+            lastUpdatedAt = connections[0].lastSyncedAt;
+        }
+
         return {
             hasData: true,
             totalRevenue: effectiveRevenue,
@@ -88,7 +99,8 @@ export class FinancialMetricsService {
                 bankAccounts: bankAccounts.length
             },
             dataSource: hasRealData ? 'Real-time Transactions' : (latestSnapshot?.sourceFile || 'Manual Upload'),
-            lastUpdated: hasRealData ? new Date() : latestSnapshot?.uploadedAt
+            lastUpdated: hasRealData ? new Date() : latestSnapshot?.uploadedAt,
+            lastUpdatedAt: lastUpdatedAt
         };
     }
 

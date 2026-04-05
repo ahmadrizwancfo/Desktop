@@ -35,12 +35,9 @@ export function CreateContactModal({ isOpen, onClose }: CreateContactModalProps)
         address: '',
     });
 
-    const createMutation = useMutation({
         mutationFn: async (data: ContactForm) => {
-            // For now, simulate a successful add since backend endpoint doesn't exist
-            // TODO: Replace with actual API call when backend /contacts endpoint is ready
-            await new Promise(resolve => setTimeout(resolve, 500));
-            return { ...data, id: Date.now().toString() };
+            const res = await apiClient.post('/contacts', data);
+            return res.data;
         },
         onSuccess: () => {
             setShowSuccess(true);

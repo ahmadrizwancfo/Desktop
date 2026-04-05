@@ -84,46 +84,83 @@ export const DEMO_TRANSACTIONS = [
 export async function seedDemoData(api: AxiosInstance): Promise<{ success: boolean; profileId?: string; error?: string }> {
     try {
         // 1. Create org
-        const orgRes = await api.post('/organizations', {
-            name: DEMO_STARTUP_PROFILE.companyName,
-            industry: DEMO_STARTUP_PROFILE.industry,
-            country: DEMO_STARTUP_PROFILE.country,
-        });
-        const orgId = orgRes.data.id;
+        let orgId: string;
+        try {
+            const orgRes = await api.post('/organizations', {
+                name: DEMO_STARTUP_PROFILE.companyName,
+                industry: DEMO_STARTUP_PROFILE.industry,
+                country: DEMO_STARTUP_PROFILE.country,
+            });
+            orgId = orgRes.data.id;
+        } catch (err: any) {
+            console.error('Org creation failed:', err?.response?.data || err);
+            return { success: false, error: 'Org Creation: ' + (err?.response?.data?.message || err.message) };
+        }
 
         // 2. Create startup profile
-        const profileRes = await api.post('/startup-profile', {
-            ...DEMO_STARTUP_PROFILE,
-            organizationId: orgId,
-        });
-
-        // 3. Create a demo bank account
-        const bankRes = await api.post('/bank-accounts', {
-            accountName: 'HDFC Current Account (Demo)',
-            bankName: 'HDFC Bank',
-            accountNumber: 'DEMO-9876543210',
-            accountType: 'CURRENT',
-            currency: 'INR',
-            currentBalance: DEMO_STARTUP_PROFILE.cashInBank,
-            organizationId: orgId,
-        });
-        const bankAccountId = bankRes.data.id;
-
-        // 4. Bulk insert demo transactions
-        for (const txn of DEMO_TRANSACTIONS) {
-            await api.post('/transactions', {
-                ...txn,
-                bankAccountId,
+        let profileId: string;
+        try {
+            const profileRes = await api.post('/startup-profile', {
+                ...DEMO_STARTUP_PROFILE,
                 organizationId: orgId,
             });
+            profileId = profileRes.data.id;
+        } catch (err: any) {
+            console.error('Profile creation failed:', err?.response?.data || err);
+            return { success: false, error: 'Profile Creation: ' + (err?.response?.data?.message || err.message) };
+        }
+
+        // 3. Create a demo bank account
+        let bankAccountId: string;
+        try {
+            const bankRes = await api.post('/bank-accounts', {
+                name: 'HDFC Current Account (Demo)',
+                bankName: 'HDFC Bank',
+                accountNumber: 'DEMO-9876543210',
+                currency: 'INR',
+                balance: DEMO_STARTUP_PROFILE.cashInBank,
+                organizationId: orgId,
+            });
+            bankAccountId = bankRes.data.id;
+        } catch (err: any) {
+            console.error('Bank creation failed:', err?.response?.data || err);
+            return { success: false, error: 'Bank Creation: ' + (err?.response?.data?.message || err.message) };
+        }
+
+        // 4. Bulk insert demo transactions
+        try {
+            // Inject an opening balance equivalent to the stated cash
+            await api.post('/transactions', {
+                amount: DEMO_STARTUP_PROFILE.cashInBank,
+                type: 'INCOME',
+                category: 'Equity',
+                description: 'Initial Seed Capital',
+                date: new Date('2023-01-01').toISOString(),
+                bankAccountId,
+            });
+            await new Promise(res => setTimeout(res, 105));
+
+            for (const txn of DEMO_TRANSACTIONS) {
+                await api.post('/transactions', {
+                    ...txn,
+                    bankAccountId,
+                    date: new Date(txn.date).toISOString(), // Ensure ISO format explicitly
+                });
+                
+                // Anti-throttle delay (backend has strict 10 req/s limit)
+                await new Promise(res => setTimeout(res, 105));
+            }
+        } catch (err: any) {
+            console.error('Transaction creation failed:', err?.response?.data || err);
+            return { success: false, error: 'Transaction Creation: ' + (err?.response?.data?.message || err.message) };
         }
 
         // 5. Trigger CFO Engine to generate decisions
         await api.post('/cfo-engine/run').catch(() => { /* non-blocking */ });
 
-        return { success: true, profileId: profileRes.data.id };
+        return { success: true, profileId };
     } catch (err: any) {
-        console.error('Demo seed failed:', err);
+        console.error('Demo seed failed generally:', err);
         return { success: false, error: err?.response?.data?.message || 'Failed to seed demo data' };
     }
 }

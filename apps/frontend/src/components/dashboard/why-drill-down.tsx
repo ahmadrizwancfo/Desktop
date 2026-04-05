@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, AlertCircle, Lightbulb, BarChart3 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface DrillDownData {
     metric: string;
@@ -114,22 +115,27 @@ export function WhyDrillDown({ metric, label, value, change, changePercent, isPo
     const maxTrendValue = data ? Math.max(...data.trend.map(t => t.value)) : 0;
 
     return (
-        <div className="glass-card rounded-2xl overflow-hidden">
+        <motion.div 
+            whileHover={{ scale: 1.01 }}
+            className="glass-premium rounded-[1.5rem] overflow-hidden transition-all duration-300 group hover:border-white/10"
+        >
             {/* Main Metric Row */}
             <div
-                className="p-5 cursor-pointer hover:bg-white/5 transition-colors"
+                className="p-6 cursor-pointer hover:bg-white/[0.02] transition-colors"
                 onClick={handleExpand}
             >
                 <div className="flex items-center justify-between">
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">{label}</p>
-                        <p className="text-2xl font-black text-white mt-1">{value}</p>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-black">{label}</p>
+                        <p className="text-3xl font-black text-white mt-2 tracking-tight text-editorial">{value}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold ${isChangeGood
-                                ? 'bg-emerald-500/10 text-emerald-400'
-                                : 'bg-rose-500/10 text-rose-400'
-                            }`}>
+                    <div className="flex items-center gap-4">
+                        <div className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black tracking-tight border shadow-inner",
+                            isChangeGood
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                        )}>
                             {change > 0 ? (
                                 <TrendingUp className="w-3 h-3" />
                             ) : (
@@ -137,9 +143,11 @@ export function WhyDrillDown({ metric, label, value, change, changePercent, isPo
                             )}
                             {change > 0 ? '+' : ''}{changePercent}%
                         </div>
-                        <button className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-primary/20 text-primary' : 'bg-white/5 text-slate-400 hover:text-white'
-                            }`}>
-                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        <button className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all border",
+                            isExpanded ? 'bg-primary/20 text-primary border-primary/20' : 'bg-white/5 text-slate-500 border-white/5 hover:text-white hover:border-white/10'
+                        )}>
+                            {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                         </button>
                     </div>
                 </div>
@@ -242,6 +250,6 @@ export function WhyDrillDown({ metric, label, value, change, changePercent, isPo
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     );
 }
