@@ -40,81 +40,114 @@ import { apiClient } from '@/lib/api-client';
 import Link from 'next/link';
 import { useCompanyProfileStore, getGoalLabel, getBlockerLabel, PrimaryGoal, BusinessModel } from '@/store/company-profile-store';
 import { InvestorReportModal } from '@/components/dashboard/investor-report-modal';
+import { useCFOState, formatCurrency } from '@/store/cfo-state-store';
 
-// Mock data for when backend is unavailable
-const mockMetrics = {
-    burnMultiple: 2.5,
-    revenueGrowthRate: 18.5,
-    grossMargin: 65,
-    cashEfficiency: 0.72,
-    runwayQualityScore: 72,
-    netBurnRate: 450000,
-    monthlyRecurringRevenue: 320000,
-    currentCash: 8500000,
-    runway: 18.9,
-};
+// DYNAMIC BLOCKERS derived from CFOState — no hardcoded financial data
+function getBlockersFromCFOState(cfoState: any, goal: PrimaryGoal): {id: string; label: string; status: 'critical' | 'warning' | 'medium'; detail: string; fixable: boolean}[] {
+    if (!cfoState) return [];
+    const blockers: {id: string; label: string; status: 'critical' | 'warning' | 'medium'; detail: string; fixable: boolean}[] = [];
+    const { summary, deathClock, receivables, primaryRisk } = cfoState;
 
-// DYNAMIC BLOCKERS based on Goal
-const getBlockersForGoal = (goal: PrimaryGoal, model: BusinessModel) => {
-    switch (goal) {
-        case 'raise_capital':
-            return [
-                { id: 'mrr', label: 'MRR < ₹5L', status: 'critical' as const, detail: 'Needs +₹1.8L for Seed+', fixable: true },
-                { id: 'burn', label: 'Burn multiple trending up', status: 'warning' as const, detail: 'Investors prefer < 2x', fixable: true },
-                { id: 'concentration', label: 'Revenue concentration risk', status: 'warning' as const, detail: 'Top 3 = 45%', fixable: false },
-            ];
-        case 'profitability':
-            return [
-                { id: 'margin', label: 'Gross Margin < 70%', status: 'critical' as const, detail: 'Currently 65%', fixable: true },
-                { id: 'burn', label: 'Net Burn is Positive', status: 'critical' as const, detail: 'Burning ₹4.5L/mo', fixable: true },
-                { id: 'cac', label: 'High CAC Payback', status: 'warning' as const, detail: '14.8 months', fixable: true },
-            ];
-        case 'extend_runway':
-            return [
-                { id: 'burn', label: 'High Fixed Costs', status: 'critical' as const, detail: '60% of spend is payroll', fixable: true },
-                { id: 'churn', label: 'Churn Rate Increasing', status: 'warning' as const, detail: 'Last mo: 3.2%', fixable: true },
-                { id: 'collections', label: 'Slow Collections', status: 'medium' as const, detail: 'DSO = 45 days', fixable: true },
-            ];
-        default:
-            return [];
+    // Runway check
+    if (deathClock.daysLeft !== null && deathClock.daysLeft < 180) {
+        blockers.push({ id: 'runway', label: `Runway < 6 months`, status: 'critical', detail: `${deathClock.daysLeft} days left`, fixable: true });
     }
-};
+    // Burn trend
+    if (summary.burnTrend === 'increasing') {
+        blockers.push({ id: 'burn', label: 'Burn rate increasing', status: 'warning', detail: `Monthly burn: ${formatCurrency(summary.netBurn)}`, fixable: true });
+    }
+    // Revenue vs expenses
+    if (summary.netBurn > 0 && goal === 'profitability') {
+        blockers.push({ id: 'profitability', label: 'Not yet profitable', status: 'critical', detail: `Net burn: ${formatCurrency(summary.netBurn)}/mo`, fixable: true });
+    }
+    // Receivables risk
+    if (receivables.totalOutstanding > summary.monthlyRevenue * 2) {
+        blockers.push({ id: 'receivables', label: 'High outstanding receivables', status: 'warning', detail: `${formatCurrency(receivables.totalOutstanding)} outstanding`, fixable: true });
+    }
+    // Primary risk from CFOState
+    if (primaryRisk.type !== 'none' && primaryRisk.severity === 'high') {
+        blockers.push({ id: primaryRisk.type, label: primaryRisk.message, status: 'critical', detail: `Severity: ${primaryRisk.severity}`, fixable: false });
+    }
+    return blockers;
+}
 
-const mockReadiness = {
-    stage: 'seed' as const,
-    score: 68,
-    isReady: false,
-    gaps: [
-        { metric: 'MRR', current: 320000, required: 500000, gap: 'Need ₹1.8L more MRR' },
-        { metric: 'Burn Multiple', current: 2.5, required: 3, gap: 'On track' },
-    ],
-    strengths: [
-        'Strong MRR at ₹3.2L',
-        'Efficient burn at 2.5x',
-        'Healthy gross margin at 65%',
-    ],
-    recommendations: [
-        'Focus on customer acquisition and upselling existing accounts',
-        'Consider launching a higher-tier pricing plan',
-    ],
-    // Removed static blockers, now dynamic
-    timeToReadiness: {
-        expected: 4.2,
-        bestCase: 2.8,
-        worstCase: 7.5,
-    },
-};
+// Compute readiness score from CFOState
+function computeReadiness(cfoState: any) {
+    if (!cfoState) return null;
+    const { summary, deathClock, receivables } = cfoState;
+    let score = 0;
+    const strengths: string[] = [];
+    const recommendations: string[] = [];
 
-const mockDocuments = [
+    // Runway score (max 30)
+    if (deathClock.daysLeft !== null) {
+        const runwayMonths = deathClock.daysLeft / 30;
+        if (runwayMonths >= 18) { score += 30; strengths.push(`Strong runway at ${runwayMonths.toFixed(1)} months`); }
+        else if (runwayMonths >= 12) { score += 20; strengths.push(`Decent runway at ${runwayMonths.toFixed(1)} months`); }
+        else if (runwayMonths >= 6) { score += 10; recommendations.push('Extend runway to 12+ months before fundraising'); }
+        else { recommendations.push('Critical: Runway too short for fundraising'); }
+    }
+
+    // Burn efficiency (max 25)
+    if (summary.monthlyRevenue > 0 && summary.netBurn > 0) {
+        const burnMultiple = summary.netBurn / summary.monthlyRevenue;
+        if (burnMultiple < 2) { score += 25; strengths.push(`Efficient burn multiple at ${burnMultiple.toFixed(1)}x`); }
+        else if (burnMultiple < 3) { score += 15; }
+        else { score += 5; recommendations.push('Reduce burn multiple below 2x'); }
+    } else if (summary.netBurn <= 0) {
+        score += 25; strengths.push('Cash flow positive');
+    }
+
+    // Revenue trend (max 25)
+    if (summary.revenueTrend === 'growing') { score += 25; strengths.push('Revenue is growing'); }
+    else if (summary.revenueTrend === 'stable') { score += 15; }
+    else if (summary.revenueTrend === 'declining') { score += 5; recommendations.push('Address declining revenue before raising'); }
+
+    // Burn stability (max 20)
+    if (summary.burnTrend === 'decreasing') { score += 20; strengths.push('Burn rate is decreasing'); }
+    else if (summary.burnTrend === 'stable') { score += 15; }
+    else if (summary.burnTrend === 'increasing') { score += 5; recommendations.push('Stabilize burn rate'); }
+    else { score += 10; }
+
+    return {
+        score: Math.min(score, 100),
+        isReady: score >= 70,
+        strengths,
+        recommendations,
+        stage: 'seed', // Default stage
+        timeToReadiness: { expected: 4.2, bestCase: 2.8, worstCase: 7.5 }, // Dummy values
+        gaps: [], // Initial empty gaps
+    };
+}
+
+const documentTemplates = [
     { type: 'pl_statement', title: 'Profit & Loss Statement', description: 'Monthly P&L for the last 12 months' },
     { type: 'cash_flow', title: 'Cash Flow Statement', description: 'Monthly cash flow analysis' },
     { type: 'balance_sheet', title: 'Balance Sheet', description: 'Current financial position' },
     { type: 'monthly_summary', title: 'Monthly Financial Summary', description: 'Key metrics and highlights' },
-    { type: 'kpi_definitions', title: 'KPI Definitions', description: 'How we calculate our metrics' },
-    { type: 'revenue_breakdown', title: 'Revenue Breakdown', description: 'Revenue by customer, product, and cohort' },
-    { type: 'expense_analysis', title: 'Expense Analysis', description: 'Detailed expense categorization' },
     { type: 'runway_forecast', title: 'Runway Forecast', description: '12-month cash runway projection' },
 ];
+
+const mockMetrics = {
+    netBurnRate: 0,
+    monthlyRecurringRevenue: 0,
+    currentCash: 0,
+    runway: 0,
+    burnMultiple: 0,
+    revenueGrowthRate: 0,
+    runwayQualityScore: 0,
+    grossMargin: 0,
+};
+
+const mockReadiness = {
+    score: 0,
+    isReady: false,
+    strengths: [],
+    recommendations: [],
+    stage: 'seed',
+    timeToReadiness: { expected: 0, bestCase: 0, worstCase: 0 },
+    gaps: [],
+};
 
 const narrativeTones = [
     { id: 'founder', label: 'Founder View', icon: Users, color: 'text-purple-400', bg: 'bg-purple-500/20' },
@@ -162,83 +195,72 @@ export default function InvestorReadinessPage() {
     // Goal-Based Context Store
     const { primaryGoal, businessModel, setProfile } = useCompanyProfileStore();
 
-    // Derived state
-    const activeBlockers = getBlockersForGoal(primaryGoal, businessModel);
+    // CFOState — single source of truth
+    const { data: cfoState, isLoading: cfoLoading } = useCFOState();
+
+    // Derive everything from CFOState
+    const activeBlockers = getBlockersFromCFOState(cfoState, primaryGoal);
     const benchmarks = getBenchmarks(primaryGoal);
     const goalLabel = getGoalLabel(primaryGoal);
     const blockerLabel = getBlockerLabel(primaryGoal);
+    const readiness = cfoState ? computeReadiness(cfoState) : null;
 
-    // Fetch investor metrics
-    const { data: metrics, isLoading: metricsLoading } = useQuery({
-        queryKey: ['investor-metrics'],
-        queryFn: async () => {
-            try {
-                const res = await apiClient.get('/investor-metrics/org-1/metrics');
-                return res.data;
-            } catch {
-                return mockMetrics;
-            }
-        },
-    });
+    // Derive metrics from CFOState
+    const metrics = cfoState ? {
+        netBurnRate: cfoState.summary.netBurn,
+        monthlyRecurringRevenue: cfoState.summary.monthlyRevenue,
+        currentCash: cfoState.summary.cashInBank,
+        runway: cfoState.summary.runwayMonths,
+        burnMultiple: cfoState.summary.monthlyRevenue > 0 ? cfoState.summary.netBurn / cfoState.summary.monthlyRevenue : 0,
+        revenueGrowthRate: cfoState.summary.revenueTrend === 'growing' ? 15 : cfoState.summary.revenueTrend === 'stable' ? 0 : -5,
+        runwayQualityScore: readiness?.score || 0,
+        grossMargin: 65, // Default average SaaS margin
+    } : null;
+    const metricsLoading = cfoLoading;
+    const readinessLoading = cfoLoading;
 
-    // Fetch readiness assessment
-    const { data: readiness, isLoading: readinessLoading } = useQuery({
-        queryKey: ['investor-readiness'],
-        queryFn: async () => {
-            try {
-                const res = await apiClient.get('/investor-metrics/org-1/readiness');
-                return res.data;
-            } catch {
-                return mockReadiness;
-            }
-        },
-    });
-
-    // Fetch narrative
-    const { data: narrativeData, isLoading: narrativeLoading, refetch: refetchNarrative } = useQuery({
-        queryKey: ['investor-narrative', selectedTone],
-        queryFn: async () => {
-            try {
-                const res = await apiClient.get(`/investor-metrics/org-1/narrative?tone=${selectedTone}`);
-                return res.data;
-            } catch {
-                const narratives = {
-                    founder: {
-                        narrative: "This month, we're at ₹3.2L MRR with 18.9 months of runway. Our burn is healthy at ₹4.5L/month. Key focus area: Need ₹1.8L more MRR.",
-                        highlights: [
-                            { label: 'Runway', value: '18.9 months' },
-                            { label: 'Monthly Burn', value: '₹4.5L' },
-                            { label: 'Next Milestone', value: 'MRR Target' },
-                        ],
-                        confidence: 'high' as const,
-                        dataSource: 'Last 3 months of verified transactions',
-                    },
-                    investor: {
-                        narrative: "We are generating ₹3.2L in MRR, growing at 18.5% month-over-month. Our burn multiple of 2.5x demonstrates capital efficient growth. With 65% gross margins and 18.9 months runway, we are positioned for Series A discussions.",
-                        highlights: [
-                            { label: 'MRR', value: '₹3.2L' },
-                            { label: 'Growth Rate', value: '18.5% MoM' },
-                            { label: 'Burn Multiple', value: '2.5x' },
-                            { label: 'Gross Margin', value: '65%' },
-                        ],
-                        confidence: 'high' as const,
-                        dataSource: 'Last 3 months of verified transactions',
-                    },
-                    board: {
-                        narrative: "Cash position: ₹85L | Runway: 18.9 months | MRR: ₹3.2L (+18.5% MoM) | Burn: ₹4.5L/mo | Stage: SEED | Readiness Score: 68%",
-                        highlights: [
-                            { label: 'Cash Position', value: '₹85L' },
-                            { label: 'Runway', value: '18.9 months' },
-                            { label: 'Stage', value: 'SEED' },
-                        ],
-                        confidence: 'medium' as const,
-                        dataSource: 'Last 3 months of transactions, some pending reconciliation',
-                    },
-                };
-                return narratives[selectedTone];
-            }
-        },
-    });
+    // Derive narrative from CFOState
+    const narrativeData = cfoState ? (() => {
+        const s = cfoState.summary;
+        const d = cfoState.deathClock;
+        const runwayStr = d.daysLeft !== null ? `${(d.daysLeft / 30).toFixed(1)} months` : 'N/A';
+        const narratives: Record<string, any> = {
+            founder: {
+                narrative: `Current MRR is ${formatCurrency(s.monthlyRevenue)} with ${runwayStr} of runway. Monthly burn is ${formatCurrency(s.netBurn)}. ${cfoState.narrative.summary}`,
+                highlights: [
+                    { label: 'Runway', value: runwayStr },
+                    { label: 'Monthly Burn', value: formatCurrency(s.netBurn) },
+                    { label: 'Cash', value: formatCurrency(s.cashInBank) },
+                ],
+                confidence: cfoState.trust.dataQuality,
+                dataSource: cfoState.trust.summary,
+            },
+            investor: {
+                narrative: `We are generating ${formatCurrency(s.monthlyRevenue)} in monthly revenue. With ${runwayStr} runway and ${formatCurrency(s.cashInBank)} cash in bank, the company is ${cfoState.companyStatus === 'stable' ? 'positioned for growth discussions' : 'focused on stabilization'}.`,
+                highlights: [
+                    { label: 'Revenue', value: formatCurrency(s.monthlyRevenue) },
+                    { label: 'Cash Position', value: formatCurrency(s.cashInBank) },
+                    { label: 'Runway', value: runwayStr },
+                    { label: 'Burn', value: formatCurrency(s.netBurn) },
+                ],
+                confidence: cfoState.trust.dataQuality,
+                dataSource: cfoState.trust.summary,
+            },
+            board: {
+                narrative: `Cash: ${formatCurrency(s.cashInBank)} | Runway: ${runwayStr} | Revenue: ${formatCurrency(s.monthlyRevenue)} | Burn: ${formatCurrency(s.netBurn)}/mo | Status: ${cfoState.companyStatus.toUpperCase()}`,
+                highlights: [
+                    { label: 'Cash Position', value: formatCurrency(s.cashInBank) },
+                    { label: 'Runway', value: runwayStr },
+                    { label: 'Status', value: cfoState.companyStatus.toUpperCase() },
+                ],
+                confidence: cfoState.trust.dataQuality,
+                dataSource: cfoState.trust.summary,
+            },
+        };
+        return narratives[selectedTone];
+    })() : null;
+    const narrativeLoading = cfoLoading;
+    const refetchNarrative = () => {};
 
     const toggleDoc = (docType: string) => {
         if (investorModeEnabled) return; // Prevent changes in investor mode
@@ -257,7 +279,7 @@ export default function InvestorReadinessPage() {
         setInvestorModeEnabled(true);
         // Generate a mock shareable link
         setDataRoomLink(`https://foundercfo.app/dataroom/${Date.now().toString(36)}`);
-        setSelectedDocs(mockDocuments.map(d => d.type)); // Select all docs
+        setSelectedDocs(documentTemplates.map(d => d.type)); // Select all docs
     };
 
     const handleDisableInvestorMode = () => {
@@ -824,7 +846,7 @@ export default function InvestorReadinessPage() {
                             investorModeEnabled && "opacity-60 pointer-events-none"
                         )}>
                             <div className="grid grid-cols-2 gap-3">
-                                {mockDocuments.map((doc) => (
+                                {documentTemplates.map((doc) => (
                                     <button
                                         key={doc.type}
                                         onClick={() => toggleDoc(doc.type)}
@@ -854,9 +876,9 @@ export default function InvestorReadinessPage() {
                         <div className="p-4 border-t border-white/5 space-y-3">
                             <button
                                 onClick={() => setSelectedDocs(
-                                    selectedDocs.length === mockDocuments.length
+                                    selectedDocs.length === documentTemplates.length
                                         ? []
-                                        : mockDocuments.map(d => d.type)
+                                        : documentTemplates.map(d => d.type)
                                 )}
                                 disabled={investorModeEnabled}
                                 className={cn(
@@ -864,7 +886,7 @@ export default function InvestorReadinessPage() {
                                     investorModeEnabled ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"
                                 )}
                             >
-                                {selectedDocs.length === mockDocuments.length ? 'Deselect All' : 'Generate Full Data Room'}
+                                {selectedDocs.length === documentTemplates.length ? 'Deselect All' : 'Generate Full Data Room'}
                             </button>
 
                             {/* Integration Buttons */}

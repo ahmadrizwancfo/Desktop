@@ -25,6 +25,7 @@ import {
     Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/ui/logo';
 
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -58,19 +59,15 @@ export function Sidebar() {
     return (
         <div className="w-64 h-screen fixed left-0 top-0 glass-premium border-r border-white/5 flex flex-col p-6 z-50">
             {/* Logo Section */}
-            <div className="flex items-center gap-4 mb-12">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-[0_0_30px_-5px_rgba(255,255,255,0.2)] group/logo overflow-hidden relative">
-                    <div className="absolute inset-0 bg-primary opacity-90 group-hover/logo:opacity-100 transition-opacity" />
-                    <TrendingUp className="text-white w-6 h-6 relative z-10 group-hover/logo:scale-110 transition-transform duration-500" />
-                </div>
+            <Link href="/dashboard" className="flex items-center gap-4 mb-12 group">
                 <div>
-                    <h1 className="text-xl font-bold tracking-tight text-white text-editorial leading-none">FounderCFO</h1>
+                    <Logo size="md" />
                     <p className="text-[9px] text-primary/80 font-black uppercase tracking-[0.3em] mt-1.5 flex items-center gap-1.5">
                         <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />
                         Intelligence
                     </p>
                 </div>
-            </div>
+            </Link>
 
             {/* Navigation */}
             <nav className="flex-1 space-y-1.5 overflow-y-auto pr-2 custom-scrollbar">

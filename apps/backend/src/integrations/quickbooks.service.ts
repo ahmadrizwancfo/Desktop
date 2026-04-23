@@ -8,7 +8,7 @@ export class QuickbooksService {
     private readonly logger = new Logger(QuickbooksService.name);
     private readonly clientId = process.env.QB_CLIENT_ID || 'mock_qb_client';
     private readonly clientSecret = process.env.QB_CLIENT_SECRET || 'mock_qb_secret';
-    private readonly redirectUri = process.env.QB_REDIRECT_URI || 'http://localhost:3000/api/integrations/quickbooks/callback';
+    private readonly redirectUri = process.env.QB_REDIRECT_URI || 'http://localhost:3001/api/integrations/quickbooks/callback';
     private readonly environment = process.env.QB_ENVIRONMENT || 'sandbox'; // or 'production'
 
     constructor(

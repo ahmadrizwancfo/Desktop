@@ -1,24 +1,3 @@
-// ============================================================
-// FounderCFO — Enhanced Prisma Schema
-// Version: 2.0
-//
-// CHANGES FROM v1:
-//  1. FK constraints on AiUsage (organizationId → Organization, userId → User)
-//  2. Soft-delete (deletedAt) on Invoice, Transaction, BankAccount
-//  3. Composite indexes on hot query paths
-//  4. Budget model added
-//  5. FundingRound model added
-//  6. MetricSnapshot model added (KPI trend tracking)
-//  7. RecurringExpense model added (accurate burn rate)
-//  8. ChatThread + ChatMessage models added (CFO chat interface)
-//  9. StartupProfileSnapshot for versioned context
-// 10. Invoice constraint note: at least one of customerId/vendorId required
-//     (enforced at application layer via Zod — Prisma has no CHECK constraints)
-// 11. ComplianceItem.type and severity promoted to enums
-// 12. ActionItem.assignee promoted to enum
-// 13. Scenario extended with monthly projection JSON
-// ============================================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -28,58 +7,61 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Auth & Users ────────────────────────────────────────────────────────────
-
 model User {
-  id             String        @id @default(uuid())
-  email          String        @unique
-  password       String
-  name           String?
-  role           Role          @default(FOUNDER)
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  googleId       String?       @unique
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  auditLogs      AuditLog[]
-  notifications  Notification[]
-  aiUsage        AiUsage[] // FIX: proper relation
-  startupProfile StartupProfile?
-  chatThreads    ChatThread[]
+  id                     String                  @id @default(uuid())
+  email                  String                  @unique
+  password               String
+  name                   String?
+  role                   Role                    @default(FOUNDER)
+  organizationId         String?
+  googleId               String?                 @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  actionFeedbacks        ActionFeedback[]
+  actionItems            ActionItem[]
+  aiUsage                AiUsage[]
+  auditLogs              AuditLog[]
+  chatThreads            ChatThread[]
   integrationConnections IntegrationConnection[]
-  rawImports     RawImport[]
+  notifications          Notification[]
+  rawImports             RawImport[]
+  simulationLogs         SimulationLog[]
+  startupProfile         StartupProfile?
+  organization           Organization?           @relation(fields: [organizationId], references: [id])
 }
 
 model Organization {
-  id                   String   @id @default(uuid())
-  name                 String
-  industry             String?
-  country              String   @default("IN")
-  currency             String   @default("INR")
-  fiscalYearStartMonth Int      @default(4)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  users             User[]
-  bankAccounts      BankAccount[]
-  invoices          Invoice[]
-  customers         Customer[]
-  vendors           Vendor[]
-  financialMetrics  FinancialMetrics[]
-  complianceItems   ComplianceItem[]
-  scenarios         Scenario[]
-  actionItems       ActionItem[]
-  budgets           Budget[]
-  fundingRounds     FundingRound[]
-  metricSnapshots   MetricSnapshot[]
-  recurringExpenses RecurringExpense[]
-  chatThreads       ChatThread[]
-  startupProfiles   StartupProfile[]
-  AiUsage           AiUsage[]
-  financialSnapshots FinancialSnapshot[]
+  id                     String                  @id @default(uuid())
+  name                   String
+  industry               String?
+  country                String                  @default("IN")
+  currency               String                  @default("INR")
+  fiscalYearStartMonth   Int                     @default(4)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  actionItems            ActionItem[]
+  AiUsage                AiUsage[]
+  bankAccounts           BankAccount[]
+  budgets                Budget[]
+  cfoDecisionEvents      CfoDecisionEvent[]
+  cfoStateSnapshots      CfoStateSnapshot[]
+  chatThreads            ChatThread[]
+  complianceItems        ComplianceItem[]
+  customers              Customer[]
+  financialMetrics       FinancialMetrics[]
+  financialSnapshots     FinancialSnapshot[]
+  fundingRounds          FundingRound[]
   integrationConnections IntegrationConnection[]
-  rawImports        RawImport[]
+  invoices               Invoice[]
+  metricSnapshots        MetricSnapshot[]
+  rawImports             RawImport[]
+  recurringExpenses      RecurringExpense[]
+  scenarios              Scenario[]
+  simulationLogs         SimulationLog[]
+  startupProfiles        StartupProfile?
+  users                  User[]
+  vendors                Vendor[]
+  decisionFeedbacks      DecisionFeedback[]
 }
 
 model AuditLog {
@@ -88,9 +70,9 @@ model AuditLog {
   entity    String
   entityId  String
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   details   Json?
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([entity, entityId])
@@ -100,17 +82,15 @@ model AuditLog {
 model Notification {
   id        String   @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
   title     String
   message   String
   isRead    Boolean  @default(false)
   type      String
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId, isRead])
 }
-
-// ─── Core Financial Models ────────────────────────────────────────────────────
 
 model BankAccount {
   id             String        @id @default(uuid())
@@ -120,15 +100,18 @@ model BankAccount {
   balance        Decimal       @default(0) @db.Decimal(15, 2)
   currency       String        @default("INR")
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id])
-  transactions   Transaction[]
-  // FIX: Soft delete — financial records must never be hard-deleted
+  provider       String        @default("manual")
+  externalId     String?
+  lastSyncedAt   DateTime?
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  transactions   Transaction[]
 
+  @@unique([organizationId, provider, externalId])
   @@index([organizationId])
-  @@index([organizationId, deletedAt]) // filter active accounts
+  @@index([organizationId, deletedAt])
 }
 
 model Transaction {
@@ -139,25 +122,19 @@ model Transaction {
   description   String?
   date          DateTime
   bankAccountId String
-  bankAccount   BankAccount     @relation(fields: [bankAccountId], references: [id])
   invoiceId     String?
-  invoice       Invoice?        @relation(fields: [invoiceId], references: [id])
   metadata      Json?
-  
-  // Integration Sync Tracking
-  source        String?         // e.g. "CSV_UPLOAD", "ZOHO", "BANKING_API_SYNC"
-  externalId    String?         // source unique identifier for dedup
-
-  // FIX: Soft delete
+  source        String?
+  externalId    String?
   deletedAt     DateTime?
   createdAt     DateTime        @default(now())
+  bankAccount   BankAccount     @relation(fields: [bankAccountId], references: [id])
+  invoice       Invoice?        @relation(fields: [invoiceId], references: [id])
 
-  // FIX: Composite indexes for date-range queries (most common query pattern)
+  @@unique([bankAccountId, externalId])
   @@index([bankAccountId, date])
   @@index([bankAccountId, type, date])
   @@index([date])
-  // Deduplication: same external transaction can't be imported twice per account
-  @@unique([bankAccountId, externalId])
 }
 
 model Invoice {
@@ -168,18 +145,16 @@ model Invoice {
   status         InvoiceStatus @default(DRAFT)
   dueDate        DateTime
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id])
   customerId     String?
-  customer       Customer?     @relation(fields: [customerId], references: [id])
   vendorId       String?
-  vendor         Vendor?       @relation(fields: [vendorId], references: [id])
-  transactions   Transaction[]
-  // FIX: Soft delete
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  vendor         Vendor?       @relation(fields: [vendorId], references: [id])
+  transactions   Transaction[]
 
-  // NOTE: Application layer must enforce: customerId OR vendorId is required (use Zod)
   @@index([organizationId, status])
   @@index([organizationId, dueDate])
   @@index([organizationId, deletedAt])
@@ -191,9 +166,9 @@ model Customer {
   email          String?
   gstin          String?
   organizationId String
+  createdAt      DateTime     @default(now())
   organization   Organization @relation(fields: [organizationId], references: [id])
   invoices       Invoice[]
-  createdAt      DateTime     @default(now())
 
   @@index([organizationId])
 }
@@ -204,84 +179,63 @@ model Vendor {
   email          String?
   gstin          String?
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  invoices       Invoice[]
   createdAt      DateTime     @default(now())
+  invoices       Invoice[]
+  organization   Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
 }
 
-// ─── AI & Document Intelligence ──────────────────────────────────────────────
-
 model FinancialMetrics {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-
-  documentType String
-  period       String?
-  currency     String  @default("INR")
-  sourceFile   String
-  confidence   String
-
-  // Balance Sheet
-  totalAssets        Decimal? @db.Decimal(20, 2)
-  totalLiabilities   Decimal? @db.Decimal(20, 2)
-  totalEquity        Decimal? @db.Decimal(20, 2)
-  currentAssets      Decimal? @db.Decimal(20, 2)
-  currentLiabilities Decimal? @db.Decimal(20, 2)
-  currentRatio       Decimal? @db.Decimal(10, 4)
-  debtToEquity       Decimal? @db.Decimal(10, 4)
-
-  // P&L
-  revenue       Decimal? @db.Decimal(20, 2)
-  totalExpenses Decimal? @db.Decimal(20, 2)
-  netProfit     Decimal? @db.Decimal(20, 2)
-  grossProfit   Decimal? @db.Decimal(20, 2)
-  ebitda        Decimal? @db.Decimal(20, 2)
-  profitMargin  Decimal? @db.Decimal(10, 4)
-
-  // Cash Flow
-  operatingCashFlow Decimal? @db.Decimal(20, 2)
-  investingCashFlow Decimal? @db.Decimal(20, 2)
-  financingCashFlow Decimal? @db.Decimal(20, 2)
-  netCashFlow       Decimal? @db.Decimal(20, 2)
-
-  // Startup KPIs
-  monthlyBurn Decimal? @db.Decimal(20, 2)
-  cashRunway  Int?
-
-  // Bank Statement
-  openingBalance Decimal? @db.Decimal(20, 2)
-  closingBalance Decimal? @db.Decimal(20, 2)
-  totalCredits   Decimal? @db.Decimal(20, 2)
-  totalDebits    Decimal? @db.Decimal(20, 2)
-
-  // GST
-  gstLiability   Decimal? @db.Decimal(20, 2)
-  inputTaxCredit Decimal? @db.Decimal(20, 2)
-  netGstPayable  Decimal? @db.Decimal(20, 2)
-
-  // Receivables
-  totalInvoiceValue  Decimal? @db.Decimal(20, 2)
-  pendingReceivables Decimal? @db.Decimal(20, 2)
-
-  extractedFields String[]
-  warnings        String[]
-  uploadedAt      DateTime @default(now())
+  id                 String       @id @default(uuid())
+  organizationId     String
+  documentType       String
+  period             String?
+  currency           String       @default("INR")
+  sourceFile         String
+  confidence         String
+  totalAssets        Decimal?     @db.Decimal(20, 2)
+  totalLiabilities   Decimal?     @db.Decimal(20, 2)
+  totalEquity        Decimal?     @db.Decimal(20, 2)
+  currentAssets      Decimal?     @db.Decimal(20, 2)
+  currentLiabilities Decimal?     @db.Decimal(20, 2)
+  currentRatio       Decimal?     @db.Decimal(10, 4)
+  debtToEquity       Decimal?     @db.Decimal(10, 4)
+  revenue            Decimal?     @db.Decimal(20, 2)
+  totalExpenses      Decimal?     @db.Decimal(20, 2)
+  netProfit          Decimal?     @db.Decimal(20, 2)
+  grossProfit        Decimal?     @db.Decimal(20, 2)
+  ebitda             Decimal?     @db.Decimal(20, 2)
+  profitMargin       Decimal?     @db.Decimal(10, 4)
+  operatingCashFlow  Decimal?     @db.Decimal(20, 2)
+  investingCashFlow  Decimal?     @db.Decimal(20, 2)
+  financingCashFlow  Decimal?     @db.Decimal(20, 2)
+  netCashFlow        Decimal?     @db.Decimal(20, 2)
+  monthlyBurn        Decimal?     @db.Decimal(20, 2)
+  cashRunway         Int?
+  openingBalance     Decimal?     @db.Decimal(20, 2)
+  closingBalance     Decimal?     @db.Decimal(20, 2)
+  totalCredits       Decimal?     @db.Decimal(20, 2)
+  totalDebits        Decimal?     @db.Decimal(20, 2)
+  gstLiability       Decimal?     @db.Decimal(20, 2)
+  inputTaxCredit     Decimal?     @db.Decimal(20, 2)
+  netGstPayable      Decimal?     @db.Decimal(20, 2)
+  totalInvoiceValue  Decimal?     @db.Decimal(20, 2)
+  pendingReceivables Decimal?     @db.Decimal(20, 2)
+  extractedFields    String[]
+  warnings           String[]
+  uploadedAt         DateTime     @default(now())
+  organization       Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
   @@index([organizationId, documentType])
   @@index([uploadedAt])
 }
 
-// FIX: Proper FK relations on AiUsage
 model AiUsage {
   id             String       @id @default(uuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
   userId         String?
-  user           User?        @relation(fields: [userId], references: [id])
   endpoint       String
   model          String
   inputTokens    Int
@@ -293,16 +247,590 @@ model AiUsage {
   success        Boolean      @default(true)
   errorMessage   String?
   timestamp      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User?        @relation(fields: [userId], references: [id])
 
   @@index([organizationId])
-  @@index([organizationId, timestamp]) // for monthly cost reports
+  @@index([organizationId, timestamp])
   @@index([timestamp])
   @@index([endpoint])
 }
 
-// ─── Compliance ───────────────────────────────────────────────────────────────
+model ComplianceItem {
+  id             String             @id @default(uuid())
+  organizationId String
+  type           ComplianceType
+  title          String
+  description    String?
+  dueDate        DateTime
+  severity       ComplianceSeverity @default(MEDIUM)
+  status         ComplianceStatus   @default(PENDING)
+  amount         Decimal?           @db.Decimal(20, 2)
+  completedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id])
 
-// FIX: Promoted string enums to proper Prisma enums
+  @@index([organizationId, status])
+  @@index([organizationId, dueDate])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model Scenario {
+  id                 String       @id @default(uuid())
+  name               String
+  organizationId     String
+  headcount          Int          @default(0)
+  monthlySalary      Decimal      @default(0) @db.Decimal(20, 2)
+  saasSpend          Decimal      @default(0) @db.Decimal(20, 2)
+  marketingSpend     Decimal      @default(0) @db.Decimal(20, 2)
+  monthlyRevenue     Decimal      @default(0) @db.Decimal(20, 2)
+  currentCash        Decimal      @default(0) @db.Decimal(20, 2)
+  projectedBurn      Decimal      @default(0) @db.Decimal(20, 2)
+  projectedRunway    Float        @default(0)
+  monthlyProjections Json?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  organization       Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model ActionItem {
+  id                     String             @id @default(uuid())
+  title                  String
+  description            String?
+  organizationId         String
+  assignee               Assignee           @default(FOUNDER)
+  status                 ActionStatus       @default(OPEN)
+  expectedImpact         Decimal            @default(0) @db.Decimal(20, 2)
+  actualImpact           Decimal?           @db.Decimal(20, 2)
+  dueDate                DateTime?
+  completedAt            DateTime?
+  sourceInsight          String?
+  sourceMetric           String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  actionType             String?
+  appliedAt              DateTime?
+  appliedBy              String?
+  approvalStatus         ApprovalStatus     @default(NOT_APPLICABLE)
+  claimedAt              DateTime?
+  completionNotes        String?
+  escalationLevel        Int                @default(0)
+  executionMode          ExecutionMode      @default(SUGGESTED)
+  executionPayload       Json?
+  hasBeenNotified        Boolean            @default(false)
+  isEscalated            Boolean            @default(false)
+  isExecutable           Boolean            @default(false)
+  isUnderReview          Boolean            @default(false)
+  lastVerifiedAt         DateTime?
+  overrideReason         String?
+  priority               ActionPriority     @default(MEDIUM)
+  seenInShadowMode       Boolean            @default(false)
+  userId                 String?
+  verificationConfidence Int                @default(0)
+  verificationNotes      String?
+  verificationReason     String?
+  verificationStatus     VerificationStatus @default(UNVERIFIED)
+  verificationWindow     Int                @default(7)
+  feedback               ActionFeedback[]
+  organization           Organization       @relation(fields: [organizationId], references: [id])
+  user                   User?              @relation(fields: [userId], references: [id])
+  autoPilotLogs          AutoPilotLog[]
+  executionLogs          ExecutionLog[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, assignee])
+  @@index([dueDate])
+}
+
+model ActionFeedback {
+  id        String       @id @default(uuid())
+  actionId  String
+  userId    String
+  type      FeedbackType @default(DISAGREE)
+  message   String
+  createdAt DateTime     @default(now())
+  action    ActionItem   @relation(fields: [actionId], references: [id])
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@index([actionId])
+  @@index([userId])
+}
+
+model ExecutionLog {
+  id              String                 @id @default(uuid())
+  actionId        String
+  executedAt      DateTime               @default(now())
+  impactExpected  Json?
+  impactActual    Json?
+  status          String
+  decisionQuality DecisionQuality?
+  classification  OutcomeClassification?
+  processScore    Float?
+  accuracyScore   Float?
+  impactDelta     Float?
+  failureReason   String?
+  contextSnapshot Json?
+  profileId       String?
+  metadata        Json?
+  explanation     Json?                  // v2.2 Structured reasoning
+  action          ActionItem             @relation(fields: [actionId], references: [id])
+  profile         StartupProfile?        @relation(fields: [profileId], references: [id])
+
+  @@index([actionId])
+  @@index([profileId])
+}
+
+model CfoCategoryPerformance {
+  id              String   @id @default(uuid())
+  organizationId  String
+  category        String
+  recentAccuracy  Json?
+  failureStreak   Int      @default(0)
+  confidenceScore Float    @default(100)
+  isSuppressed    Boolean  @default(false)
+  lastUpdated     DateTime @default(now())
+
+  @@unique([organizationId, category])
+  @@index([organizationId])
+}
+
+model AutoPilotLog {
+  id          String             @id @default(uuid())
+  profileId   String
+  actionId    String
+  status      AutoPilotLogStatus @default(EXECUTED)
+  executedAt  DateTime           @default(now())
+  executeAt   DateTime?
+  reason      String
+  confidence  Float
+  riskLevel   AutoPilotRisk
+  isSimulated Boolean            @default(false)
+  isRollback  Boolean            @default(false)
+  impactBurn  Float?
+  metadata    Json?
+  action      ActionItem         @relation(fields: [actionId], references: [id])
+  profile     StartupProfile     @relation(fields: [profileId], references: [id])
+
+  @@index([profileId])
+  @@index([actionId])
+}
+
+model StartupProfileVersion {
+  id        String         @id @default(uuid())
+  profileId String
+  changes   Json
+  source    String         @default("AUTO_EXECUTION")
+  userId    String?
+  createdAt DateTime       @default(now())
+  profile   StartupProfile @relation(fields: [profileId], references: [id])
+
+  @@index([profileId])
+}
+
+model StartupProfile {
+  id                      String                   @id @default(uuid())
+  userId                  String                   @unique
+  organizationId          String                   @unique
+  companyName             String
+  stage                   StartupStage
+  monthlyRevenue          Decimal                  @db.Decimal(20, 2)
+  monthlyExpenses         Decimal                  @db.Decimal(20, 2)
+  cashInBank              Decimal                  @db.Decimal(20, 2)
+  teamSize                Int
+  country                 String                   @default("IN")
+  industry                String
+  primaryGoal             PrimaryGoal
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  lastCriticalEmailSentAt DateTime?
+  lastAlertGeneratedAt    DateTime?
+  ignoredAlertsCount      Int                      @default(0)
+  daysSinceLastAction     Int                      @default(0)
+  autoPilotDelayMinutes   Int                      @default(30)
+  autoPilotEnabledAt      DateTime?
+  autoPilotFailureStreak  Int                      @default(0)
+  autoPilotMode           AutoPilotMode            @default(OFF)
+  cautionMultiplier       Float                    @default(1.0)
+  cfoAccuracyScore        Float                    @default(85)
+  complianceScore         Int                      @default(100)
+  envUncertaintyScore     Float                    @default(0)
+  growthMode              Boolean                  @default(false)
+  hiringFreeze            Boolean                  @default(false)
+  isTrustZoneDowngraded   Boolean                  @default(false)
+  lastAccuracyUpdate      DateTime                 @default(now())
+  lastAutoPilotFailureAt  DateTime?
+  lastAutoPilotScanAt     DateTime?
+  lastScoreUpdate         DateTime                 @default(now())
+  marketingMultiplier     Float                    @default(1.0)
+  maxAutoBurnImpact       Float                    @default(5.0)
+  rollbackRate            Float                    @default(0)
+  rolledBackAutoActions   Int                      @default(0)
+  salesMultiplier         Float                    @default(1.0)
+  shadowModeEnabled       Boolean                  @default(true)
+  targetBurn              Float?
+  totalAutoActions        Int                      @default(0)
+  totalEvaluatedActions   Int                      @default(0)
+  
+  // v2.1 Hybrid Decision Engine Upgrades
+  lastDashboardMode       String?                  @default("STABLE")
+  modeStagingCount        Int                      @default(0)
+  lastSnapshotAt          DateTime?
+  highestCashBuffer       Float?                   @default(0)
+  rollbackRecoveryCount   Int                      @default(0)
+  
+  decisionSensitivity     SensitivityLevel         @default(BALANCED)
+  notificationPreference  AlertTier                @default(IMPORTANT)
+  
+  autoPilotLogs           AutoPilotLog[]
+  cfoDecisions            CfoDecision[]
+  logs                    ExecutionLog[]
+  organization            Organization             @relation(fields: [organizationId], references: [id])
+  user                    User                     @relation(fields: [userId], references: [id])
+  snapshots               StartupProfileSnapshot[]
+  versions                StartupProfileVersion[]
+
+  @@index([organizationId])
+}
+
+model StartupProfileSnapshot {
+  id               String         @id @default(uuid())
+  startupProfileId String
+  stage            StartupStage
+  monthlyRevenue   Decimal        @db.Decimal(20, 2)
+  monthlyExpenses  Decimal        @db.Decimal(20, 2)
+  cashInBank       Decimal        @db.Decimal(20, 2)
+  teamSize         Int
+  primaryGoal      PrimaryGoal
+  snapshotAt       DateTime       @default(now())
+  projectedRunway  Float          @default(0)
+  startupProfile   StartupProfile @relation(fields: [startupProfileId], references: [id])
+
+  @@index([startupProfileId])
+  @@index([snapshotAt])
+}
+
+model CfoDecision {
+  id                 String         @id @default(uuid())
+  startupProfileId   String
+  decisionDomain     DecisionDomain
+  decisionType       String
+  severity           String
+  confidence         Float
+  facts              Json
+  recommendedActions Json
+  status             DecisionStatus @default(OPEN)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  aiExplanation      AiExplanation?
+  startupProfile     StartupProfile @relation(fields: [startupProfileId], references: [id])
+
+  @@index([startupProfileId, status])
+  @@index([createdAt])
+  @@index([decisionDomain])
+}
+
+model AiExplanation {
+  id              String      @id @default(uuid())
+  cfoDecisionId   String      @unique
+  modelUsed       String
+  explanationText String
+  tone            String
+  latencyMs       Int
+  createdAt       DateTime    @default(now())
+  cfoDecision     CfoDecision @relation(fields: [cfoDecisionId], references: [id])
+}
+
+model FinancialSnapshot {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  snapshotDate   DateTime     @default(now())
+  revenue        Decimal      @db.Decimal(20, 2)
+  expenses       Decimal      @db.Decimal(20, 2)
+  cashBalance    Decimal      @db.Decimal(20, 2)
+  burn           Decimal      @db.Decimal(20, 2)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, snapshotDate])
+  @@index([userId])
+}
+
+model WeeklyBrief {
+  id                String   @id @default(uuid())
+  userId            String
+  organizationId    String
+  weekStart         DateTime
+  summaryText       String
+  topRisk           String
+  topRecommendation String
+  metricsJson       Json
+  createdAt         DateTime @default(now())
+
+  @@index([userId, weekStart])
+  @@index([organizationId])
+}
+
+model Alert {
+  id               String       @id @default(uuid())
+  userId           String
+  organizationId   String
+  decisionId       String?
+  alertType        String
+  severity         String
+  message          String
+  metadata         Json?
+  acknowledged     Boolean      @default(false)
+  channel          AlertChannel @default(IN_APP)
+  status           AlertStatus  @default(SENT)
+  createdAt        DateTime     @default(now())
+  firstDetectedAt  DateTime     @default(now())
+  lastSentAt       DateTime     @default(now())
+  previousSeverity String?
+
+  @@index([userId, alertType, createdAt])
+  @@index([decisionId])
+  @@index([organizationId])
+}
+
+model Budget {
+  id             String       @id @default(uuid())
+  organizationId String
+  category       String
+  period         String
+  plannedAmount  Decimal      @db.Decimal(20, 2)
+  actualAmount   Decimal      @default(0) @db.Decimal(20, 2)
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, category, period])
+  @@index([organizationId, period])
+}
+
+model SimulationLog {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  inputSnapshot  Json
+  impactSummary  Json
+  riskLevel      String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([userId])
+}
+
+model FundingRound {
+  id             String             @id @default(uuid())
+  organizationId String
+  roundType      FundingRoundType
+  targetAmount   Decimal            @db.Decimal(20, 2)
+  raisedAmount   Decimal            @default(0) @db.Decimal(20, 2)
+  valuation      Decimal?           @db.Decimal(20, 2)
+  dilution       Decimal?           @db.Decimal(5, 4)
+  status         FundingRoundStatus @default(PLANNING)
+  leadInvestor   String?
+  closedAt       DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+}
+
+model MetricSnapshot {
+  id             String       @id @default(uuid())
+  organizationId String
+  metricKey      String
+  value          Decimal      @db.Decimal(20, 4)
+  unit           String?
+  period         String
+  source         String?
+  recordedAt     DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, metricKey, period])
+  @@index([organizationId, metricKey])
+  @@index([organizationId, period])
+}
+
+model RecurringExpense {
+  id             String           @id @default(uuid())
+  organizationId String
+  name           String
+  vendor         String?
+  amount         Decimal          @db.Decimal(20, 2)
+  frequency      ExpenseFrequency @default(MONTHLY)
+  category       String
+  startDate      DateTime
+  endDate        DateTime?
+  isActive       Boolean          @default(true)
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, category])
+}
+
+model ChatThread {
+  id             String        @id @default(uuid())
+  organizationId String
+  userId         String
+  title          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  messages       ChatMessage[]
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, userId])
+  @@index([updatedAt])
+}
+
+model ChatMessage {
+  id           String      @id @default(uuid())
+  threadId     String
+  role         MessageRole
+  content      String
+  inputTokens  Int?
+  outputTokens Int?
+  model        String?
+  latencyMs    Int?
+  createdAt    DateTime    @default(now())
+  thread       ChatThread  @relation(fields: [threadId], references: [id])
+
+  @@index([threadId, createdAt])
+}
+
+model IntegrationConnection {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  provider       String
+  status         String
+  syncStatus     SyncStatus   @default(IDLE)
+  lastError      String?
+  accessMetadata Json?
+  lastSyncedAt   DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+  syncLogs       SyncLog[]
+
+  @@index([organizationId, provider])
+}
+
+model WebhookEvent {
+  id          String    @id @default(uuid())
+  provider    String
+  eventId     String    @unique
+  eventType   String
+  payload     Json
+  processed   Boolean   @default(false)
+  error       String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([provider, processed])
+}
+
+model SyncLog {
+  id            String                @id @default(uuid())
+  connectionId  String
+  provider      String
+  syncType      String
+  status        String
+  recordsSynced Int                   @default(0)
+  errorDetails  String?
+  durationMs    Int?
+  createdAt     DateTime              @default(now())
+  connection    IntegrationConnection @relation(fields: [connectionId], references: [id])
+
+  @@index([connectionId, createdAt])
+}
+
+model RawImport {
+  id             String       @id @default(uuid())
+  userId         String
+  organizationId String
+  provider       String
+  sourceType     String
+  rawPayload     Json
+  status         String
+  importedAt     DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+}
+
+model CfoStateSnapshot {
+  id                String       @id @default(uuid())
+  organizationId    String
+  companyStatus     String
+  runwayMonths      Float
+  daysLeft          Int?
+  cashInBank        Float
+  monthlyRevenue    Float
+  monthlyExpenses   Float
+  netBurn           Float
+  burnTrend         String
+  revenueTrend      String
+  tone              String
+  transactionCount  Int          @default(0)
+  riskScore         Float?       @default(0)
+  dataQuality       String
+  totalReceivables  Float        @default(0)
+  runwayChangeDays  Int?
+  burnChangePercent Float?
+  cashChangeAmount  Float?
+  riskChanged       Boolean      @default(false)
+  statusChanged     Boolean      @default(false)
+  fullState         Json
+  explanation       Json?        // Structured reasoning for mode/state
+  generatedAt       DateTime     @default(now())
+  organization      Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, generatedAt])
+  @@index([organizationId])
+}
+
+model CfoDecisionEvent {
+  id                String       @id @default(uuid())
+  organizationId    String
+  decisionId        String
+  decisionStatement String
+  optionChosen      String?
+  firstShownAt      DateTime     @default(now())
+  lastShownAt       DateTime     @default(now())
+  clickedAt         DateTime?
+  actedAt           DateTime?
+  resolvedAt        DateTime?
+  acknowledged      Boolean      @default(false)
+  acted             Boolean      @default(false)
+  resolved          Boolean      @default(false)
+  outcome           String?
+  runwayAtShown     Float?
+  runwayAtResolved  Float?
+  runwayDelta       Float?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, decisionId])
+  @@index([organizationId, resolved])
+  @@index([organizationId, createdAt])
+}
+
 enum ComplianceType {
   GST
   TDS
@@ -327,102 +855,77 @@ enum ComplianceStatus {
   WAIVED
 }
 
-model ComplianceItem {
-  id             String             @id @default(uuid())
-  organizationId String
-  organization   Organization       @relation(fields: [organizationId], references: [id])
-  type           ComplianceType
-  title          String
-  description    String?
-  dueDate        DateTime
-  severity       ComplianceSeverity @default(MEDIUM)
-  status         ComplianceStatus   @default(PENDING)
-  amount         Decimal?           @db.Decimal(20, 2)
-  completedAt    DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-
-  @@index([organizationId, status])
-  @@index([organizationId, dueDate]) // "upcoming deadlines" query
-  @@index([dueDate])
-  @@index([status])
-}
-
-// ─── Scenario Simulator ───────────────────────────────────────────────────────
-
-model Scenario {
-  id             String       @id @default(uuid())
-  name           String
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-
-  // Inputs
-  headcount      Int     @default(0)
-  monthlySalary  Decimal @default(0) @db.Decimal(20, 2)
-  saasSpend      Decimal @default(0) @db.Decimal(20, 2)
-  marketingSpend Decimal @default(0) @db.Decimal(20, 2)
-  monthlyRevenue Decimal @default(0) @db.Decimal(20, 2)
-  currentCash    Decimal @default(0) @db.Decimal(20, 2)
-
-  // Outputs
-  projectedBurn   Decimal @default(0) @db.Decimal(20, 2)
-  projectedRunway Float   @default(0)
-
-  // FIX: Month-by-month projection stored as structured JSON
-  // Shape: Array<{ month: string; revenue: number; burn: number; cashBalance: number }>
-  monthlyProjections Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([organizationId])
-}
-
-// ─── Action Tracking ──────────────────────────────────────────────────────────
-
-// FIX: Promoted assignee to enum
-enum Assignee {
-  FOUNDER
-  OPS
-  ACCOUNTANT
-  FINANCE
-}
-
-model ActionItem {
-  id             String       @id @default(uuid())
-  title          String
-  description    String?
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-
-  assignee Assignee     @default(FOUNDER)
-  status   ActionStatus @default(OPEN)
-
-  expectedImpact Decimal  @default(0) @db.Decimal(20, 2)
-  actualImpact   Decimal? @db.Decimal(20, 2)
-
-  dueDate     DateTime?
-  completedAt DateTime?
-
-  sourceInsight String?
-  sourceMetric  String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([organizationId, status])
-  @@index([organizationId, assignee])
-  @@index([dueDate])
-}
-
 enum ActionStatus {
   OPEN
   IN_PROGRESS
   DONE
   DISMISSED
+  MISSED
 }
 
-// ─── Startup Context ──────────────────────────────────────────────────────────
+enum ActionPriority {
+  IMMEDIATE
+  HIGH
+  MEDIUM
+}
+
+enum VerificationStatus {
+  VERIFIED
+  UNVERIFIED
+  CONTRADICTED
+}
+
+enum FeedbackType {
+  DISAGREE
+  CONTEXT_OVERRIDE
+  DATA_ISSUE
+}
+
+enum ExecutionMode {
+  SUGGESTED
+  ONE_CLICK_APPLY
+  REVIEW_REQUIRED
+  APPROVAL_REQUIRED
+}
+
+enum ApprovalStatus {
+  NOT_APPLICABLE
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum OutcomeClassification {
+  GOOD_DECISION_GOOD_OUTCOME
+  GOOD_DECISION_BAD_OUTCOME
+  BAD_DECISION_BAD_OUTCOME
+  BAD_DECISION_GOOD_OUTCOME
+}
+
+enum DecisionQuality {
+  GOOD
+  NEUTRAL
+  BAD
+}
+
+enum AutoPilotMode {
+  OFF
+  SAFE_MODE
+  ASSISTED_MODE
+}
+
+enum AutoPilotRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AutoPilotLogStatus {
+  PENDING
+  EXECUTED
+  CANCELLED
+  SIMULATED
+}
 
 enum StartupStage {
   IDEA
@@ -439,78 +942,11 @@ enum PrimaryGoal {
   SCALE
 }
 
-model StartupProfile {
-  id              String       @id @default(uuid())
-  userId          String       @unique
-  user            User         @relation(fields: [userId], references: [id])
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  companyName     String
-  stage           StartupStage
-  monthlyRevenue  Decimal      @db.Decimal(20, 2)
-  monthlyExpenses Decimal      @db.Decimal(20, 2)
-  cashInBank      Decimal      @db.Decimal(20, 2)
-  teamSize        Int
-  country         String       @default("IN")
-  industry        String
-  primaryGoal     PrimaryGoal
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  cfoDecisions CfoDecision[]
-  // FIX: Versioned snapshots so historical decisions retain their context
-  snapshots    StartupProfileSnapshot[]
-
-  @@index([organizationId])
-}
-
-// FIX: New — snapshot on every update so CfoDecision context is preserved
-model StartupProfileSnapshot {
-  id               String         @id @default(uuid())
-  startupProfileId String
-  startupProfile   StartupProfile @relation(fields: [startupProfileId], references: [id])
-  stage            StartupStage
-  monthlyRevenue   Decimal        @db.Decimal(20, 2)
-  monthlyExpenses  Decimal        @db.Decimal(20, 2)
-  cashInBank       Decimal        @db.Decimal(20, 2)
-  teamSize         Int
-  primaryGoal      PrimaryGoal
-  snapshotAt       DateTime       @default(now())
-
-  @@index([startupProfileId])
-  @@index([snapshotAt])
-}
-
-model CfoDecision {
-  id                 String         @id @default(uuid())
-  startupProfileId   String
-  startupProfile     StartupProfile @relation(fields: [startupProfileId], references: [id])
-  decisionDomain     DecisionDomain
-  decisionType       String
-  severity           String
-  confidence         Float
-  facts              Json
-  recommendedActions Json
-  status             DecisionStatus @default(OPEN)
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-
-  aiExplanation AiExplanation?
-
-  @@index([startupProfileId, status]) // FIX: composite
-  @@index([createdAt])
-  @@index([decisionDomain])
-}
-
-model AiExplanation {
-  id              String      @id @default(uuid())
-  cfoDecisionId   String      @unique
-  cfoDecision     CfoDecision @relation(fields: [cfoDecisionId], references: [id])
-  modelUsed       String
-  explanationText String      @db.Text
-  tone            String
-  latencyMs       Int
-  createdAt       DateTime    @default(now())
+enum Assignee {
+  FOUNDER
+  OPS
+  ACCOUNTANT
+  FINANCE
 }
 
 enum DecisionDomain {
@@ -523,47 +959,15 @@ enum DecisionDomain {
 }
 
 enum DecisionStatus {
+  NEW
   OPEN
   ACKNOWLEDGED
   RESOLVED
+  REVIEWING
+  IMPLEMENTING
+  FIXED
+  IGNORED
 }
-
-// ─── Financial Snapshots (point-in-time state) ────────────────────────────────
-
-model FinancialSnapshot {
-  id             String       @id @default(uuid())
-  userId         String
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  snapshotDate   DateTime     @default(now())
-  revenue        Decimal      @db.Decimal(20, 2)
-  expenses       Decimal      @db.Decimal(20, 2)
-  cashBalance    Decimal      @db.Decimal(20, 2)
-  burn           Decimal      @db.Decimal(20, 2)
-  createdAt      DateTime     @default(now())
-
-  @@index([organizationId, snapshotDate])
-  @@index([userId])
-}
-
-// ─── Weekly Briefs (persisted) ────────────────────────────────────────────────
-
-model WeeklyBrief {
-  id                String   @id @default(uuid())
-  userId            String
-  organizationId    String
-  weekStart         DateTime
-  summaryText       String   @db.Text
-  topRisk           String
-  topRecommendation String
-  metricsJson       Json     // runway, burn, cash, burnTrend
-  createdAt         DateTime @default(now())
-
-  @@index([userId, weekStart])
-  @@index([organizationId])
-}
-
-// ─── Alerts (linked to decisions) ─────────────────────────────────────────────
 
 enum AlertChannel {
   IN_APP
@@ -578,44 +982,6 @@ enum AlertStatus {
   READ
   FAILED
 }
-
-model Alert {
-  id               String       @id @default(uuid())
-  userId           String
-  organizationId   String
-  decisionId       String?
-  alertType        String       // e.g. "CFO_ALERT_RUNWAY_RISK"
-  channel          AlertChannel @default(IN_APP)
-  status           AlertStatus  @default(SENT)
-  severity         String?      // current severity when alert was sent
-  previousSeverity String?      // severity from last alert (for escalation detection)
-  firstDetectedAt  DateTime     @default(now()) // when this alert type was first raised
-  lastSentAt       DateTime     @default(now()) // last time this alert was sent
-  sentAt           DateTime     @default(now())
-
-  @@index([userId, alertType, sentAt])
-  @@index([decisionId])
-  @@index([organizationId])
-}
-
-model Budget {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  category       String // e.g. "Engineering", "Marketing", "Infra"
-  period         String // "2026-03" (YYYY-MM)
-  plannedAmount  Decimal      @db.Decimal(20, 2)
-  actualAmount   Decimal      @default(0) @db.Decimal(20, 2)
-  // Variance is computed: actualAmount - plannedAmount (positive = overspend)
-  notes          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  @@unique([organizationId, category, period])
-  @@index([organizationId, period])
-}
-
-// ─── NEW: Funding Rounds ──────────────────────────────────────────────────────
 
 enum FundingRoundType {
   BOOTSTRAPPED
@@ -637,102 +1003,11 @@ enum FundingRoundStatus {
   ABANDONED
 }
 
-model FundingRound {
-  id             String             @id @default(uuid())
-  organizationId String
-  organization   Organization       @relation(fields: [organizationId], references: [id])
-  roundType      FundingRoundType
-  targetAmount   Decimal            @db.Decimal(20, 2)
-  raisedAmount   Decimal            @default(0) @db.Decimal(20, 2)
-  valuation      Decimal?           @db.Decimal(20, 2) // pre-money valuation
-  dilution       Decimal?           @db.Decimal(5, 4) // e.g. 0.15 = 15%
-  status         FundingRoundStatus @default(PLANNING)
-  leadInvestor   String?
-  closedAt       DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-
-  @@index([organizationId])
-  @@index([organizationId, status])
-}
-
-// ─── NEW: Metric Snapshots (KPI trend tracking) ───────────────────────────────
-
-model MetricSnapshot {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  metricKey      String // 'burn_rate' | 'mrr' | 'arr' | 'runway_months' | 'cac' | 'ltv'
-  value          Decimal      @db.Decimal(20, 4)
-  unit           String? // 'INR' | 'months' | 'percent'
-  period         String // "2026-03" (YYYY-MM)
-  source         String? // 'manual' | 'calculated' | 'uploaded'
-  recordedAt     DateTime     @default(now())
-
-  @@unique([organizationId, metricKey, period])
-  @@index([organizationId, metricKey])
-  @@index([organizationId, period])
-}
-
-// ─── NEW: Recurring Expenses (for accurate burn rate) ─────────────────────────
-
 enum ExpenseFrequency {
   MONTHLY
   QUARTERLY
   ANNUAL
   ONE_TIME
-}
-
-model RecurringExpense {
-  id             String           @id @default(uuid())
-  organizationId String
-  organization   Organization     @relation(fields: [organizationId], references: [id])
-  name           String // "AWS", "Salaries", "Office Rent"
-  vendor         String?
-  amount         Decimal          @db.Decimal(20, 2)
-  frequency      ExpenseFrequency @default(MONTHLY)
-  category       String // "Infra" | "Payroll" | "Marketing" | etc.
-  startDate      DateTime
-  endDate        DateTime?
-  isActive       Boolean          @default(true)
-  notes          String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-
-  @@index([organizationId, isActive])
-  @@index([organizationId, category])
-}
-
-// ─── NEW: CFO Chat Interface ──────────────────────────────────────────────────
-
-model ChatThread {
-  id             String        @id @default(uuid())
-  organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id])
-  userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  title          String? // Auto-generated from first message
-  messages       ChatMessage[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  @@index([organizationId, userId])
-  @@index([updatedAt])
-}
-
-model ChatMessage {
-  id           String      @id @default(uuid())
-  threadId     String
-  thread       ChatThread  @relation(fields: [threadId], references: [id])
-  role         MessageRole
-  content      String      @db.Text
-  inputTokens  Int?
-  outputTokens Int?
-  model        String? // which gemini model was used
-  latencyMs    Int?
-  createdAt    DateTime    @default(now())
-
-  @@index([threadId, createdAt])
 }
 
 enum MessageRole {
@@ -741,13 +1016,13 @@ enum MessageRole {
   SYSTEM
 }
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
-
 enum Role {
   FOUNDER
   ACCOUNTANT
   INVESTOR
   ADMIN
+  OPERATOR
+  VIEWER
 }
 
 enum TransactionType {
@@ -764,32 +1039,32 @@ enum InvoiceStatus {
   CANCELLED
 }
 
-// ─── Integrations ────────────────────────────────────────────────────────────
+enum SyncStatus {
+  IDLE
+  SYNCING
+  FAILED
+}
+model DecisionFeedback {
+  id                String   @id @default(cuid())
+  organizationId    String
+  decisionId        String
+  decisionType      String
+  accepted          Boolean
+  rolledBack        Boolean
+  outcomeScore      Float?
+  createdAt         DateTime @default(now())
 
-model IntegrationConnection {
-  id             String       @id @default(uuid())
-  userId         String
-  user           User         @relation(fields: [userId], references: [id])
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  provider       String       // e.g., 'CSV_MANUAL', 'ZOHO', 'STRIPE'
-  status         String       // e.g., 'ACTIVE', 'ERROR', 'DISCONNECTED'
-  accessMetadata Json?
-  lastSyncedAt   DateTime?
-  createdAt      DateTime     @default(now())
-
-  @@index([organizationId, provider])
+  organization      Organization @relation(fields: [organizationId], references: [id])
 }
 
-model RawImport {
-  id             String       @id @default(uuid())
-  userId         String
-  user           User         @relation(fields: [userId], references: [id])
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  provider       String
-  sourceType     String       // e.g., 'BANK_STATEMENT', 'REVENUE_CSV'
-  rawPayload     Json
-  status         String
-  importedAt     DateTime     @default(now())
+enum SensitivityLevel {
+  CONSERVATIVE
+  BALANCED
+  AGGRESSIVE
+}
+
+enum AlertTier {
+  ALL
+  IMPORTANT
+  CRITICAL_ONLY
 }

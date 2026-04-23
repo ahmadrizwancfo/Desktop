@@ -4,6 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI, GenerativeModel, GenerateContentResult } from '@google/generative-ai';
 import { AI_CONFIG, AiResponse, CategorizationResult, ComplianceAlert, COMPLIANCE_DEADLINES } from './ai-config';
 import { AiMetricsService } from './ai-metrics.service';
+import { CfoStateService } from '../cfo-engine/cfo-state.service';
+import { CfoBrainService } from '../cfo-engine/cfo-brain.service';
+import { forwardRef, Inject } from '@nestjs/common';
 
 interface CacheEntry {
     response: string;
@@ -25,6 +28,10 @@ export class AiService {
         private prisma: PrismaService,
         private configService: ConfigService,
         private metricsService: AiMetricsService,
+        @Inject(forwardRef(() => CfoStateService))
+        private stateService: CfoStateService,
+        @Inject(forwardRef(() => CfoBrainService))
+        private brainService: CfoBrainService,
     ) {
         this.initializeModels();
     }
@@ -233,116 +240,103 @@ export class AiService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // ==================== Financial Context ====================
-
-    private async getFinancialContext(organizationId: string): Promise<string> {
-        const transactions = await this.prisma.transaction.findMany({
-            where: { bankAccount: { organizationId } },
-            orderBy: { date: 'desc' },
-            take: 100,
-        });
-
-        const bankAccounts = await this.prisma.bankAccount.findMany({
-            where: { organizationId },
-        });
-
-        const invoices = await this.prisma.invoice.findMany({
-            where: { organizationId },
-            orderBy: { createdAt: 'desc' },
-            take: 50,
-        });
-
-        // Calculate key metrics
-        const totalBalance = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
-        const expenses = transactions.filter(t => t.type === 'EXPENSE');
-        const income = transactions.filter(t => t.type === 'INCOME');
-        const monthlyExpense = expenses.reduce((sum, t) => sum + Number(t.amount), 0) / 3;
-        const monthlyIncome = income.reduce((sum, t) => sum + Number(t.amount), 0) / 3;
-        const monthlyBurn = monthlyExpense - monthlyIncome;
-        const runway = monthlyBurn > 0 ? Math.round(totalBalance / monthlyBurn) : 99;
-
-        // Category breakdown
-        const categoryTotals: Record<string, number> = {};
-        expenses.forEach(t => {
-            const cat = t.category || 'Other';
-            categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(t.amount);
-        });
-
-        const topCategories = Object.entries(categoryTotals)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5);
-
-        // Invoice summary
-        const overdueInvoices = invoices.filter(i => i.status === 'OVERDUE');
-        const pendingInvoices = invoices.filter(i => i.status === 'SENT' || i.status === 'DRAFT');
-        const totalReceivables = pendingInvoices.reduce((sum, i) => sum + Number(i.amount), 0);
-
-        return `
-FINANCIAL CONTEXT (as of ${new Date().toLocaleDateString('en-IN')}):
-
-CASH POSITION:
-- Total Bank Balance: ₹${(totalBalance / 100000).toFixed(2)}L
-- Monthly Burn Rate: ₹${(monthlyBurn / 100000).toFixed(2)}L
-- Monthly Income: ₹${(monthlyIncome / 100000).toFixed(2)}L
-- Runway: ${runway} months
-
-EXPENSE BREAKDOWN (Last 3 months):
-${topCategories.map(([cat, amt]) => `- ${cat}: ₹${(amt / 1000).toFixed(0)}K`).join('\n')}
-
-ACCOUNTS RECEIVABLE:
-- Pending Invoices: ${pendingInvoices.length} (₹${(totalReceivables / 100000).toFixed(2)}L)
-- Overdue Invoices: ${overdueInvoices.length}
-
-BANK ACCOUNTS: ${bankAccounts.length} connected
-${bankAccounts.length > 0 ? '- ' + bankAccounts.map(acc => `${acc.name}: ₹${(Number(acc.balance) / 100000).toFixed(2)}L`).join('\n- ') : '- No accounts connected'}
-`;
-    }
+    // ==================== Financial Context (SSOT) ====================
+    // REMOVED Independent calculations to preserve SSOT.
+    // AI now consumes data from CfoStateService strictly.
 
     // ==================== Chat API ====================
 
-    async getChatResponse(organizationId: string, message: string): Promise<string> {
-        const context = await this.getFinancialContext(organizationId);
+    async getChatResponse(organizationId: string, message: string, versionId?: string): Promise<string> {
+        // Fetch Single Source of Truth state (Exactly once per request loop)
+        const state = await this.stateService.getState(organizationId);
+        
+        const timestamp = state.generatedAt;
+        const currentVersion = state.versionId;
 
-        const prompt = `${AI_CONFIG.systemPrompts.cfoChatAssistant}
+        const ignoredCount = state.decisionMemory?.pendingDecisions || 0;
+        const runway = state.summary.runwayMonths;
+        const isCrisis = (runway <= 3 && !state.isInfiniteRunway) || ignoredCount >= 3;
+
+        const stage = state.decisionEngine.decisions[0]?.startupStage || 'stabilize';
+        
+        const context = `
+AUTHORITATIVE FINANCIAL DATA (DO NOT RECALCULATE):
+- Version Identifier: ${currentVersion}
+- Observation Moment: ${timestamp}
+${versionId && versionId !== currentVersion ? `- User View Sync: Dashboard was locked to ${versionId}. AI is now synchronized.` : ''}
+
+PRIMARY DECISION:
+- Urgency: ${state.decisionEngine.urgency.toUpperCase()}
+- Summary: ${state.decisionEngine.summary}
+- Confidence Adjustments Needed: ${state.decisionEngine.confidenceAdjusted ? 'YES (Incomplete Data)' : 'NO'}
+
+DECISION ENGINE V3.5 (LOGICAL OUTCOMES):
+${state.decisionEngine.decisions.slice(0, 1).map(d => `
+  - KEY: ${d.decisionKey}
+  - STAGE: ${d.startupStage.toUpperCase()}
+  - RATIONALE: ${d.rationale}
+  - TRADE-OFF GAIN: ${d.tradeOffs.gain}
+  - TRADE-OFF LOSS: ${d.tradeOffs.loss}
+  - REJECTED OPTION: ${d.alternative.option}
+  - WHY REJECTED: ${d.alternative.whyRejected}
+  - LOGICAL CONSEQUENCE: ${d.alternative.consequence}
+  - RISK TIMEFRAME: ${d.alternative.timeframe}
+  - OUTCOME CONFIDENCE: ${d.alternative.confidence.toUpperCase()}
+`).join('\n')}
+
+BEHAVIORAL AUDIT:
+- Pending Decisions: ${state.decisionMemory.pendingDecisions}
+- Ignore Streak: ${state.decisionMemory.ignoredForDays ? state.decisionMemory.ignoredForDays + ' days' : 'None'}
+- System Nudge: ${state.decisionMemory.nudge || 'No immediate pressure.'}
+- Crisis Mode: ${isCrisis ? 'ACTIVE' : 'INACTIVE'}
+
+KEY PARAMETERS:
+- Cash in Bank: ₹${(state.summary.cashInBank / 100000).toFixed(2)}L
+- Net Burn Rate: ₹${(state.summary.netBurn / 100000).toFixed(2)}L
+- Current Runway: ${state.isInfiniteRunway ? 'Infinite' : state.summary.runwayMonths.toFixed(1) + ' months'}
+- Death Clock: ${state.deathClock.statement}
+`;
+
+        const systemPrompt = `You are an AI CFO co-founder. You implement the "Outcome Clarity Layer" (v3.5).
+Your goal is to force awareness of logical consequences. You do not force decisions, you force clarity.
+
+TONE BY STAGE:
+- ${stage === 'survival' ? 'SURVIVAL: Be direct, time-bound, and factual. Inaction has immediate mathematical consequences.' : ''}
+- ${stage === 'stabilize' ? 'STABILIZE: Be analytical and structured. Focus on unit economics and capital efficiency.' : ''}
+- ${stage === 'growth' ? 'GROWTH: Be strategic and opportunity-focused. Highlight market momentum and scaling risks.' : ''}
+
+REQUIRED RESPONSE STRUCTURE:
+1. Recommendation: (e.g. "Strong recommendation: Cut ₹2L/month")
+2. Trade-off: (Explain "You gain: [Gain]" vs "You lose: [Loss]")
+3. Why this works: (The data rationale)
+4. Alternative considered: (Mention REJECTED OPTION and WHY REJECTED)
+5. If you continue this path: (Explicitly state LOGICAL CONSEQUENCE and RISK TIMEFRAME. Mention OUTCOME CONFIDENCE)
+
+RULES:
+- Never hide the downside of the alternative.
+- Use factual, logical phrasing. No hyper-emotional fear-mongering.
+- Always conclude with: "Final decision is yours. This is based on available data."
+`;
+
+        const prompt = `${systemPrompt}
 
 ${context}
 
 USER QUESTION: ${message}
 
-Respond naturally and helpfully. If the user asks about something not in the data, provide general guidance. Keep responses concise but informative.`;
+Respond naturally as a world-class CFO co-founder. Priority: Resolve the primary decision first.`;
 
         const result = await this.generateWithRetry(prompt, organizationId, 'chat', false);
 
         if (!result.success) {
-            return this.getFallbackResponse(organizationId, message);
+            return this.getFallbackResponse(state);
         }
 
         return result.data;
     }
 
-    private async getFallbackResponse(organizationId: string, message: string): Promise<string> {
-        const lowMessage = message.toLowerCase();
-        const forecast = await this.getCashFlowForecast(organizationId);
-        const tds = await this.getTdsLiability(organizationId);
-
-        if (lowMessage.includes('runway')) {
-            return `Based on your current balance of ₹${(forecast.currentBalance / 100000).toFixed(1)}L and monthly burn of ₹${(forecast.monthlyBurn / 100000).toFixed(1)}L, your runway is approximately ${forecast.runwayMonths} months. ${forecast.riskLevel === 'HIGH' ? '⚠️ This is concerning - consider reducing burn or raising funds.' : 'You\'re in a healthy position.'}`;
-        }
-
-        if (lowMessage.includes('tds') || lowMessage.includes('tax')) {
-            return `Your TDS liability for this quarter is ₹${(tds.totalTdsPayable / 1000).toFixed(0)}K across ${tds.liabilities.length} categories. Next deposit due: ${tds.nextDueDate}. Shall I prepare the challan?`;
-        }
-
-        if (lowMessage.includes('burn') || lowMessage.includes('expense')) {
-            const topCat = forecast.topExpenseCategories[0];
-            return `Your monthly burn is ₹${(forecast.monthlyBurn / 100000).toFixed(1)}L. Top expense: ${topCat?.name || 'General'} (${topCat?.percentage || 0}% of spend). I can help optimize this.`;
-        }
-
-        if (lowMessage.includes('gst')) {
-            return "Your GST summary: GSTR-3B for January is due by Feb 20th. Based on your sales, estimated liability is ₹85,000. ITC available: ₹62,000. Net payable: ₹23,000.";
-        }
-
-        return `I'm analyzing your financials. Current balance: ₹${(forecast.currentBalance / 100000).toFixed(1)}L, Runway: ${forecast.runwayMonths} months, TDS pending: ₹${(tds.totalTdsPayable / 1000).toFixed(0)}K. What would you like to explore?`;
+    private getFallbackResponse(state: any): string {
+        return `I'm analyzing your authoritative financials. Current balance: ₹${(state.summary.cashInBank / 100000).toFixed(1)}L, Runway: ${state.isInfiniteRunway ? 'Infinite' : state.summary.runwayMonths + ' months'}. How can I help you interpret this?`;
     }
 
     // ==================== Expense Categorization ====================
@@ -418,14 +412,17 @@ Respond ONLY with a JSON object (no markdown, no explanation):`;
     // ==================== Compliance Analysis ====================
 
     async getComplianceAlerts(organizationId: string): Promise<ComplianceAlert[]> {
-        const context = await this.getFinancialContext(organizationId);
+        const state = await this.stateService.getState(organizationId);
         const today = new Date();
 
         const prompt = `${AI_CONFIG.systemPrompts.complianceAnalysis}
 
 Today's date: ${today.toLocaleDateString('en-IN')}
 
-${context}
+METRICS:
+- Cash: ₹${state.summary.cashInBank}
+- Expenses: ₹${state.summary.monthlyExpenses}
+- Net Burn: ₹${state.summary.netBurn}
 
 Based on this data, identify upcoming compliance deadlines and potential issues.
 Respond with a JSON array of alerts, each with: { type, severity, title, description, dueDate, actionRequired, estimatedAmount }`;
@@ -590,18 +587,15 @@ Respond with a JSON array of alerts, each with: { type, severity, title, descrip
         riskFactors: string[];
         recommendations: string[];
     }> {
-        const context = await this.getFinancialContext(organizationId);
-        const cashFlow = await this.getCashFlowForecast(organizationId);
+        const state = await this.stateService.getState(organizationId);
 
         const prompt = `${AI_CONFIG.systemPrompts.financialAnalysis}
 
-${context}
-
-Current metrics:
-- Balance: ₹${(cashFlow.currentBalance / 100000).toFixed(2)}L
-- Monthly Burn: ₹${(cashFlow.monthlyBurn / 100000).toFixed(2)}L
-- Monthly Income: ₹${(cashFlow.monthlyIncome / 100000).toFixed(2)}L
-- Current Runway: ${cashFlow.runwayMonths} months
+AUTHORITATIVE METRICS:
+- Balance: ₹${(state.summary.cashInBank / 100000).toFixed(2)}L
+- Monthly Burn: ₹${(state.summary.netBurn / 100000).toFixed(2)}L
+- Monthly Income: ₹${(state.summary.monthlyRevenue / 100000).toFixed(2)}L
+- Current Runway: ${state.summary.runwayMonths} months
 
 Generate a ${months}-month forecast with three scenarios (optimistic, realistic, pessimistic).
 For each scenario, provide monthly projections of: balance, revenue, expenses, runway.
@@ -621,7 +615,7 @@ Respond with JSON:
         const result = await this.generateWithRetry(prompt, organizationId, 'predictions', false);
 
         if (!result.success) {
-            return this.getDefaultPredictions(cashFlow, months);
+            return this.getDefaultPredictions(state.summary, months);
         }
 
         try {
@@ -633,10 +627,10 @@ Respond with JSON:
             this.logger.warn('Failed to parse predictions');
         }
 
-        return this.getDefaultPredictions(cashFlow, months);
+        return this.getDefaultPredictions(state.summary, months);
     }
 
-    private getDefaultPredictions(cashFlow: any, months: number): any {
+    private getDefaultPredictions(summary: any, months: number): any {
         const scenarios = ['optimistic', 'realistic', 'pessimistic'];
         const multipliers = { optimistic: 0.8, realistic: 1.0, pessimistic: 1.2 };
         const revenueGrowth = { optimistic: 1.1, realistic: 1.0, pessimistic: 0.9 };
@@ -647,15 +641,15 @@ Respond with JSON:
                 data: Array.from({ length: months }, (_, i) => {
                     const month = new Date();
                     month.setMonth(month.getMonth() + i + 1);
-                    const burn = cashFlow.monthlyBurn * multipliers[name as keyof typeof multipliers];
-                    const revenue = cashFlow.monthlyIncome * Math.pow(revenueGrowth[name as keyof typeof revenueGrowth], i + 1);
-                    const balance = Math.max(0, cashFlow.currentBalance - (burn - revenue) * (i + 1));
+                    const burn = summary.netBurn * multipliers[name as keyof typeof multipliers];
+                    const revenue = summary.monthlyRevenue * Math.pow(revenueGrowth[name as keyof typeof revenueGrowth], i + 1);
+                    const balance = Math.max(0, summary.cashInBank - (burn - revenue) * (i + 1));
 
                     return {
                         month: month.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }),
                         balance,
                         revenue,
-                        expenses: cashFlow.monthlyExpense * multipliers[name as keyof typeof multipliers],
+                        expenses: summary.monthlyExpenses * multipliers[name as keyof typeof multipliers],
                         runway: burn > revenue ? Math.round(balance / (burn - revenue)) : 99,
                     };
                 }),
@@ -676,16 +670,15 @@ Respond with JSON:
     // ==================== Board Reports & Investor Updates ====================
 
     async generateBoardReport(organizationId: string): Promise<string> {
-        const context = await this.getFinancialContext(organizationId);
-        const cashFlow = await this.getCashFlowForecast(organizationId);
+        const state = await this.stateService.getState(organizationId);
         const compliance = await this.getComplianceAlerts(organizationId);
 
         const prompt = `${AI_CONFIG.systemPrompts.boardReport}
 
-${context}
+${JSON.stringify(state)}
 
 Additional metrics:
-- Risk Level: ${cashFlow.riskLevel}
+- Risk Level: ${state.primaryRisk.severity}
 - Pending Compliance: ${compliance.filter((c) => c.severity === 'CRITICAL' || c.severity === 'HIGH').length} critical/high alerts
 
 Generate a professional board report in markdown format.`;
@@ -698,16 +691,15 @@ Generate a professional board report in markdown format.`;
         organizationId: string,
         customHighlights?: string[]
     ): Promise<string> {
-        const context = await this.getFinancialContext(organizationId);
-        const cashFlow = await this.getCashFlowForecast(organizationId);
+        const state = await this.stateService.getState(organizationId);
 
         const prompt = `${AI_CONFIG.systemPrompts.investorUpdate}
 
-${context}
+${JSON.stringify(state)}
 
 Current Status:
-- Runway: ${cashFlow.runwayMonths} months
-- Burn: ₹${(cashFlow.monthlyBurn / 100000).toFixed(1)}L/month
+- Runway: ${state.summary.runwayMonths} months
+- Burn: ₹${(state.summary.netBurn / 100000).toFixed(1)}L/month
 ${customHighlights ? `\nHighlights to include:\n${customHighlights.map((h) => `- ${h}`).join('\n')}` : ''}
 
 Generate a concise investor update email.`;
@@ -716,20 +708,25 @@ Generate a concise investor update email.`;
         return result.data;
     }
 
-    // ==================== Existing Methods (Updated) ====================
+    // ==================== Existing Methods ====================
+
+    async getCashFlowForecast(organizationId: string) {
+        const state = await this.stateService.getState(organizationId);
+        return {
+            currentBalance: state.summary.cashInBank,
+            monthlyBurn: state.summary.netBurn,
+            monthlyRevenue: state.summary.monthlyRevenue,
+            runwayMonths: state.summary.runwayMonths,
+            riskLevel: state.companyStatus === 'stable' ? 'LOW' : state.companyStatus === 'at_risk' ? 'MEDIUM' : 'HIGH',
+            forecast: state.cashForecast.next30Days
+        };
+    }
 
     async getInsights(organizationId: string) {
-        const transactions = await this.prisma.transaction.findMany({
-            where: { bankAccount: { organizationId } },
-            orderBy: { date: 'desc' },
-            take: 200,
-        });
-
+        const state = await this.stateService.getState(organizationId);
         const insights: any[] = [];
 
-        const monthlyExpenses = transactions
-            .filter(t => t.type === 'EXPENSE')
-            .reduce((sum, t) => sum + Number(t.amount), 0);
+        const monthlyExpenses = state.summary.monthlyExpenses;
 
         if (monthlyExpenses > 500000) {
             insights.push({
@@ -740,103 +737,21 @@ Generate a concise investor update email.`;
             });
         }
 
-        const tdsEligible = transactions.filter(t =>
-            t.type === 'EXPENSE' &&
-            Number(t.amount) > 30000 &&
-            ['Professional Fees', 'Consulting', 'Legal', 'Technical Services'].includes(t.category || '')
-        );
-
-        if (tdsEligible.length > 0) {
-            const totalUnder194J = tdsEligible.reduce((sum, t) => sum + Number(t.amount), 0);
-            insights.push({
-                type: 'TDS_ALERT',
-                title: `TDS Required: ${tdsEligible.length} Transactions`,
-                description: `₹${(totalUnder194J / 100000).toFixed(1)}L in payments require 10% TDS (Section 194J).`,
-                impact: 'CRITICAL',
-                action: 'Review TDS Liability',
-            });
-        }
-
-        const gstEligible = transactions.filter(t =>
-            t.type === 'EXPENSE' && Number(t.amount) > 10000
-        );
-        const potentialITC = gstEligible.reduce((sum, t) => sum + Number(t.amount) * 0.18, 0);
-
-        if (potentialITC > 10000) {
-            insights.push({
-                type: 'COMPLIANCE',
-                title: 'GST Input Credit Opportunity',
-                description: `Potential ITC of ₹${(potentialITC / 1000).toFixed(0)}K from ${gstEligible.length} eligible purchases.`,
-                impact: 'HIGH'
-            });
-        }
-
+        // Logic simplified to use state
         return insights;
-    }
-
-    async getCashFlowForecast(organizationId: string) {
-        const bankAccounts = await this.prisma.bankAccount.findMany({
-            where: { organizationId },
-        });
-
-        const totalBalance = bankAccounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
-
-        const transactions = await this.prisma.transaction.findMany({
-            where: { bankAccount: { organizationId } },
-            orderBy: { date: 'desc' },
-            take: 90,
-        });
-
-        const expenses = transactions.filter(t => t.type === 'EXPENSE');
-        const income = transactions.filter(t => t.type === 'INCOME');
-
-        const avgMonthlyExpense = expenses.reduce((sum, t) => sum + Number(t.amount), 0) / 3;
-        const avgMonthlyIncome = income.reduce((sum, t) => sum + Number(t.amount), 0) / 3;
-        const avgMonthlyBurn = avgMonthlyExpense - avgMonthlyIncome;
-
-        const runway = avgMonthlyBurn > 0 ? Math.round(totalBalance / avgMonthlyBurn) : 99;
-
-        const categoryTotals: Record<string, number> = {};
-        expenses.forEach(t => {
-            const cat = t.category || 'Other';
-            categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(t.amount);
-        });
-
-        const topCategories = Object.entries(categoryTotals)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5)
-            .map(([name, amount]) => ({ name, amount, percentage: Math.round(amount / avgMonthlyExpense * 100 / 3) }));
-
-        return {
-            currentBalance: totalBalance,
-            monthlyBurn: avgMonthlyBurn,
-            monthlyIncome: avgMonthlyIncome,
-            monthlyExpense: avgMonthlyExpense,
-            runwayMonths: runway,
-            topExpenseCategories: topCategories,
-            forecast: [
-                { month: 'Feb 2026', projected: totalBalance - avgMonthlyBurn },
-                { month: 'Mar 2026', projected: totalBalance - avgMonthlyBurn * 2 },
-                { month: 'Apr 2026', projected: totalBalance - avgMonthlyBurn * 3 },
-            ],
-            riskLevel: runway < 6 ? 'HIGH' : runway < 12 ? 'MEDIUM' : 'LOW',
-        };
     }
 
     async getTdsLiability(organizationId: string) {
         const transactions = await this.prisma.transaction.findMany({
-            where: {
-                bankAccount: { organizationId },
-                type: 'EXPENSE',
-            },
-            orderBy: { date: 'desc' },
+            where: { bankAccount: { organizationId }, type: 'EXPENSE' },
         });
 
         const tdsRules = [
-            { section: '194C', name: 'Contractor Payments', threshold: 30000, rate: 0.01, categories: ['Contractor', 'Construction'] },
-            { section: '194J', name: 'Professional Services', threshold: 30000, rate: 0.10, categories: ['Professional Fees', 'Consulting', 'Legal', 'Technical Services', 'Auditor'] },
-            { section: '194H', name: 'Commission', threshold: 15000, rate: 0.05, categories: ['Commission', 'Brokerage'] },
-            { section: '194I', name: 'Rent', threshold: 240000, rate: 0.10, categories: ['Rent', 'Office Rent'] },
+            { section: '194J', name: 'Professional Fees', rate: 0.10, threshold: 30000, categories: ['Professional Fees', 'Legal & Compliance'] },
+            { section: '194C', name: 'Contractor Payments', rate: 0.02, threshold: 30000, categories: ['Contractor Payments'] },
+            { section: '194I', name: 'Rent', rate: 0.10, threshold: 240000, categories: ['Rent'] },
+            { section: '194H', name: 'Commission', rate: 0.05, threshold: 15000, categories: ['Commission & Brokerage'] },
+            { section: '192', name: 'Salary', rate: 0.05, threshold: 250000, categories: ['Salary & Wages'] }
         ];
 
         const liabilities: any[] = [];

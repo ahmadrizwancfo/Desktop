@@ -219,7 +219,7 @@ export default function UpgradePage() {
                 {/* FAQ */}
                 <div className="text-center pb-12">
                     <p className="text-slate-400">
-                        Questions? <a href="#" className="text-primary font-bold hover:underline">Contact our sales team</a>
+                        Questions? <a href="mailto:support@foundercfo.com" className="text-primary font-bold hover:underline">Contact our sales team</a>
                     </p>
                 </div>
             </div>

@@ -1,18 +1,20 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { BreakEvenCalculator } from '@/components/simulator/break-even-calculator';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     TrendingUp, TrendingDown, Users, CreditCard, Megaphone, DollarSign,
     Save, RotateCcw, AlertTriangle, Lightbulb, Loader2, Zap, Shield,
-    Clock, ArrowRight, Check, X, ChevronRight, BarChart3, Layers
+    Clock, ArrowRight, Check, X, ChevronRight, BarChart3, Layers, BrainCircuit
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/lib/utils';
+import { decodeActionPayload, type ActionPayload } from '@/store/cfo-state-store';
 
 interface SimulationResult {
     currentCash: number;
@@ -167,10 +169,26 @@ const PRESET_SCENARIOS: PresetScenario[] = [
 ];
 
 export default function SimulatorPage() {
+    return (
+        <Suspense fallback={
+            <DashboardLayout>
+                <div className="h-full flex items-center justify-center">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                </div>
+            </DashboardLayout>
+        }>
+            <SimulatorContent />
+        </Suspense>
+    );
+}
+
+function SimulatorContent() {
     const user = useAuthStore((state) => state.user);
+    const searchParams = useSearchParams();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<'simulator' | 'breakeven'>('simulator');
     const [activeScenarioTab, setActiveScenarioTab] = useState<'presets' | 'saved'>('presets');
+    const [loadedFromDashboard, setLoadedFromDashboard] = useState<string | null>(null);
 
     const { data: savedScenarios, refetch: refetchScenarios } = useQuery({
         queryKey: ['scenarios'],
@@ -223,6 +241,45 @@ export default function SimulatorPage() {
             setValues(baselineData);
         }
     }, [baselineData]);
+
+    // ── ACTION PAYLOAD: read from ?action= param (sent by Dashboard) ─────
+    useEffect(() => {
+        const actionParam = searchParams.get('action');
+        if (!actionParam || !baselineData) return;
+
+        const payload = decodeActionPayload(actionParam);
+        if (!payload) return;
+
+        const newValues = { ...baselineData };
+
+        if (payload.type === 'simulate_cost_cut' && payload.preloadedScenario) {
+            const ps = payload.preloadedScenario;
+            if (ps.saasSpend !== undefined) newValues.saasSpend = ps.saasSpend;
+            if (ps.marketingSpend !== undefined) newValues.marketingSpend = ps.marketingSpend;
+            if (ps.targetReduction && !ps.saasSpend && !ps.marketingSpend) {
+                // Apply generic cut: reduce marketing by 50%, SaaS by 30%
+                newValues.marketingSpend = Math.round(newValues.marketingSpend * 0.5);
+                newValues.saasSpend = Math.round(newValues.saasSpend * 0.7);
+            }
+            setLoadedFromDashboard('Cost Reduction — loaded from Dashboard recommendation');
+        }
+
+        if (payload.type === 'simulate_fundraise' && payload.preloadedScenario) {
+            if (payload.preloadedScenario.currentCash) {
+                newValues.currentCash = newValues.currentCash + payload.preloadedScenario.currentCash;
+            }
+            setLoadedFromDashboard('Fundraise Scenario — loaded from Dashboard recommendation');
+        }
+
+        if (payload.type === 'simulate_growth' && payload.preloadedScenario) {
+            if (payload.preloadedScenario.monthlyRevenue) {
+                newValues.monthlyRevenue = payload.preloadedScenario.monthlyRevenue;
+            }
+            setLoadedFromDashboard('Growth Scenario — loaded from Dashboard recommendation');
+        }
+
+        setValues(newValues);
+    }, [searchParams, baselineData]);
 
     // Calculate mutation
     const calculateMutation = useMutation({
@@ -381,6 +438,26 @@ export default function SimulatorPage() {
     return (
         <DashboardLayout>
             <div className="max-w-7xl mx-auto space-y-8">
+                {/* ── LOADED FROM DASHBOARD BANNER ────────────────────────── */}
+                {loadedFromDashboard && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-3 p-4 rounded-2xl bg-primary/10 border border-primary/30"
+                    >
+                        <BrainCircuit className="w-5 h-5 text-primary flex-shrink-0" />
+                        <div className="flex-1">
+                            <p className="text-sm font-bold text-white">{loadedFromDashboard}</p>
+                            <p className="text-xs text-slate-400">Sliders have been adjusted based on your financial data. Tweak and explore.</p>
+                        </div>
+                        <button
+                            onClick={() => { setLoadedFromDashboard(null); resetToBaseline(); }}
+                            className="text-xs text-slate-500 hover:text-white transition-colors font-bold px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10"
+                        >
+                            Reset
+                        </button>
+                    </motion.div>
+                )}
                 {/* Header */}
                 <div className="flex flex-col md:flex-row justify-between items-end gap-4">
                     <div>

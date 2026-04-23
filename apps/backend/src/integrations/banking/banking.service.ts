@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { IBankingProvider } from './banking.interface';
 import { SandboxBankingProvider } from './providers/sandbox.provider';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CfoBrainService } from '../../cfo-engine/cfo-brain.service';
 
 @Injectable()
 export class BankingService {
@@ -13,6 +14,7 @@ export class BankingService {
         private configService: ConfigService,
         private sandboxProvider: SandboxBankingProvider,
         private prisma: PrismaService,
+        @Optional() @Inject(CfoBrainService) private cfoBrain: CfoBrainService | null,
     ) {
         const mode = this.configService.get<string>('BANKING_MODE') || 'sandbox';
 
@@ -153,6 +155,15 @@ export class BankingService {
         // ── 5. Recalculate StartupProfile metrics ────────────────────────────
         if (newCount > 0) {
             await this.recalculateOrgMetrics(organizationId, userId);
+        }
+
+        // ── 6. Regenerate CFO Brain insights (non-blocking) ──────────────────
+        if (newCount > 0 && this.cfoBrain) {
+            this.cfoBrain.generateReport(organizationId, userId).then(report => {
+                this.logger.log(`CFO Brain: ${report.insights.length} insights regenerated after sync`);
+            }).catch(err => {
+                this.logger.warn(`CFO Brain post-sync failed: ${err.message}`);
+            });
         }
 
         return {

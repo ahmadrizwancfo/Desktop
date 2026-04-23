@@ -7,11 +7,13 @@ import { WeeklyBriefController } from './weekly-brief.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiModule } from '../ai/ai.module';
 
+import { EmailService } from './email.service';
+
 @Global()
 @Module({
     imports: [PrismaModule, ConfigModule, AiModule],
     controllers: [NotificationsController, WeeklyBriefController],
-    providers: [NotificationsService, SmartNotificationsService],
-    exports: [NotificationsService, SmartNotificationsService],
+    providers: [NotificationsService, SmartNotificationsService, EmailService],
+    exports: [NotificationsService, SmartNotificationsService, EmailService],
 })
 export class NotificationsModule { }

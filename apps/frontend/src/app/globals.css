@@ -3,7 +3,7 @@
 @theme {
   --font-sans: "Outfit", Arial, sans-serif;
   
-  --color-primary: #818cf8;
+  --color-primary: #A78BFA;
   --color-primary-foreground: #ffffff;
   
   --color-background: #020617; /* Deeper navy/black */
@@ -22,8 +22,8 @@
 :root {
   --background: #020617;
   --foreground: #f8fafc;
-  --primary: #818cf8;
-  --primary-glow: rgba(129, 140, 248, 0.2);
+  --primary: #A78BFA;
+  --primary-glow: rgba(167, 139, 250, 0.2);
   --accent-violet: #8b5cf6;
   --accent-teal: #14b8a6;
 }

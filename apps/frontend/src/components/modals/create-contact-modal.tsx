@@ -35,6 +35,7 @@ export function CreateContactModal({ isOpen, onClose }: CreateContactModalProps)
         address: '',
     });
 
+    const createMutation = useMutation({
         mutationFn: async (data: ContactForm) => {
             const res = await apiClient.post('/contacts', data);
             return res.data;

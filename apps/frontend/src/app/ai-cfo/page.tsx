@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useCFOState } from '@/store/cfo-state-store';
 
 interface Message {
     id: string;
@@ -117,39 +118,16 @@ function AICFOContent() {
         enabled: !!user?.organizationId,
     });
 
-    // Get real financial context
-    const { data: context } = useQuery({
-        queryKey: ['financial-context', user?.organizationId],
-        queryFn: async () => {
-            try {
-                const res = await apiClient.get('/recommendations');
-                const data = res.data;
-                return {
-                    runway: data.runway || 7.2,
-                    burnTrend: data.burnTrend || 'stable',
-                    revenueGrowth: data.revenueGrowth || 0,
-                    topRisk: data.topRisk || 'No critical risks detected',
-                    cashFlowScore: data.cashFlowScore || 75,
-                } as FinancialContext;
-            } catch {
-                // Fallback to profile-derived context
-                const cashInBank = profile?.cashInBank || 2800000;
-                const burn = profile?.monthlyExpenses || 550000;
-                const revenue = profile?.monthlyRevenue || 320000;
-                const netBurn = burn - revenue;
-                const runway = netBurn > 0 ? cashInBank / netBurn : 999;
+    // Get real financial context from SSOT
+    const { data: state } = useCFOState();
 
-                return {
-                    runway: Math.min(runway, 99),
-                    burnTrend: 'stable' as const,
-                    revenueGrowth: 0,
-                    topRisk: runway < 6 ? `Runway critically low at ${runway.toFixed(1)} months` : 'Monitor burn rate',
-                    cashFlowScore: Math.min(Math.round((runway / 18) * 100), 100),
-                } as FinancialContext;
-            }
-        },
-        enabled: !!user?.organizationId,
-    });
+    const context: FinancialContext | undefined = state ? {
+        runway: state.summary.runwayMonths,
+        burnTrend: state.summary.burnTrend as any,
+        revenueGrowth: state.delta.prevRevenue ? ((state.summary.monthlyRevenue - state.delta.prevRevenue) / state.delta.prevRevenue) * 100 : 0,
+        topRisk: state.primaryRisk.message,
+        cashFlowScore: state.dynamicConfidence.score,
+    } : undefined;
 
     // Initial greeting based on context
     useEffect(() => {
@@ -161,10 +139,10 @@ function AICFOContent() {
                 content: greeting,
                 timestamp: 'Just now',
                 opinion: context.burnTrend === 'increasing' ? 'bearish' : 'bullish',
-                confidence: 85,
+                confidence: state?.dynamicConfidence.score || 85,
             }]);
         }
-    }, [context, messages.length]);
+    }, [context, messages.length, state?.dynamicConfidence.score]);
 
     // Handle pre-filled question from URL (?q=...)
     useEffect(() => {
@@ -207,7 +185,10 @@ function AICFOContent() {
         setIsTyping(true);
 
         try {
-            const response = await apiClient.post('/ai/chat', { message: msgText });
+            const response = await apiClient.post('/ai/chat', { 
+                message: msgText,
+                versionId: state?.versionId 
+            });
 
             const aiResponse: Message = {
                 id: (Date.now() + 1).toString(),
@@ -215,7 +196,7 @@ function AICFOContent() {
                 content: response.data.response,
                 timestamp: 'Now',
                 opinion: determineOpinion(response.data.response),
-                confidence: Math.floor(Math.random() * 20) + 75,
+                confidence: state?.dynamicConfidence.score || 85,
                 actions: extractActions(msgText),
             };
 
@@ -224,7 +205,7 @@ function AICFOContent() {
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(),
                 role: 'ai',
-                content: "I'm having trouble connecting. This might be a network issue. Try again in a moment.",
+                content: "I'm having trouble connecting to the financial engine. Please try again in a moment.",
                 timestamp: 'Now',
             }]);
         } finally {

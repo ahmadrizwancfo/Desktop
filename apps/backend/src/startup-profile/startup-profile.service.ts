@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateStartupProfileDto } from './dto/create-startup-profile.dto';
 import { CfoEngineService } from '../cfo-engine/cfo-engine.service';
 import { AiExplainerService } from '../ai-explainer/ai-explainer.service';
+import { SensitivityLevel, AlertTier } from '@prisma/client';
 
 @Injectable()
 export class StartupProfileService {
@@ -41,6 +42,8 @@ export class StartupProfileService {
                 country: dto.country ?? 'IN',
                 industry: dto.industry,
                 primaryGoal: dto.primaryGoal,
+                decisionSensitivity: SensitivityLevel.BALANCED,
+                notificationPreference: AlertTier.IMPORTANT
             },
             update: {
                 companyName: dto.companyName,
@@ -52,6 +55,8 @@ export class StartupProfileService {
                 country: dto.country ?? 'IN',
                 industry: dto.industry,
                 primaryGoal: dto.primaryGoal,
+                decisionSensitivity: (dto.decisionSensitivity as SensitivityLevel) ?? SensitivityLevel.BALANCED,
+                notificationPreference: (dto.notificationPreference as AlertTier) ?? AlertTier.IMPORTANT
             },
         });
 

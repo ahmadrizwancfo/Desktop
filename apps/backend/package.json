@@ -17,7 +17,10 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "simulate:autopilot": "npx ts-node --project tsconfig.json src/simulations/auto-pilot.simulation.ts",
+    "simulate:behavioral": "npx ts-node --project tsconfig.json src/simulations/behavioral-audit.ts",
+    "simulate:db:push": "powershell -Command \"$env:DATABASE_URL='postgresql://postgres:postgres@localhost:5432/foundercfo_test?schema=public'; npx prisma db push --skip-generate\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -50,6 +53,7 @@
     "prisma": "^5.22.0",
     "razorpay": "^2.9.6",
     "reflect-metadata": "^0.2.2",
+    "resend": "^6.12.0",
     "rxjs": "^7.8.1",
     "sharp": "^0.34.5",
     "tesseract.js": "^7.0.0",

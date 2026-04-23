@@ -33,6 +33,7 @@ import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { useStartupProfileStore } from '@/store/startup-profile-store';
+import { useCfoStateStore } from '@/store/cfo-state-store';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -65,6 +66,8 @@ interface CfoDecision {
   recommendedActions: string[];
   status: Status;
   createdAt: string;
+  reversibility: 'high' | 'medium' | 'low';
+  impactLine?: string;
   aiExplanation: AiExplanation | null;
 }
 
@@ -185,7 +188,9 @@ const DecisionCard = memo(function DecisionCard({
   onStatusChange: (id: string, status: Status) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [tracked, setTracked] = useState(false); // FIX: prevent double-submit
+  const [tracked, setTracked] = useState(false); 
+  const cfoState = useCfoStateStore((s) => s.state);
+  const summary = cfoState?.summary;
 
   const domain = DOMAIN_META[decision.decisionDomain];
   const DomainIcon = domain?.Icon ?? AlertTriangle;
@@ -307,7 +312,21 @@ const DecisionCard = memo(function DecisionCard({
             <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider', SEVERITY_BADGE[decision.severity])}>
               {decision.severity}
             </span>
-            {/* FIX: Confidence bar instead of just text */}
+            {decision.impactLine && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 uppercase tracking-widest border border-emerald-500/30">
+                {decision.impactLine}
+              </span>
+            )}
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 group relative cursor-help">
+              <span className={cn('w-1.5 h-1.5 rounded-full', 
+                decision.reversibility === 'high' ? 'bg-emerald-500' : 
+                decision.reversibility === 'medium' ? 'bg-amber-500' : 'bg-rose-500'
+              )} />
+              <span className="text-[10px] font-bold text-slate-400 capitalize">
+                {decision.reversibility === 'high' ? 'Easy to undo' : 
+                 decision.reversibility === 'medium' ? 'Moderate effort' : 'Hard to reverse'}
+              </span>
+            </div>
             <ConfidenceBar value={decision.confidence} severity={decision.severity} />
             <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold ml-auto', STATUS_STYLES[decision.status])}>
               {decision.status}
@@ -339,6 +358,37 @@ const DecisionCard = memo(function DecisionCard({
                 // FIX: Accessible live region for screen readers
                 aria-live="polite"
               >
+                {/* Show the Math - Deterministic Breakdown */}
+                {summary && (
+                  <div className="mb-3 p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/10">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3">Why this action?</p>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 text-[11px] font-medium">Cash Balance</span>
+                        <span className="text-white text-[11px] font-bold">₹{(summary.cashInBank/100000).toFixed(2)}L</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 text-[11px] font-medium">Monthly Burn</span>
+                        <span className="text-white text-[11px] font-bold">₹{(summary.netBurn/100000).toFixed(2)}L</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 text-[11px] font-medium">Avg Burn (Last 30 days)</span>
+                        <span className="text-white text-[11px] font-bold">₹{(summary.netBurn/100000).toFixed(2)}L</span>
+                      </div>
+                      {summary.monthlyRevenue > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 text-[11px] font-medium">Revenue (30 days)</span>
+                          <span className="text-white text-[11px] font-bold">₹{(summary.monthlyRevenue/100000).toFixed(2)}L</span>
+                        </div>
+                      )}
+                      <div className="pt-2 mt-2 border-t border-white/5 flex justify-between items-center">
+                        <span className="text-indigo-400 text-[11px] font-black uppercase tracking-wider">Runway</span>
+                        <span className="text-indigo-400 text-lg font-black tracking-tighter tabular-nums">{summary.runwayMonths.toFixed(1)} Months</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Key numbers */}
                 {factEntries.length > 0 && (
                   <div className="mb-3 p-3 rounded-xl bg-white/5 border border-white/10">
@@ -407,7 +457,7 @@ const DecisionCard = memo(function DecisionCard({
             >
               {expanded
                 ? <><ChevronUp className="w-3 h-3" aria-hidden /> Collapse</>
-                : <><ChevronDown className="w-3 h-3" aria-hidden /> Why this matters</>
+                : <><ChevronDown className="w-3 h-3" aria-hidden /> See the logic</>
               }
             </button>
 
@@ -416,13 +466,13 @@ const DecisionCard = memo(function DecisionCard({
               <button
                 onClick={() => statusMutation.mutate(nextStatus)}
                 disabled={statusMutation.isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs font-bold hover:bg-primary/20 hover:text-primary transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs font-bold hover:bg-white/10 transition-colors disabled:opacity-50"
               >
                 {statusMutation.isPending
                   ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
-                  : <CheckCircle className="w-3 h-3" aria-hidden />
+                  : <CheckCircle className="w-3 h-3 text-emerald-400" aria-hidden />
                 }
-                Mark {nextStatus === 'ACKNOWLEDGED' ? 'Seen' : 'Resolved'}
+                {nextStatus === 'ACKNOWLEDGED' ? 'Mark Action Taken' : 'Mark Fixed'}
               </button>
             )}
 

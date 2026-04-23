@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { TrendingUp, Mail, Lock, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 
@@ -80,10 +81,7 @@ export default function RegisterPage() {
             >
                 <div className="text-center mb-8">
                     <Link href="/" className="inline-flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 transition-transform">
-                            <TrendingUp className="text-white w-6 h-6" />
-                        </div>
-                        <span className="text-2xl font-black text-white tracking-tighter">FounderCFO</span>
+                        <Logo size="lg" />
                     </Link>
                     <h1 className="text-3xl font-bold text-white tracking-tight">Create Account</h1>
                     <p className="text-slate-400 mt-2">Start your 14-day free trial. No credit card required.</p>

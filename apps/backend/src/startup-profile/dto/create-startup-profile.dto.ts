@@ -58,4 +58,12 @@ export class CreateStartupProfileDto {
     @IsString()
     @IsOptional()
     organizationId?: string;
+
+    @IsString()
+    @IsOptional()
+    decisionSensitivity?: string;
+
+    @IsString()
+    @IsOptional()
+    notificationPreference?: string;
 }

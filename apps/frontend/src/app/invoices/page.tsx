@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { InvoiceReminders, InvoiceAgingChart } from '@/components/dashboard/invoice-reminders';
@@ -15,15 +15,15 @@ import {
     CheckCircle2,
     Clock,
     AlertCircle,
-    MoreVertical,
-    Download,
-    Eye,
     Loader2,
     MessageCircle,
-    Bell
+    Bell,
+    Trash2,
+    CheckCircle,
+    X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const statusConfig: Record<string, { color: string; bg: string; icon: any }> = {
     PAID: { color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: CheckCircle2 },
@@ -35,8 +35,11 @@ const statusConfig: Record<string, { color: string; bg: string; icon: any }> = {
 
 export default function InvoicesPage() {
     const user = useAuthStore((state) => state.user);
+    const queryClient = useQueryClient();
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
+    const [searchQuery, setSearchQuery] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     const { data: invoices, isLoading } = useQuery({
         queryKey: ['invoices', user?.organizationId],
@@ -47,9 +50,43 @@ export default function InvoicesPage() {
         enabled: !!user?.organizationId,
     });
 
-    const filteredInvoices = invoices?.filter((inv: any) =>
-        filterStatus === 'ALL' || inv.status === filterStatus
-    ) || [];
+    // Mark as Paid mutation
+    const markPaid = useMutation({
+        mutationFn: async (id: string) => {
+            await apiClient.patch(`/invoices/${id}`, { status: 'PAID' });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
+        },
+    });
+
+    // Delete invoice mutation
+    const deleteInvoice = useMutation({
+        mutationFn: async (id: string) => {
+            await apiClient.delete(`/invoices/${id}`);
+        },
+        onSuccess: () => {
+            setDeleteConfirmId(null);
+            queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
+        },
+    });
+
+    // Send Reminder mutation
+    const sendReminder = useMutation({
+        mutationFn: async (id: string) => {
+            await apiClient.post(`/invoices/${id}/send-reminder`, { channel: 'EMAIL' });
+        },
+    });
+
+    const filteredInvoices = (invoices || []).filter((inv: any) => {
+        const matchesStatus = filterStatus === 'ALL' || inv.status === filterStatus;
+        const matchesSearch = !searchQuery ||
+            inv.invoiceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            inv.clientName?.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesStatus && matchesSearch;
+    });
 
     const stats = {
         total: invoices?.length || 0,
@@ -61,6 +98,51 @@ export default function InvoicesPage() {
     return (
         <DashboardLayout>
             <CreateInvoiceModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+
+            {/* Delete Confirmation Modal */}
+            <AnimatePresence>
+                {deleteConfirmId && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm z-50"
+                        >
+                            <div className="glass-card rounded-3xl border border-white/10 p-6 text-center">
+                                <div className="w-14 h-14 mx-auto bg-rose-500/20 rounded-full flex items-center justify-center mb-4">
+                                    <Trash2 className="w-7 h-7 text-rose-500" />
+                                </div>
+                                <h3 className="text-lg font-bold text-white mb-2">Delete Invoice?</h3>
+                                <p className="text-sm text-slate-400 mb-6">This action cannot be undone. The invoice will be permanently removed.</p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setDeleteConfirmId(null)}
+                                        className="flex-1 py-3 rounded-xl bg-white/5 text-white font-bold text-sm hover:bg-white/10 transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => deleteInvoice.mutate(deleteConfirmId)}
+                                        disabled={deleteInvoice.isPending}
+                                        className="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold text-sm hover:bg-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {deleteInvoice.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
 
             <div className="flex flex-col gap-8">
                 {/* Header */}
@@ -102,6 +184,8 @@ export default function InvoicesPage() {
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                                 <input
                                     type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Search invoices..."
                                     className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
                                 />
@@ -139,7 +223,7 @@ export default function InvoicesPage() {
                                             <th className="px-6 py-4">Due Date</th>
                                             <th className="px-6 py-4">Status</th>
                                             <th className="px-6 py-4 text-right">Amount</th>
-                                            <th className="px-6 py-4"></th>
+                                            <th className="px-6 py-4 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -177,15 +261,36 @@ export default function InvoicesPage() {
                                                         ₹{Number(invoice.amount).toLocaleString('en-IN')}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button className="p-2 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white" title="View">
-                                                                <Eye className="w-4 h-4" />
-                                                            </button>
-                                                            <button className="p-2 hover:bg-emerald-500/10 rounded-lg text-slate-400 hover:text-emerald-500" title="WhatsApp">
-                                                                <MessageCircle className="w-4 h-4" />
-                                                            </button>
-                                                            <button className="p-2 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white">
-                                                                <MoreVertical className="w-4 h-4" />
+                                                        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {/* Mark as Paid (only for non-paid invoices) */}
+                                                            {invoice.status !== 'PAID' && (
+                                                                <button
+                                                                    onClick={() => markPaid.mutate(invoice.id)}
+                                                                    disabled={markPaid.isPending}
+                                                                    className="p-2 hover:bg-emerald-500/10 rounded-lg text-slate-400 hover:text-emerald-500 transition-all"
+                                                                    title="Mark as Paid"
+                                                                >
+                                                                    <CheckCircle className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                            {/* Send Reminder (only for pending/overdue) */}
+                                                            {(invoice.status === 'PENDING' || invoice.status === 'OVERDUE') && (
+                                                                <button
+                                                                    onClick={() => sendReminder.mutate(invoice.id)}
+                                                                    disabled={sendReminder.isPending}
+                                                                    className="p-2 hover:bg-sky-500/10 rounded-lg text-slate-400 hover:text-sky-500 transition-all"
+                                                                    title="Send Reminder"
+                                                                >
+                                                                    <MessageCircle className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                            {/* Delete */}
+                                                            <button
+                                                                onClick={() => setDeleteConfirmId(invoice.id)}
+                                                                className="p-2 hover:bg-rose-500/10 rounded-lg text-slate-400 hover:text-rose-500 transition-all"
+                                                                title="Delete Invoice"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
                                                             </button>
                                                         </div>
                                                     </td>

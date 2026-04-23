@@ -6,21 +6,24 @@ import { Header } from './header';
 import { KeyboardShortcuts } from '../ui/keyboard-shortcuts';
 import { PageTransition } from './page-transition';
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+export function DashboardLayout({ children, banner }: { children: React.ReactNode, banner?: React.ReactNode }) {
     return (
-        <div className="min-h-screen bg-[#020617] text-foreground flex overflow-hidden">
-            {/* Sidebar - Desktop */}
-            <Sidebar />
+        <div className="flex flex-col min-h-screen">
+            {banner}
+            <div className="flex-1 bg-[#020617] text-foreground flex overflow-hidden">
+                {/* Sidebar - Desktop */}
+                <Sidebar />
 
-            {/* Main Content */}
-            <main className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
-                <Header />
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 p-10">
-                    <PageTransition>
-                        {children}
-                    </PageTransition>
-                </div>
-            </main>
+                {/* Main Content */}
+                <main className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
+                    <Header />
+                    <div className="flex-1 overflow-y-auto custom-scrollbar relative z-10 p-10">
+                        <PageTransition>
+                            {children}
+                        </PageTransition>
+                    </div>
+                </main>
+            </div>
 
             {/* Keyboard Shortcuts */}
             <KeyboardShortcuts />

@@ -219,18 +219,73 @@ export class WeeklyBriefController {
             // First brief — no comparison available
         }
 
-        // ── COMPACT 3-LINE SUMMARY ────────────────────────────────────────────
-        const runwayLine = `Runway: ${Math.round(runway * 10) / 10} months${changeVsLastWeek ? ` (${changeVsLastWeek.runwayDirection} by ${Math.abs(changeVsLastWeek.runwayDelta)}mo)` : ''}`;
-        const burnLine = `Burn: ₹${(monthlyExpenses / 100000).toFixed(1)}L/mo${burnTrend !== 0 ? ` (${burnTrend > 0 ? '↑' : '↓'}${Math.abs(Math.round(burnTrend))}% vs last month)` : ''}`;
-        const riskLine = biggestRisk.severity !== 'LOW'
-            ? `⚠️ ${biggestRisk.type} [${biggestRisk.severity}]: ${biggestRisk.summary}`
-            : '✅ No critical risks detected';
+        // ── PRESSURE LANGUAGE: OPENING LINE ──────────────────────────────────────
+        let openingLine: string;
+        if (changeVsLastWeek) {
+            if (changeVsLastWeek.runwayDirection === 'worsened') {
+                openingLine = `This week moved you closer to running out of cash. You lost ${Math.abs(changeVsLastWeek.runwayDelta)} months of runway.`;
+            } else if (changeVsLastWeek.runwayDirection === 'improved') {
+                openingLine = `This week moved you further from running out of cash. You gained ${changeVsLastWeek.runwayDelta} months of runway.`;
+            } else {
+                openingLine = `This week, your financial position did not change. Inaction is still a risk.`;
+            }
+        } else {
+            openingLine = `This is your first survival brief. Your runway is ${Math.round(runway * 10) / 10} months.`;
+        }
+
+        // ── TOP MISTAKE (biggest negative impact this week) ──────────────────
+        let topMistake: string | null = null;
+        if (changeVsLastWeek?.burnDirection === 'increased' && changeVsLastWeek.burnDelta > 0) {
+            const fmtBurn = changeVsLastWeek.burnDelta >= 100000
+                ? `₹${(changeVsLastWeek.burnDelta / 100000).toFixed(1)}L`
+                : `₹${Math.round(changeVsLastWeek.burnDelta / 1000)}K`;
+            topMistake = `Your burn increased by ${fmtBurn}/mo. This is directly shortening your survival time.`;
+        } else if (biggestRisk.severity === 'CRITICAL' || biggestRisk.severity === 'HIGH') {
+            topMistake = `Unresolved ${biggestRisk.type} risk (${biggestRisk.severity}): ${biggestRisk.summary}`;
+        }
+
+        // ── BEST DECISION (if any improvement) ──────────────────────────────
+        let bestDecision: string | null = null;
+        if (changeVsLastWeek?.burnDirection === 'decreased') {
+            const fmtSaved = Math.abs(changeVsLastWeek.burnDelta) >= 100000
+                ? `₹${(Math.abs(changeVsLastWeek.burnDelta) / 100000).toFixed(1)}L`
+                : `₹${Math.round(Math.abs(changeVsLastWeek.burnDelta) / 1000)}K`;
+            bestDecision = `You reduced burn by ${fmtSaved}/mo. This bought you more time.`;
+        }
+
+        // ── NEXT WEEK ACTIONS (2 recommended) ────────────────────────────────
+        const nextWeekActions: string[] = [];
+        if (runway < 6) {
+            nextWeekActions.push('Cut all non-essential spending immediately. You are running out of time.');
+        }
+        if (burnTrend > 10) {
+            nextWeekActions.push(`Your burn is trending up. Identify and eliminate the top spending category this week.`);
+        }
+        if (monthlyRevenue > 0 && runway < 12) {
+            nextWeekActions.push('Chase all outstanding invoices. Every rupee collected extends your runway.');
+        }
+        if (nextWeekActions.length === 0) {
+            nextWeekActions.push('Continue monitoring expenses and maintain current burn rate.');
+            nextWeekActions.push('Review your top 3 expense categories for optimization opportunities.');
+        }
+
+        // ── PRESSURE SUMMARY ─────────────────────────────────────────────────
+        const pressureSummary = [
+            openingLine,
+            `Runway: ${Math.round(runway * 10) / 10} months at ₹${(monthlyExpenses / 100000).toFixed(1)}L/mo burn.`,
+            topMistake ? `⚠️ ${topMistake}` : null,
+            bestDecision ? `✅ ${bestDecision}` : null,
+        ].filter(Boolean).join('\n');
 
         return {
             companyName: profile?.companyName || 'Your Startup',
             generatedAt: now.toISOString(),
             weekOf: `${now.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} — ${new Date(now.getTime() + 6 * 86400000).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-            summary: `${runwayLine}\n${burnLine}\n${riskLine}`,
+            summary: pressureSummary,
+            openingLine,
+            topMistake,
+            bestDecision,
+            nextWeekActions: nextWeekActions.slice(0, 2),
             metrics: {
                 runway: Math.round(runway * 10) / 10,
                 runwayStatus: runway < 6 ? 'CRITICAL' : runway < 12 ? 'WARNING' : 'HEALTHY',

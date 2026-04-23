@@ -7,15 +7,20 @@ import { ExpenseBreakdown } from '@/components/dashboard/expense-breakdown';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
-import { Receipt, TrendingDown, Filter, Download, Plus, Search, Loader2, CheckCircle2, XCircle, Lightbulb } from 'lucide-react';
+import { useCFOState, formatCurrency } from '@/store/cfo-state-store';
+import { Receipt, TrendingDown, Filter, Download, Plus, Search, Loader2, CheckCircle2, XCircle, Lightbulb, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { DecisionBadge } from '@/components/ui/decision-badge';
+import { cn } from '@/lib/utils';
 
 export default function ExpensesPage() {
     const user = useAuthStore((state) => state.user);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showBreakdown, setShowBreakdown] = useState(true);
+
+    // THE ONE SOURCE: CFOState
+    const { data: cfoState } = useCFOState();
 
     // Fetch expenses from API
     const { data: expenses, isLoading } = useQuery({
@@ -48,7 +53,7 @@ export default function ExpensesPage() {
             category.toLowerCase().includes(searchLower);
     }) || [];
 
-    const formatCurrency = (amount: number) => {
+    const localFormatCurrency = (amount: number) => {
         if (amount >= 100000) {
             return `₹${(amount / 100000).toFixed(2)}L`;
         }
@@ -56,6 +61,14 @@ export default function ExpensesPage() {
     };
 
     const pendingCount = expenses?.filter((e: any) => (e.metadata as any)?.status === 'PENDING').length || 0;
+
+    // Brain insights: real data from CFOState
+    const brainInsights = cfoState?.insights?.filter(i =>
+        i.type === 'DIAGNOSTIC' || i.type === 'ACTION'
+    ).slice(0, 4) || [];
+
+    // Category breakdown with runway impact from CFOState
+    const categoryImpacts = cfoState?.categoryBreakdown?.slice(0, 5) || [];
 
     return (
         <DashboardLayout>
@@ -80,10 +93,10 @@ export default function ExpensesPage() {
                 {/* Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {[
-                        { label: 'This Month', value: stats?.thisMonth ? formatCurrency(stats.thisMonth) : '₹0', change: '+12%', negative: true },
-                        { label: 'Pending Review', value: stats?.pendingReview ? formatCurrency(stats.pendingReview) : '₹0', change: `${pendingCount} items`, neutral: true },
+                        { label: 'This Month', value: stats?.thisMonth ? localFormatCurrency(stats.thisMonth) : '₹0', change: '+12%', negative: true },
+                        { label: 'Pending Review', value: stats?.pendingReview ? localFormatCurrency(stats.pendingReview) : '₹0', change: `${pendingCount} items`, neutral: true },
                         { label: 'Top Category', value: stats?.topCategory || 'SaaS', change: `${stats?.topCategoryPercent || 35}%`, neutral: true },
-                        { label: 'TDS Deductible', value: stats?.tdsLiability ? formatCurrency(stats.tdsLiability) : '₹0', change: 'Due Feb 7', negative: true },
+                        { label: 'TDS Deductible', value: stats?.tdsLiability ? localFormatCurrency(stats.tdsLiability) : '₹0', change: 'Due Feb 7', negative: true },
                     ].map((stat, i) => (
                         <motion.div
                             key={i}
@@ -212,12 +225,45 @@ export default function ExpensesPage() {
                         </div>
                     </div>
 
-                    {/* Right: Breakdown + Insights */}
+                    {/* Right: Breakdown + REAL Brain Insights */}
                     <div className="space-y-6">
                         {/* Expense Breakdown */}
                         <ExpenseBreakdown />
 
-                        {/* AI Insights */}
+                        {/* ── Category Runway Impact (from CFOState) ───────── */}
+                        {categoryImpacts.length > 0 && (
+                            <div className="glass-card rounded-3xl p-6 border-rose-500/10 bg-rose-500/[0.03]">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-2 bg-rose-500/20 rounded-xl">
+                                        <Zap className="w-5 h-5 text-rose-400" />
+                                    </div>
+                                    <h4 className="text-sm font-bold text-white uppercase tracking-widest">Runway Impact</h4>
+                                </div>
+                                <div className="space-y-2">
+                                    {categoryImpacts.map((cat) => (
+                                        <div key={cat.category} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-xs font-bold text-white">{cat.category}</span>
+                                                <span className="text-xs font-bold text-slate-400">{formatCurrency(cat.amount)}/mo</span>
+                                            </div>
+                                            {cat.runwayImpactDays > 0 && (
+                                                <p className="text-[10px] text-emerald-400 font-bold">
+                                                    Cutting 30% = +{cat.runwayImpactDays} days runway
+                                                    {cat.cutPotential > 0 && <span className="text-slate-500 font-medium"> (saves {formatCurrency(cat.cutPotential)}/mo)</span>}
+                                                </p>
+                                            )}
+                                            {cat.trend === 'up' && cat.changePercent && (
+                                                <p className="text-[10px] text-rose-400 flex items-center gap-1 mt-0.5">
+                                                    <TrendingUp className="w-2.5 h-2.5" /> +{cat.changePercent}% vs last month
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── REAL AI Insights (from CFOState.insights) ────── */}
                         <div className="glass-card rounded-3xl p-6 border-primary/20 bg-primary/5">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-2 bg-primary/20 rounded-xl">
@@ -226,21 +272,39 @@ export default function ExpensesPage() {
                                 <h4 className="text-sm font-bold text-white uppercase tracking-widest">AI Insights</h4>
                             </div>
                             <div className="space-y-3">
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                    <p className="text-xs text-slate-300">
-                                        💡 <strong>SaaS Optimization:</strong> Your subscriptions increased 23% this quarter. Review Figma and Notion seats.
-                                    </p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                    <p className="text-xs text-slate-300">
-                                        🔍 <strong>TDS Alert:</strong> ₹15K TDS to be filed by Feb 7th for contractor payments.
-                                    </p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                    <p className="text-xs text-slate-300">
-                                        📊 <strong>Trend:</strong> Travel expenses up 125% - tag as one-time if for client visits.
-                                    </p>
-                                </div>
+                                {brainInsights.length > 0 ? (
+                                    brainInsights.map((insight, i) => (
+                                        <div key={i} className={cn(
+                                            "p-3 rounded-xl border",
+                                            insight.severity === 'critical' ? "bg-rose-500/10 border-rose-500/20" :
+                                            insight.severity === 'high' ? "bg-amber-500/10 border-amber-500/20" :
+                                            "bg-white/5 border-white/5"
+                                        )}>
+                                            <div className="flex items-start gap-2">
+                                                {insight.severity === 'critical' || insight.severity === 'high' ? (
+                                                    <AlertTriangle className={cn("w-3 h-3 mt-0.5 flex-shrink-0",
+                                                        insight.severity === 'critical' ? "text-rose-400" : "text-amber-400"
+                                                    )} />
+                                                ) : (
+                                                    <Lightbulb className="w-3 h-3 mt-0.5 flex-shrink-0 text-primary" />
+                                                )}
+                                                <div>
+                                                    <p className="text-xs font-bold text-white">{insight.title}</p>
+                                                    <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{insight.body}</p>
+                                                    {insight.metric && (
+                                                        <span className="text-[10px] font-bold text-primary mt-1 inline-block">{insight.metric}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+                                        <p className="text-xs text-slate-300">
+                                            💡 Connect more data sources to unlock AI-powered expense insights.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

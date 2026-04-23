@@ -13,66 +13,15 @@ import {
     User,
     Phone,
     Mail,
-    MapPin,
-    MoreVertical,
     FileText,
     Loader2,
     Users,
-    UserCheck,
-    IndianRupee,
     TrendingUp,
-    TrendingDown
+    TrendingDown,
+    Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-
-// Mock data since we don't have a customers/vendors endpoint yet
-const mockContacts = [
-    {
-        id: '1',
-        name: 'Acme Technologies Pvt Ltd',
-        type: 'CUSTOMER',
-        email: 'accounts@acmetech.in',
-        phone: '+91 98765 43210',
-        gstin: '29AABCU9603R1ZM',
-        totalBusiness: 1250000,
-        lastTransaction: '2026-01-15',
-        status: 'ACTIVE'
-    },
-    {
-        id: '2',
-        name: 'CloudServe India',
-        type: 'VENDOR',
-        email: 'billing@cloudserve.in',
-        phone: '+91 87654 32109',
-        gstin: '27AADCC4567D1Z9',
-        totalBusiness: 450000,
-        lastTransaction: '2026-01-18',
-        status: 'ACTIVE'
-    },
-    {
-        id: '3',
-        name: 'Digital Marketing Pro',
-        type: 'VENDOR',
-        email: 'finance@dmpro.co.in',
-        phone: '+91 76543 21098',
-        gstin: '06AABCT1234A1ZT',
-        totalBusiness: 180000,
-        lastTransaction: '2026-01-20',
-        status: 'ACTIVE'
-    },
-    {
-        id: '4',
-        name: 'TechStart Solutions',
-        type: 'CUSTOMER',
-        email: 'ap@techstart.io',
-        phone: '+91 65432 10987',
-        gstin: '33AADCS5678B1ZW',
-        totalBusiness: 890000,
-        lastTransaction: '2026-01-12',
-        status: 'ACTIVE'
-    },
-];
 
 export default function CustomersVendorsPage() {
     const user = useAuthStore((state) => state.user);
@@ -80,24 +29,29 @@ export default function CustomersVendorsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-    // Use mock data for now
-    const contacts = mockContacts;
-    const isLoading = false;
+    // Fetch REAL contacts from backend
+    const { data: contacts, isLoading, isError } = useQuery({
+        queryKey: ['contacts', user?.organizationId],
+        queryFn: async () => {
+            const res = await apiClient.get('/contacts');
+            return res.data;
+        },
+        enabled: !!user?.organizationId,
+    });
 
-    const filteredContacts = contacts.filter(contact => {
+    const contactList = contacts || [];
+
+    const filteredContacts = contactList.filter((contact: any) => {
         const matchesTab = activeTab === 'ALL' || contact.type === activeTab;
-        const matchesSearch = contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            contact.email.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            contact.email?.toLowerCase().includes(searchQuery.toLowerCase());
         return matchesTab && matchesSearch;
     });
 
     const stats = {
-        totalCustomers: contacts.filter(c => c.type === 'CUSTOMER').length,
-        totalVendors: contacts.filter(c => c.type === 'VENDOR').length,
-        totalReceivables: contacts.filter(c => c.type === 'CUSTOMER').reduce((sum, c) => sum + c.totalBusiness, 0),
-        totalPayables: contacts.filter(c => c.type === 'VENDOR').reduce((sum, c) => sum + c.totalBusiness, 0),
+        totalCustomers: contactList.filter((c: any) => c.type === 'CUSTOMER').length,
+        totalVendors: contactList.filter((c: any) => c.type === 'VENDOR').length,
     };
-
 
     return (
         <DashboardLayout>
@@ -108,7 +62,7 @@ export default function CustomersVendorsPage() {
                 <div className="flex justify-between items-end">
                     <div>
                         <h2 className="text-3xl font-bold text-white tracking-tight">Customers & Vendors</h2>
-                        <p className="text-slate-400 mt-1">Manage your business relationships and track balances.</p>
+                        <p className="text-slate-400 mt-1">Manage your business relationships.</p>
                     </div>
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
@@ -120,7 +74,7 @@ export default function CustomersVendorsPage() {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                     <div className="glass-card rounded-2xl p-5 border-emerald-500/20 bg-emerald-500/5">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="p-2 bg-emerald-500/20 rounded-xl">
@@ -138,28 +92,6 @@ export default function CustomersVendorsPage() {
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Vendors</p>
                         </div>
                         <p className="text-3xl font-black text-white">{stats.totalVendors}</p>
-                    </div>
-                    <div className="glass-card rounded-2xl p-5">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="p-2 bg-emerald-500/20 rounded-xl">
-                                <TrendingUp className="w-5 h-5 text-emerald-500" />
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Receivables</p>
-                        </div>
-                        <p className="text-2xl font-black text-emerald-500">
-                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(stats.totalReceivables)}
-                        </p>
-                    </div>
-                    <div className="glass-card rounded-2xl p-5">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="p-2 bg-rose-500/20 rounded-xl">
-                                <TrendingDown className="w-5 h-5 text-rose-500" />
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Payables</p>
-                        </div>
-                        <p className="text-2xl font-black text-rose-500">
-                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(stats.totalPayables)}
-                        </p>
                     </div>
                 </div>
 
@@ -193,14 +125,20 @@ export default function CustomersVendorsPage() {
                     </div>
                 </div>
 
-                {/* Contacts Grid */}
+                {/* Content */}
                 {isLoading ? (
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="w-10 h-10 animate-spin text-primary" />
                     </div>
+                ) : isError ? (
+                    <div className="glass-card rounded-3xl py-16 text-center border-rose-500/20">
+                        <Database className="w-16 h-16 text-rose-500/30 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-white mb-2">Could not load contacts</h3>
+                        <p className="text-slate-400 text-sm mb-6">Ensure your backend is running and try again.</p>
+                    </div>
                 ) : filteredContacts.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredContacts.map((contact, i) => (
+                        {filteredContacts.map((contact: any, i: number) => (
                             <motion.div
                                 key={contact.id}
                                 initial={{ opacity: 0, y: 20 }}
@@ -219,43 +157,32 @@ export default function CustomersVendorsPage() {
                                             <Building2 className="w-6 h-6 text-amber-500" />
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn(
-                                            "text-[8px] font-black px-2 py-1 rounded uppercase tracking-tighter",
-                                            contact.type === 'CUSTOMER' ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
-                                        )}>
-                                            {contact.type}
-                                        </span>
-                                        <button className="text-slate-500 hover:text-white p-1">
-                                            <MoreVertical className="w-4 h-4" />
-                                        </button>
-                                    </div>
+                                    <span className={cn(
+                                        "text-[8px] font-black px-2 py-1 rounded uppercase tracking-tighter",
+                                        contact.type === 'CUSTOMER' ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
+                                    )}>
+                                        {contact.type}
+                                    </span>
                                 </div>
 
                                 <h3 className="text-lg font-bold text-white mb-1">{contact.name}</h3>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">GSTIN: {contact.gstin}</p>
+                                {contact.gstin && (
+                                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-4">GSTIN: {contact.gstin}</p>
+                                )}
 
                                 <div className="space-y-2 mb-4">
-                                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                                        <Mail className="w-3.5 h-3.5" />
-                                        <span>{contact.email}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                                        <Phone className="w-3.5 h-3.5" />
-                                        <span>{contact.phone}</span>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 border-t border-white/5 flex justify-between items-end">
-                                    <div>
-                                        <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter">Total Business</p>
-                                        <p className="text-lg font-black text-white">
-                                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(contact.totalBusiness)}
-                                        </p>
-                                    </div>
-                                    <button className="p-2 bg-white/5 rounded-xl hover:bg-primary hover:text-white text-slate-400 transition-all">
-                                        <FileText className="w-4 h-4" />
-                                    </button>
+                                    {contact.email && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                                            <Mail className="w-3.5 h-3.5" />
+                                            <span>{contact.email}</span>
+                                        </div>
+                                    )}
+                                    {contact.phone && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                                            <Phone className="w-3.5 h-3.5" />
+                                            <span>{contact.phone}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -265,8 +192,10 @@ export default function CustomersVendorsPage() {
                 ) : (
                     <div className="glass-card rounded-3xl py-20 text-center">
                         <Users className="w-16 h-16 text-slate-500/30 mx-auto mb-4" />
-                        <h3 className="text-lg font-bold text-white mb-2">No Contacts Found</h3>
-                        <p className="text-slate-400 text-sm mb-6">Add your first customer or vendor to get started.</p>
+                        <h3 className="text-lg font-bold text-white mb-2">No Contacts Yet</h3>
+                        <p className="text-slate-400 text-sm mb-6 max-w-md mx-auto">
+                            Add your first customer or vendor. Contact data will be used to track receivables and payables.
+                        </p>
                         <button
                             onClick={() => setIsCreateModalOpen(true)}
                             className="px-6 py-3 rounded-2xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all inline-flex items-center gap-2"

@@ -48,6 +48,7 @@ export function CreateExpenseModal({ isOpen, onClose }: CreateExpenseModalProps)
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['expenses'] });
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
             onClose();
             setFormData({
                 vendor: '',

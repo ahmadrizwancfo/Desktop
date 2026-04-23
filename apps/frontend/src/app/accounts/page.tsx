@@ -28,7 +28,7 @@ export default function AccountsPage() {
             // 1. Initiate Consent
             const res = await apiClient.post('/integrations/banking/consent', {
                 userId: user?.id,
-                mobile: '9999999999' // Mock mobile number
+                mobile: user?.phone || '' // Uses user's registered phone
             });
 
             setConsentHandle(res.data.consentHandle);
@@ -120,7 +120,7 @@ export default function AccountsPage() {
                                             {new Intl.NumberFormat('en-IN', { style: 'currency', currency: acc.currency }).format(acc.balance)}
                                         </p>
                                     </div>
-                                    <button className="p-2 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+                                    <button className="p-2 rounded-xl text-slate-600 cursor-not-allowed opacity-50" title="Auto-syncs daily" disabled>
                                         <RefreshCw className="w-4 h-4" />
                                     </button>
                                 </div>

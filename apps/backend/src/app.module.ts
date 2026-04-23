@@ -7,6 +7,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -36,6 +37,9 @@ import { ContactsModule } from './contacts/contacts.module';
   imports: [
     // Global configuration
     ConfigModule.forRoot({ isGlobal: true }),
+    
+    // Background Job Scheduler
+    ScheduleModule.forRoot(),
 
     // Rate Limiting: 100 requests per minute per IP
     ThrottlerModule.forRoot([{

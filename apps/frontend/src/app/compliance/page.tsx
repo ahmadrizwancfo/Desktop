@@ -409,35 +409,21 @@ export default function CompliancePage() {
                                                 <p className="text-[10px] text-slate-500 uppercase tracking-widest">EPFO Compliance</p>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] font-black px-2 py-1 rounded uppercase tracking-tighter bg-emerald-500/20 text-emerald-500">
-                                            FILED
+                                        <span className="text-[10px] font-black px-2 py-1 rounded uppercase tracking-tighter bg-white/10 text-slate-500">
+                                            NOT CONNECTED
                                         </span>
                                     </div>
-                                    <div className="p-5 space-y-3">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Employees Covered</span>
-                                            <span className="text-white font-medium">12</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Monthly Contribution</span>
-                                            <span className="text-white font-medium">₹72,000</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Due Date</span>
-                                            <span className="text-white font-medium">15th Feb 2026</span>
-                                        </div>
-                                        <div className="pt-3 border-t border-white/5 flex gap-2">
-                                            <button
-                                                onClick={() => window.open('https://unifiedportal-mem.epfindia.gov.in/', '_blank')}
-                                                className="flex-1 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold hover:bg-blue-500/20 transition-all flex items-center justify-center gap-1"
-                                            >
-                                                <ExternalLink className="w-3 h-3" />
-                                                EPFO Portal
-                                            </button>
-                                            <button className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-xs font-bold hover:bg-white/10 transition-all">
-                                                <Download className="w-3 h-3" />
-                                            </button>
-                                        </div>
+                                    <div className="p-5 text-center">
+                                        <p className="text-xs text-slate-400 mb-3">
+                                            PF data will appear here once payroll integration is connected.
+                                        </p>
+                                        <button
+                                            onClick={() => window.open('https://unifiedportal-mem.epfindia.gov.in/', '_blank')}
+                                            className="py-2 px-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold hover:bg-blue-500/20 transition-all inline-flex items-center gap-1"
+                                        >
+                                            <ExternalLink className="w-3 h-3" />
+                                            Open EPFO Portal
+                                        </button>
                                     </div>
                                 </div>
 
@@ -453,35 +439,21 @@ export default function CompliancePage() {
                                                 <p className="text-[10px] text-slate-500 uppercase tracking-widest">ESIC Compliance</p>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] font-black px-2 py-1 rounded uppercase tracking-tighter bg-amber-500/20 text-amber-500">
-                                            DUE SOON
+                                        <span className="text-[10px] font-black px-2 py-1 rounded uppercase tracking-tighter bg-white/10 text-slate-500">
+                                            NOT CONNECTED
                                         </span>
                                     </div>
-                                    <div className="p-5 space-y-3">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Employees Covered</span>
-                                            <span className="text-white font-medium">8</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Monthly Contribution</span>
-                                            <span className="text-white font-medium">₹18,400</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Due Date</span>
-                                            <span className="text-amber-400 font-medium">15th Feb 2026</span>
-                                        </div>
-                                        <div className="pt-3 border-t border-white/5 flex gap-2">
-                                            <button
-                                                onClick={() => window.open('https://www.esic.in/', '_blank')}
-                                                className="flex-1 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold hover:bg-purple-500/20 transition-all flex items-center justify-center gap-1"
-                                            >
-                                                <ExternalLink className="w-3 h-3" />
-                                                ESIC Portal
-                                            </button>
-                                            <button className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 text-xs font-bold hover:bg-white/10 transition-all">
-                                                <Download className="w-3 h-3" />
-                                            </button>
-                                        </div>
+                                    <div className="p-5 text-center">
+                                        <p className="text-xs text-slate-400 mb-3">
+                                            ESIC data will appear here once payroll integration is connected.
+                                        </p>
+                                        <button
+                                            onClick={() => window.open('https://www.esic.in/', '_blank')}
+                                            className="py-2 px-4 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold hover:bg-purple-500/20 transition-all inline-flex items-center gap-1"
+                                        >
+                                            <ExternalLink className="w-3 h-3" />
+                                            Open ESIC Portal
+                                        </button>
                                     </div>
                                 </div>
                             </div>

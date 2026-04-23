@@ -35,6 +35,7 @@ export function CreateInvoiceModal({ isOpen, onClose }: CreateInvoiceModalProps)
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['invoices'] });
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
             onClose();
             setFormData({
                 invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,

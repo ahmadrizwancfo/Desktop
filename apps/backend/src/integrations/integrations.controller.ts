@@ -16,8 +16,9 @@ import { RazorpayService } from './razorpay.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ZohoService } from './zoho.service';
 import { QuickbooksService } from './quickbooks.service';
+import { SyncEngineService } from './sync-engine.service';
 import { Request, Response } from 'express';
-import { Req, Res, Query } from '@nestjs/common';
+import { Req, Res, Query, Param } from '@nestjs/common';
 
 @Controller('integrations')
 export class IntegrationsController {
@@ -26,21 +27,27 @@ export class IntegrationsController {
         private readonly razorpayService: RazorpayService,
         private readonly zohoService: ZohoService,
         private readonly quickbooksService: QuickbooksService,
+        private readonly syncEngineService: SyncEngineService,
         private readonly prisma: PrismaService,
     ) { }
 
     @Get('connections')
     @UseGuards(JwtAuthGuard)
     async getConnections(@GetUser() user: any) {
-        return this.prisma.integrationConnection.findMany({
-            where: { organizationId: user.organizationId },
-            select: {
-                id: true,
-                provider: true,
-                status: true,
-                lastSyncedAt: true,
-            }
+        const connections = await this.prisma.integrationConnection.findMany({
+            where: { organizationId: user.organizationId }
         });
+
+        return {
+            integrations: connections.map(conn => ({
+                id: conn.id,
+                type: conn.provider.toLowerCase(),
+                status: conn.status === 'CONNECTED' || conn.status === 'ACTIVE' ? 'connected' : 'disconnected',
+                syncStatus: conn.syncStatus?.toLowerCase() || 'idle',
+                lastSyncedAt: conn.lastSyncedAt,
+                error: conn.lastError
+            }))
+        };
     }
 
     @Post(':provider/disconnect')
@@ -54,6 +61,29 @@ export class IntegrationsController {
             where: { userId: user.id, provider: provider.toUpperCase() }
         });
         return { success: true };
+    }
+
+    @Post(':provider/sync-now')
+    @UseGuards(JwtAuthGuard)
+    async syncNow(@GetUser() user: any, @Param('provider') providerParam: string) {
+        const provider = providerParam.toUpperCase();
+        const connection = await this.prisma.integrationConnection.findFirst({
+            where: { userId: user.id, provider, status: 'ACTIVE' } // Zoho is currently stored as CONNECTED not ACTIVE? Actually we mapped CONNECTED for Zoho, ACTIVE for Razorpay
+        });
+
+        const connectionAny = await this.prisma.integrationConnection.findFirst({
+            where: { userId: user.id, provider, status: { in: ['ACTIVE', 'CONNECTED'] } }
+        });
+
+        if (!connectionAny) {
+            throw new BadRequestException('No active connection found for this provider.');
+        }
+
+        // Kick off manual sync asynchronously so frontend isn't blocked 
+        // (or we can await it if we want immediate feedback, but sync can take time. We chose to await for frontend UI update context)
+        await this.syncEngineService.runSyncPipeline('MANUAL', connectionAny.id);
+
+        return { success: true, message: `Sync triggered for ${provider}` };
     }
 
     @Post('razorpay/sync')
@@ -106,8 +136,8 @@ export class IntegrationsController {
         if (code && state) {
             await this.zohoService.handleCallback(code, state);
         }
-        // Redirect to frontend Integrations page
-        return res.redirect('http://localhost:3000/integrations');
+        // Redirect to frontend Dashboard page
+        return res.redirect('http://localhost:3000/dashboard');
     }
 
     @Post('zoho/sync')
@@ -135,8 +165,8 @@ export class IntegrationsController {
         if (code && state) {
             await this.quickbooksService.handleCallback(code, realmId, state);
         }
-        // Redirect to frontend Integrations page
-        return res.redirect('http://localhost:3000/integrations');
+        // Redirect to frontend Dashboard page
+        return res.redirect('http://localhost:3000/dashboard');
     }
 
     @Post('quickbooks/sync')

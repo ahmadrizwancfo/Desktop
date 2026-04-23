@@ -69,7 +69,7 @@ export class CfoAlertService {
             // ── Check previous alert for this type + user ──────────────────────
             const previousAlert = await this.prisma.alert.findFirst({
                 where: { userId, alertType: notificationType },
-                orderBy: { sentAt: 'desc' },
+                orderBy: { createdAt: 'desc' },
             });
 
             const prevSeverityRank = previousAlert?.severity
@@ -127,6 +127,7 @@ export class CfoAlertService {
                         channel: 'IN_APP',
                         status: 'SENT',
                         severity: decision.severity,
+                        message: `${escalationPrefix}${factSummary}\n\nRecommended: ${topAction}`,
                         previousSeverity: previousAlert?.severity ?? null,
                         firstDetectedAt,
                         lastSentAt: new Date(),

@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { TrendingUp, ArrowRight, Github, Mail, Lock, Loader2 } from 'lucide-react';
+import { ArrowRight, Mail, Lock, Loader2 } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 
@@ -54,10 +55,7 @@ export default function LoginPage() {
             >
                 <div className="text-center mb-8">
                     <Link href="/" className="inline-flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 transition-transform">
-                            <TrendingUp className="text-white w-6 h-6" />
-                        </div>
-                        <span className="text-2xl font-black text-white tracking-tighter">FounderCFO</span>
+                        <Logo size="lg" />
                     </Link>
                     <h1 className="text-3xl font-bold text-white tracking-tight">Welcome Back</h1>
                     <p className="text-slate-400 mt-2">Sign in to manage your financial autopilot.</p>
@@ -89,7 +87,7 @@ export default function LoginPage() {
                         <div className="space-y-2">
                             <div className="flex justify-between items-center ml-1">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Password</label>
-                                <Link href="#" className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline">Forgot?</Link>
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest cursor-not-allowed" title="Coming soon">Forgot?</span>
                             </div>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />

@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, BarChart3, PieChart, Users, Settings, Search, Bell, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/ui/logo';
 
 export function DashboardPreview() {
   return (
@@ -50,10 +51,7 @@ export function DashboardPreview() {
             {/* Sidebar */}
             <div className="w-64 border-r border-white/5 bg-slate-900/40 p-4 hidden md:flex flex-col gap-1 z-10">
               <div className="flex items-center gap-2 px-2 mb-8">
-                <div className="w-8 h-8 bg-gradient-to-tr from-primary to-indigo-500 rounded-lg flex items-center justify-center shadow-lg">
-                  <TrendingUp className="text-white w-4 h-4" />
-                </div>
-                <span className="font-bold tracking-tight text-white editorial">FounderCFO</span>
+                <Logo size="sm" />
               </div>
               {[ 
                 { icon: BarChart3, label: "Overview", active: true },

@@ -9,7 +9,7 @@ export class ZohoService {
     private readonly logger = new Logger(ZohoService.name);
     private readonly clientId = process.env.ZOHO_CLIENT_ID || 'mock_client_id';
     private readonly clientSecret = process.env.ZOHO_CLIENT_SECRET || 'mock_client_secret';
-    private readonly redirectUri = process.env.ZOHO_REDIRECT_URI || 'http://localhost:3000/api/integrations/zoho/callback';
+    private readonly redirectUri = process.env.ZOHO_REDIRECT_URI || 'http://localhost:3001/api/integrations/zoho/callback';
 
     constructor(
         private prisma: PrismaService,
@@ -94,8 +94,8 @@ export class ZohoService {
     /**
      * Trigger a sync for Invoices and Expenses
      */
-    async syncAccount(userId: string): Promise<any> {
-        this.logger.log(`Starting Zoho sync for user ${userId}`);
+    async syncAccount(userId: string, deepSync: boolean = false): Promise<any> {
+        this.logger.log(`Starting Zoho sync for user ${userId} | Deep Sync: ${deepSync}`);
 
         const connection = await this.prisma.integrationConnection.findFirst({
             where: { userId, provider: 'ZOHO' }
@@ -107,18 +107,129 @@ export class ZohoService {
 
         const orgId = connection.organizationId;
         
-        // --- 1. Fetch Mock OR Real Data ---
-        // For demonstration, we mock Zoho payload to prevent crashing without real tokens
-        const mockZohoInvoices = [
-            { invoice_id: 'zh_inv_001', date: new Date().toISOString().split('T')[0], total: 85000, status: 'paid', customer_name: 'Acme Corp' },
-            { invoice_id: 'zh_inv_002', date: new Date(Date.now() - 86400000*5).toISOString().split('T')[0], total: 42000, status: 'paid', customer_name: 'TechFlow' }
-        ];
+        const accessMetadata: any = connection.accessMetadata || {};
+        let accessToken = accessMetadata.accessToken;
+        const refreshToken = accessMetadata.refreshToken;
+        let expiresAt = accessMetadata.expiresAt ? new Date(accessMetadata.expiresAt) : new Date(0);
 
-        const mockZohoExpenses = [
-            { expense_id: 'zh_exp_001', date: new Date().toISOString().split('T')[0], total: 15000, category_name: 'Software', description: 'AWS Hosting' }
-        ];
+        // 1. Handle Token Refresh if Expired
+        if (new Date() >= expiresAt && this.clientId !== 'mock_client_id') {
+            try {
+                const tokenRes = await axios.post('https://accounts.zoho.in/oauth/v2/token', null, {
+                    params: {
+                        refresh_token: refreshToken,
+                        client_id: this.clientId,
+                        client_secret: this.clientSecret,
+                        grant_type: 'refresh_token'
+                    }
+                });
+                accessToken = tokenRes.data.access_token;
+                expiresAt = new Date(Date.now() + tokenRes.data.expires_in * 1000);
+                
+                await this.prisma.integrationConnection.update({
+                    where: { id: connection.id },
+                    data: { accessMetadata: { ...accessMetadata, accessToken, expiresAt: expiresAt.toISOString() } }
+                });
+            } catch (authErr: any) {
+                this.logger.error(`Zoho Token Refresh Error: ${authErr.message}`);
+                throw new BadRequestException('Zoho authentication expired. Please reconnect.');
+            }
+        }
 
-        // --- 2. Save Raw Import ---
+        // 2. Fetch Real Data from Zoho API
+        let realInvoices: any[] = [];
+        let realExpenses: any[] = [];
+        let realBankAccounts: any[] = [];
+
+        if (this.clientId !== 'mock_client_id') {
+            try {
+                // Get Organization ID first
+                const orgRes = await axios.get('https://www.zohoapis.in/books/v3/organizations', {
+                    headers: { Authorization: `Zoho-oauthtoken ${accessToken}` }
+                });
+                
+                const orgs = orgRes.data.organizations;
+                if (!orgs || orgs.length === 0) throw new Error('No Zoho Books organization found.');
+                const zohoOrgId = orgs[0].organization_id;
+
+                const queryParams: any = { organization_id: zohoOrgId };
+                if (!deepSync && connection.lastSyncedAt) {
+                    // Zoho uses ISO strings, e.g., 2023-11-20T12:00:00+0530
+                    let iso = connection.lastSyncedAt.toISOString();
+                    // Strip the Z and append +0000 for strict Zoho parsing, or just let Zoho parse ISO8601
+                    queryParams.last_modified_time = connection.lastSyncedAt.toISOString();
+                }
+
+                // Fetch Invoices with Pagination
+                let hasMoreInvoices = true;
+                let pageInvoices = 1;
+                while (hasMoreInvoices) {
+                    const invRes = await axios.get('https://www.zohoapis.in/books/v3/invoices', {
+                        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+                        params: { ...queryParams, status: 'paid', page: pageInvoices }
+                    });
+                    
+                    const batch = invRes.data.invoices || [];
+                    realInvoices.push(...batch);
+                    
+                    if (invRes.data.page_context?.has_more_page && pageInvoices < 20) {
+                        pageInvoices++;
+                    } else {
+                        hasMoreInvoices = false;
+                    }
+                }
+
+                // Fetch Expenses with Pagination
+                let hasMoreExpenses = true;
+                let pageExpenses = 1;
+                while (hasMoreExpenses) {
+                    const expRes = await axios.get('https://www.zohoapis.in/books/v3/expenses', {
+                        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+                        params: { ...queryParams, page: pageExpenses }
+                    });
+                    
+                    const batch = expRes.data.expenses || [];
+                    realExpenses.push(...batch);
+                    
+                    if (expRes.data.page_context?.has_more_page && pageExpenses < 20) {
+                        pageExpenses++;
+                    } else {
+                        hasMoreExpenses = false;
+                    }
+                }
+                // Fetch Bank Accounts safely (no pagination needed since count is low)
+                try {
+                    const bankRes = await axios.get('https://www.zohoapis.in/books/v3/bankaccounts', {
+                        headers: { Authorization: `Zoho-oauthtoken ${accessToken}` },
+                        params: { ...queryParams }
+                    });
+                    realBankAccounts = bankRes.data.bankaccounts || [];
+                } catch (bErr: any) {
+                    this.logger.warn(`Failed to fetch bank accounts from Zoho: ${bErr.message}`);
+                }
+                
+            } catch (apiErr: any) {
+                if (apiErr.response?.status === 429) {
+                    this.logger.error('Zoho API Rate Limit Exceeded!');
+                    throw new BadRequestException('Zoho Rate Limit Hit. Sync queued for next cycle.');
+                }
+                this.logger.error(`Zoho API Error: ${apiErr.message}`);
+                throw new BadRequestException('Failed to pull data from Zoho API.');
+            }
+        }
+
+        if (realInvoices.length === 0 && realExpenses.length === 0) {
+            return {
+                success: true,
+                provider: 'ZOHO',
+                message: 'Connected to Zoho successfully, but found 0 invoices and 0 expenses.',
+                importedCount: 0,
+                duplicateCount: 0,
+                failedCount: 0
+            };
+        }
+
+        // --- 3. Save Raw Import ---
         const rawImport = await this.prisma.rawImport.create({
             data: {
                 userId,
@@ -127,13 +238,46 @@ export class ZohoService {
                 sourceType: 'ZOHO_OAUTH',
                 status: 'PROCESSING',
                 rawPayload: {
-                    invoices: mockZohoInvoices,
-                    expenses: mockZohoExpenses
+                    invoices: realInvoices,
+                    expenses: realExpenses
                 }
             }
         });
 
-        // Get or Create Bank Account for Zoho Integration
+        // Upsert true Zoho Bank Accounts to capture LIVE Cash Balance properly
+        for (const account of realBankAccounts) {
+            try {
+                await this.prisma.bankAccount.upsert({
+                    where: {
+                        organizationId_provider_externalId: {
+                            organizationId: orgId,
+                            provider: 'zoho',
+                            externalId: account.account_id
+                        }
+                    },
+                    update: {
+                        balance: account.balance || account.bcy_balance || 0,
+                        accountNumber: account.account_number || null,
+                        lastSyncedAt: new Date(),
+                    },
+                    create: {
+                        name: account.account_name,
+                        bankName: account.bank_name || 'Zoho Bank',
+                        balance: account.balance || account.bcy_balance || 0,
+                        accountNumber: account.account_number || null,
+                        currency: account.currency_code || 'INR',
+                        organizationId: orgId,
+                        provider: 'zoho',
+                        externalId: account.account_id,
+                        lastSyncedAt: new Date()
+                    }
+                });
+            } catch (err: any) {
+                this.logger.warn(`Failed to map Zoho bank account ${account.account_name}: ${err.message}`);
+            }
+        }
+
+        // Get or Create Bank Account for generic Zoho Transactions unlinked map
         let bankAccount = await this.prisma.bankAccount.findFirst({
             where: { organizationId: orgId, name: `Zoho Integration` }
         });
@@ -156,15 +300,14 @@ export class ZohoService {
         let totalExpenseImported = 0;
 
         // Process Invoices (Income)
-        for (const inv of mockZohoInvoices) {
+        for (const inv of realInvoices) {
             try {
                 const externalId = `zoho_${inv.invoice_id}`;
                 const txnDate = new Date(inv.date).toISOString();
                 
                 const existing = await this.prisma.transaction.findFirst({
                     where: {
-                        date: txnDate,
-                        amount: inv.total,
+                        bankAccount: { organizationId: orgId },
                         source: 'ZOHO',
                         externalId: externalId
                     }
@@ -196,15 +339,14 @@ export class ZohoService {
         }
 
         // Process Expenses
-        for (const exp of mockZohoExpenses) {
+        for (const exp of realExpenses) {
             try {
                 const externalId = `zoho_${exp.expense_id}`;
                 const txnDate = new Date(exp.date).toISOString();
 
                 const existing = await this.prisma.transaction.findFirst({
                     where: {
-                        date: txnDate,
-                        amount: exp.total,
+                        bankAccount: { organizationId: orgId },
                         source: 'ZOHO',
                         externalId: externalId
                     }
@@ -220,7 +362,7 @@ export class ZohoService {
                         amount: exp.total,
                         type: 'EXPENSE',
                         category: exp.category_name || 'Operating Expense',
-                        description: `Zoho Expense: ${exp.description}`,
+                        description: `Zoho Expense: ${exp.description || 'N/A'}`,
                         date: new Date(exp.date).toISOString(),
                         bankAccountId: bankAccount.id,
                         externalId,

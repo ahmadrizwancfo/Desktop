@@ -66,6 +66,8 @@ interface CfoDecision {
     status: Status;
     createdAt: string;
     aiExplanation: AiExplanation | null;
+    reversibility: 'high' | 'medium' | 'low';
+    impactLine?: string;
 }
 
 // ─── UI Maps ──────────────────────────────────────────────────────────────────
@@ -113,6 +115,12 @@ const STATUS_STYLES: Record<Status, string> = {
     OPEN: 'bg-white/10 text-slate-400',
     ACKNOWLEDGED: 'bg-amber-500/20 text-amber-400',
     RESOLVED: 'bg-emerald-500/20 text-emerald-400',
+};
+
+const REVERSIBILITY_META: Record<'high' | 'medium' | 'low', { label: string; style: string }> = {
+    high: { label: '🟢 Easy to undo', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+    medium: { label: '🟡 Moderate effort', style: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+    low: { label: '🔴 Hard to reverse', style: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
 };
 
 // ─── Loading Skeleton ─────────────────────────────────────────────────────────
@@ -330,6 +338,11 @@ const DecisionCard = memo(function DecisionCard({
                         <span className={cn('px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border', SEVERITY_BADGE[decision.severity], 'border-white/5')}>
                             {decision.severity}
                         </span>
+                        {decision.reversibility && (
+                            <span className={cn('px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border', REVERSIBILITY_META[decision.reversibility]?.style)}>
+                                {REVERSIBILITY_META[decision.reversibility]?.label}
+                            </span>
+                        )}
                         {/* FIX: Confidence bar instead of just text */}
                         <ConfidenceBar value={decision.confidence} severity={decision.severity} />
                         <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold ml-auto', STATUS_STYLES[decision.status])}>
@@ -339,6 +352,13 @@ const DecisionCard = memo(function DecisionCard({
 
                     {/* Decision title */}
                     <h3 className="font-bold text-white text-base leading-tight mb-2 text-editorial tracking-tight">{decisionLabel}</h3>
+
+                    {decision.impactLine && (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full font-bold text-xs mb-3">
+                            <TrendingUp className="w-3 h-3" />
+                            {decision.impactLine}
+                        </div>
+                    )}
 
                     {/* Explanation or prompt */}
                     {explanation ? (

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CfoAlertService } from './cfo-alert.service';
+import { CfoForecastService } from './cfo-forecast.service';
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ export interface DecisionResult {
     severity: Severity;
     confidence: number;
     facts: Record<string, any>;
-    recommendedActions: string[];
+    recommendedActions: any[];
 }
 
 interface StartupSnapshot {
@@ -53,6 +54,7 @@ export class CfoEngineService {
     constructor(
         private prisma: PrismaService,
         private alertService: CfoAlertService,
+        private forecastService: CfoForecastService
     ) { }
 
     // ─── Public API ──────────────────────────────────────────────────────────────
@@ -76,17 +78,18 @@ export class CfoEngineService {
         };
 
         // Run all 6 domain engines
-        // Growth engine is async (queries FinancialSnapshot time-series)
         const syncResults: (DecisionResult | null)[] = [
-            this.runSurvival(snap),
-            this.runEfficiency(snap),
             this.runHiring(snap),
             this.runFundraising(snap),
             this.runCompliance(snap),
         ];
-        const growthResult = await this.runGrowth(snap);
-        syncResults.push(growthResult);
-
+        const [growthResult, efficiencyResult, survivalResult] = await Promise.all([
+            this.runGrowth(snap),
+            this.runEfficiency(snap),
+            this.runSurvival(snap)
+        ]);
+        
+        syncResults.push(growthResult, efficiencyResult, survivalResult);
         const results = syncResults.filter(Boolean) as DecisionResult[];
 
         // Upsert to DB (update existing OPEN decisions, don't duplicate)
@@ -128,124 +131,156 @@ export class CfoEngineService {
 
     // ─── 1. SURVIVAL — Runway Risk ────────────────────────────────────────────
 
-    private runSurvival(s: StartupSnapshot): DecisionResult {
-        const burn = s.monthlyExpenses - s.monthlyRevenue;
+    private async runSurvival(s: StartupSnapshot): Promise<DecisionResult | null> {
+        if (!s.userId) return null;
+        const profile = await this.prisma.user.findUnique({ where: { id: s.userId }, select: { organizationId: true } });
+        if (!profile?.organizationId) return null;
 
-        // Profitable — no survival risk
-        if (burn <= 0) {
+        const forecast = await this.forecastService.generateForecast(s.userId, profile.organizationId);
+        if (!forecast) return null;
+
+        const runway_months = forecast.runway_days_remaining / 30;
+
+        let severity: Severity = 'LOW';
+        let actions: any[] = [];
+
+        if (forecast.netDailyBurnRate <= 0) {
             return {
                 domain: 'SURVIVAL',
                 decisionType: 'RUNWAY_RISK',
                 severity: 'LOW',
                 confidence: 0.98,
                 facts: {
-                    runway_months: 999,
-                    monthly_burn: 0,
-                    cash_balance: s.cashInBank,
-                    monthly_revenue: s.monthlyRevenue,
-                    monthly_expenses: s.monthlyExpenses,
+                    runway_days_remaining: 9999,
                     status: 'profitable',
                 },
-                recommendedActions: [
-                    'You are cashflow positive — great position',
-                    'Consider reinvesting surplus into growth',
-                    'Build a 6-month cash reserve buffer',
-                ],
+                recommendedActions: [{
+                    problem: 'No cash flow shortage detected',
+                    impact: 'Startup is structurally cashflow positive with 0% insolvency risk dynamically.',
+                    action: 'Consider reinvesting surplus into growth or build a 6-month cash reserve buffer'
+                }],
             };
         }
-
-        const runway_months = Math.round((s.cashInBank / burn) * 10) / 10;
-
-        let severity: Severity;
-        if (runway_months < 3) severity = 'CRITICAL';
-        else if (runway_months < 6) severity = 'HIGH';
-        else if (runway_months < 9) severity = 'MEDIUM';
-        else severity = 'LOW';
-
-        const actions: string[] = [];
-        if (severity === 'CRITICAL') {
-            actions.push(
-                'Reduce discretionary expenses immediately',
-                'Delay all non-essential hiring',
-                'Plan fundraising within 60 days',
-                'Explore bridge financing or revenue-based financing',
-            );
-        } else if (severity === 'HIGH') {
-            actions.push(
-                'Begin fundraising conversations now',
-                'Review and cut top 3 expense categories',
-                'Model burn scenarios in the simulator',
-            );
-        } else if (severity === 'MEDIUM') {
-            actions.push(
-                'Maintain current burn discipline',
-                'Set a fundraising or revenue target for next quarter',
-            );
+        if (runway_months < 3) {
+            severity = 'CRITICAL';
+            actions = [{
+                problem: `Critical runway detected (${runway_months.toFixed(1)} months remaining).`,
+                impact: `High risk of insolvency by ${forecast.estimated_zero_cash_date?.toDateString()}. Operations will halt.`,
+                action: 'Start emergency fundraising immediately and freeze all non-essential marketing and hiring spend.'
+            }];
+        } else if (runway_months < 6) {
+            severity = 'HIGH';
+            actions = [{
+                problem: `Limited runway detected (${runway_months.toFixed(1)} months remaining).`,
+                impact: 'Insufficient buffer for next growth milestone without external injections.',
+                action: 'You should start fundraising within 60 days to prevent panic bridging rounds.'
+            }];
+        } else if (runway_months < 9) {
+            severity = 'MEDIUM';
+            actions = [{
+                problem: `Moderate runway footprint (${runway_months.toFixed(1)} months remaining).`,
+                impact: 'Safe for the short-term, but dependent on sustained trajectory without bumps.',
+                action: 'Prepare pitch deck updates and softly engage target investors.'
+            }];
         } else {
-            actions.push(
-                'Runway is healthy — focus on growth',
-                'Build a cash reserve of 12+ months',
-            );
+            severity = 'LOW';
+            actions = [{
+                problem: 'Stable cash buffers.',
+                impact: 'Extended survival ensures flexibility in market timing.',
+                action: 'Capitalize on healthy runway to double down on product growth metrics.'
+            }];
         }
 
         return {
             domain: 'SURVIVAL',
             decisionType: 'RUNWAY_RISK',
             severity,
-            confidence: 0.97,
+            confidence: 0.96,
             facts: {
-                runway_months,
-                monthly_burn: Math.round(burn),
-                cash_balance: s.cashInBank,
-                monthly_revenue: s.monthlyRevenue,
-                monthly_expenses: s.monthlyExpenses,
+                runway_months: Math.round(runway_months * 10) / 10,
+                runway_days: forecast.runway_days_remaining,
+                estimated_zero_cash_date: forecast.estimated_zero_cash_date
             },
             recommendedActions: actions,
         };
     }
 
-    // ─── 2. EFFICIENCY — Burn vs Revenue ─────────────────────────────────────
+    private async runEfficiency(s: StartupSnapshot): Promise<DecisionResult | null> {
+        if (s.monthlyRevenue <= 0 && s.monthlyExpenses <= 0) return null; // No context
+        if (!s.userId) return null;
+        const profile = await this.prisma.user.findUnique({ where: { id: s.userId }, select: { organizationId: true } });
+        if (!profile?.organizationId) return null;
 
-    private runEfficiency(s: StartupSnapshot): DecisionResult | null {
-        if (s.monthlyRevenue <= 0) return null; // pre-revenue — skip
+        let severity: Severity = 'LOW';
+        let actions: any[] = [];
+        let burn_ratio = 0;
+        let facts: any = {
+            monthly_revenue: s.monthlyRevenue,
+            monthly_expenses: s.monthlyExpenses,
+            monthly_surplus_deficit: Math.round(s.monthlyRevenue - s.monthlyExpenses),
+        };
 
-        const burn_ratio = s.monthlyExpenses / s.monthlyRevenue;
+        if (s.monthlyRevenue > 0) {
+            burn_ratio = s.monthlyExpenses / s.monthlyRevenue;
+            facts.burn_ratio = Math.round(burn_ratio * 100) / 100;
+        }
 
-        let severity: Severity;
-        if (burn_ratio > 1.5) severity = 'HIGH';
-        else if (burn_ratio > 1.0) severity = 'MEDIUM';
-        else severity = 'LOW'; // profitable
+        const snapshots = await this.prisma.financialSnapshot.findMany({
+            where: { userId: s.userId },
+            orderBy: { snapshotDate: 'desc' },
+            take: 2,
+        });
 
-        const actions =
-            severity === 'HIGH'
-                ? [
-                    'Audit every expense category above ₹50K/month',
-                    'Renegotiate SaaS and vendor contracts',
-                    'Freeze non-critical headcount',
-                    'Target a 20% burn reduction within 30 days',
-                ]
-                : severity === 'MEDIUM'
-                    ? [
-                        'Review expenses monthly',
-                        'Grow revenue faster than costs',
-                        'Identify top 2 cost drivers and challenge them',
-                    ]
-                    : [
-                        'Expenses are under control — revenue exceeds burn',
-                        'Focus on scaling revenue while maintaining margins',
-                    ];
+        let burnIncreasedWarning = false;
+        if (snapshots.length >= 2) {
+            const currentBurn = Number(snapshots[0].burn) || 0;
+            const previousBurn = Number(snapshots[1].burn) || 0;
+            if (previousBurn > 0) {
+                const increase = ((currentBurn - previousBurn) / previousBurn) * 100;
+                if (increase >= 20) {
+                    burnIncreasedWarning = true;
+                    severity = 'HIGH';
+                    facts.burn_increase_percent = Math.round(increase);
+                    actions = [{
+                        problem: `Burn Rate increasing dangerously (+${Math.round(increase)}%)`,
+                        impact: 'Future runway is structurally compromised without an equivalent revenue offset.',
+                        action: 'Reduce marketing spend or freeze non-essential hiring. Renegotiate unutilized SaaS seats.'
+                    }];
+                }
+            }
+        }
+
+        if (!burnIncreasedWarning) {
+            if (burn_ratio > 1.5) severity = 'HIGH';
+            else if (burn_ratio > 1.0) severity = 'MEDIUM';
+            else severity = 'LOW';
+
+            actions =
+                severity === 'HIGH'
+                    ? [{
+                        problem: `Unsustainable Burn Ratio (${burn_ratio.toFixed(2)}x Revenue)`,
+                        impact: 'Company is systematically over-spending per dollar of revenue generated.',
+                        action: 'Audit every expense category above $1K/month. Freeze headcount additions.'
+                    }]
+                    : severity === 'MEDIUM'
+                        ? [{
+                            problem: 'Expenses exceed operating revenue.',
+                            impact: 'Depleting capital base without significant margin accumulation.',
+                            action: 'Identify the top 2 cost drivers and challenge their ROI for the current quarter.'
+                        }]
+                        : [{
+                            problem: 'No efficiency risk detected.',
+                            impact: 'Sustained positive cash conversion cycle allows safe scale.',
+                            action: 'Target higher customer acquisition volume aggressively.'
+                        }];
+        }
 
         return {
             domain: 'EFFICIENCY',
             decisionType: 'BURN_UNSUSTAINABLE',
             severity,
             confidence: 0.93,
-            facts: {
-                burn_ratio: Math.round(burn_ratio * 100) / 100,
-                monthly_revenue: s.monthlyRevenue,
-                monthly_expenses: s.monthlyExpenses,
-                monthly_surplus_deficit: Math.round(s.monthlyRevenue - s.monthlyExpenses),
-            },
+            facts,
             recommendedActions: actions,
         };
     }
@@ -293,26 +328,24 @@ export class CfoEngineService {
                 // Healthy growth — no decision needed
                 if (severity === 'LOW') return null;
 
-                const actions: string[] =
+                const actions: any[] =
                     severity === 'CRITICAL'
-                        ? [
-                            'Revenue is contracting rapidly — investigate root cause immediately',
-                            'Pause all non-essential spending until revenue stabilizes',
-                            'Review churn data and customer feedback urgently',
-                            'Consider pivoting pricing or product strategy',
-                        ]
+                        ? [{
+                            problem: `Revenue is contracting rapidly (${roundedRate}% MoM)`,
+                            impact: 'Top-line evaporation accelerates cash zero date unconditionally.',
+                            action: 'Investigate root cause immediately. Pause all non-essential spending. Review churn data and customer feedback urgently.'
+                        }]
                         : severity === 'HIGH'
-                            ? [
-                                'Revenue is declining — identify which channels or products are underperforming',
-                                'Review pricing strategy and consider targeted promotions',
-                                'Increase outbound sales effort to offset decline',
-                                'Cut non-performing marketing spend',
-                            ]
-                            : [
-                                'Revenue growth is flat — explore new acquisition channels',
-                                'Evaluate upsell opportunities with existing customers',
-                                'Consider launching a referral or partnership program',
-                            ];
+                            ? [{
+                                problem: `Revenue is declining (${roundedRate}% MoM)`,
+                                impact: 'Negative momentum destabilizing target forecasting.',
+                                action: 'Focus on retention or pricing optimization. Cut non-performing marketing spend.'
+                            }]
+                            : [{
+                                problem: `Revenue growth is flat (${roundedRate}% MoM)`,
+                                impact: 'Stagnation prevents escaping fixed-cost gravity well.',
+                                action: 'Explore new acquisition channels and evaluate upsell opportunities with existing customers.'
+                            }];
 
                 return {
                     domain: 'GROWTH',

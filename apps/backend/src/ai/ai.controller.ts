@@ -30,8 +30,8 @@ export class AiController {
 
     @Post('chat')
     @Throttle({ default: { limit: 20, ttl: 60000 } }) // Chat is expensive - 20/min
-    async chat(@GetUser() user: any, @Body() body: { message: string }) {
-        const response = await this.aiService.getChatResponse(user.organizationId, body.message);
+    async chat(@GetUser() user: any, @Body() body: { message: string, versionId?: string }) {
+        const response = await this.aiService.getChatResponse(user.organizationId, body.message, body.versionId);
         return { response };
     }
 

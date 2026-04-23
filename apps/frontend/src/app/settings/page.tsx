@@ -9,23 +9,22 @@ import {
     Bell,
     Shield,
     CreditCard,
-    Palette,
-    Globe,
     Key,
     Save,
     Camera,
-    Mail,
-    Phone,
-    MapPin,
-    CheckCircle2,
-    History
+    History,
+    Lock,
+    Info,
+    Rocket
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CfoAutoPilotSettings } from '@/components/dashboard/cfo-auto-pilot-settings';
 
 const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'organization', label: 'Organization', icon: Building2 },
     { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'autopilot', label: 'Auto-Pilot', icon: Rocket },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'billing', label: 'Billing', icon: CreditCard },
     { id: 'audit', label: 'Audit Trail', icon: History, href: '/settings/audit-trail' },
@@ -34,12 +33,6 @@ const tabs = [
 export default function SettingsPage() {
     const user = useAuthStore((state) => state.user);
     const [activeTab, setActiveTab] = useState('profile');
-    const [saved, setSaved] = useState(false);
-
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
-    };
 
     return (
         <DashboardLayout>
@@ -83,6 +76,18 @@ export default function SettingsPage() {
 
                     {/* Content */}
                     <div className="lg:col-span-3">
+                        {/* Settings Not Connected Banner */}
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 mb-6">
+                            <Info className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                            <div>
+                                <p className="text-sm text-amber-400 font-bold">Settings persistence coming soon</p>
+                                <p className="text-xs text-amber-500/70 mt-1">
+                                    Profile and organization settings will be saved to your account once the settings API is connected.
+                                    Currently, changes are display-only.
+                                </p>
+                            </div>
+                        </div>
+
                         {activeTab === 'profile' && (
                             <div className="glass-card rounded-3xl p-8 space-y-8">
                                 <div className="flex items-center gap-6">
@@ -90,7 +95,11 @@ export default function SettingsPage() {
                                         <div className="w-24 h-24 rounded-2xl bg-primary/20 flex items-center justify-center text-3xl font-black text-primary">
                                             {user?.name?.charAt(0) || 'U'}
                                         </div>
-                                        <button className="absolute -bottom-2 -right-2 p-2 bg-primary rounded-xl text-white hover:scale-105 transition-transform">
+                                        <button
+                                            className="absolute -bottom-2 -right-2 p-2 bg-slate-700 rounded-xl text-slate-400 cursor-not-allowed opacity-50"
+                                            title="Avatar upload coming soon"
+                                            disabled
+                                        >
                                             <Camera className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -109,7 +118,8 @@ export default function SettingsPage() {
                                         <input
                                             type="text"
                                             defaultValue={user?.name || ''}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
+                                            disabled
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 outline-none cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -117,39 +127,20 @@ export default function SettingsPage() {
                                         <input
                                             type="email"
                                             defaultValue={user?.email || ''}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
+                                            disabled
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 outline-none cursor-not-allowed"
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Phone Number</label>
-                                        <input
-                                            type="tel"
-                                            placeholder="+91 98765 43210"
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Role</label>
-                                        <select className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all">
-                                            <option value="FOUNDER">Founder</option>
-                                            <option value="ADMIN">Admin</option>
-                                            <option value="ACCOUNTANT">Accountant</option>
-                                        </select>
                                     </div>
                                 </div>
 
                                 <div className="flex justify-end">
                                     <button
-                                        onClick={handleSave}
-                                        className={cn(
-                                            "px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all",
-                                            saved
-                                                ? "bg-emerald-500 text-white"
-                                                : "bg-primary text-white hover:bg-indigo-600 shadow-lg shadow-primary/20"
-                                        )}
+                                        disabled
+                                        className="px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 bg-white/5 text-slate-500 cursor-not-allowed"
+                                        title="Settings API not yet connected"
                                     >
-                                        {saved ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                        {saved ? 'Saved!' : 'Save Changes'}
+                                        <Lock className="w-4 h-4" />
+                                        Save Changes (Coming Soon)
                                     </button>
                                 </div>
                             </div>
@@ -163,40 +154,29 @@ export default function SettingsPage() {
                                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Company Name</label>
                                         <input
                                             type="text"
-                                            defaultValue="Tech Startup Pvt Ltd"
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
+                                            placeholder="Your company name"
+                                            disabled
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 outline-none cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">GSTIN</label>
                                         <input
                                             type="text"
-                                            placeholder="29AABCU9603R1ZM"
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
+                                            placeholder="Will be fetched from integration"
+                                            disabled
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 outline-none cursor-not-allowed"
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Industry</label>
-                                        <select className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all">
-                                            <option>Technology</option>
-                                            <option>E-commerce</option>
-                                            <option>FinTech</option>
-                                            <option>Healthcare</option>
-                                            <option>Other</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fiscal Year Start</label>
-                                        <select className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all">
-                                            <option>April</option>
-                                            <option>January</option>
-                                        </select>
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
-                                    <button onClick={handleSave} className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:bg-indigo-600 transition-all shadow-lg shadow-primary/20">
-                                        <Save className="w-4 h-4" />
-                                        Save Changes
+                                    <button
+                                        disabled
+                                        className="px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 bg-white/5 text-slate-500 cursor-not-allowed"
+                                        title="Settings API not yet connected"
+                                    >
+                                        <Lock className="w-4 h-4" />
+                                        Save Changes (Coming Soon)
                                     </button>
                                 </div>
                             </div>
@@ -217,13 +197,19 @@ export default function SettingsPage() {
                                             <h4 className="font-bold text-white text-sm">{item.title}</h4>
                                             <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" defaultChecked className="sr-only peer" />
-                                            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                        </label>
+                                        <div className="relative">
+                                            <div className="w-11 h-6 bg-white/10 rounded-full opacity-50 cursor-not-allowed" title="Coming soon">
+                                                <div className="absolute top-[2px] left-[2px] w-5 h-5 bg-slate-500 rounded-full" />
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
+                                <p className="text-xs text-slate-600 text-center">Notification preferences will be saved once the settings API is connected.</p>
                             </div>
+                        )}
+
+                        {activeTab === 'autopilot' && (
+                            <CfoAutoPilotSettings />
                         )}
 
                         {activeTab === 'security' && (
@@ -234,7 +220,8 @@ export default function SettingsPage() {
                                     <input
                                         type="password"
                                         placeholder="••••••••"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
+                                        disabled
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 outline-none cursor-not-allowed"
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -243,7 +230,8 @@ export default function SettingsPage() {
                                         <input
                                             type="password"
                                             placeholder="••••••••"
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
+                                            disabled
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 outline-none cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -251,7 +239,8 @@ export default function SettingsPage() {
                                         <input
                                             type="password"
                                             placeholder="••••••••"
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white outline-none focus:border-primary/50 transition-all"
+                                            disabled
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-slate-400 outline-none cursor-not-allowed"
                                         />
                                     </div>
                                 </div>
@@ -262,15 +251,23 @@ export default function SettingsPage() {
                                             <h4 className="font-bold text-amber-500 text-sm">Two-Factor Authentication</h4>
                                             <p className="text-xs text-slate-400 mt-0.5">Add an extra layer of security to your account</p>
                                         </div>
-                                        <button className="ml-auto px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 transition-all">
-                                            Enable 2FA
+                                        <button
+                                            disabled
+                                            className="ml-auto px-4 py-2 bg-white/5 text-slate-500 text-xs font-bold rounded-lg cursor-not-allowed"
+                                            title="2FA coming soon"
+                                        >
+                                            Coming Soon
                                         </button>
                                     </div>
                                 </div>
                                 <div className="flex justify-end">
-                                    <button onClick={handleSave} className="px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:bg-indigo-600 transition-all shadow-lg shadow-primary/20">
-                                        <Save className="w-4 h-4" />
-                                        Update Password
+                                    <button
+                                        disabled
+                                        className="px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 bg-white/5 text-slate-500 cursor-not-allowed"
+                                        title="Password update not yet connected"
+                                    >
+                                        <Lock className="w-4 h-4" />
+                                        Update Password (Coming Soon)
                                     </button>
                                 </div>
                             </div>
@@ -287,20 +284,10 @@ export default function SettingsPage() {
                                         Upgrade to Pro
                                     </a>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {[
-                                        { label: 'Bank Accounts', value: '1 / 3', used: 33 },
-                                        { label: 'Invoices/Month', value: '5 / 10', used: 50 },
-                                        { label: 'AI Queries', value: '8 / 20', used: 40 },
-                                    ].map((item, i) => (
-                                        <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5">
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.label}</p>
-                                            <p className="text-lg font-bold text-white mt-1">{item.value}</p>
-                                            <div className="mt-2 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                                <div className="h-full bg-primary" style={{ width: `${item.used}%` }} />
-                                            </div>
-                                        </div>
-                                    ))}
+                                <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                                    <p className="text-sm text-slate-400">
+                                        Usage tracking will be available once billing integration is complete.
+                                    </p>
                                 </div>
                             </div>
                         )}

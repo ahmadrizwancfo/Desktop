@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { useAuthStore } from '@/store/auth-store';
 
 // Mock data for when backend is unavailable
 const mockMetrics = {
@@ -58,44 +59,37 @@ const mockCohorts = [
 
 export default function UnitEconomicsPage() {
     const [activeTab, setActiveTab] = useState<'overview' | 'decisions' | 'cohorts'>('overview');
+    const user = useAuthStore((state) => state.user);
+    const orgId = user?.organizationId || '';
 
     // Fetch metrics
     const { data: metrics, isLoading: metricsLoading } = useQuery({
-        queryKey: ['unit-economics-metrics'],
+        queryKey: ['unit-economics-metrics', orgId],
         queryFn: async () => {
-            try {
-                const res = await apiClient.get('/unit-economics/org-1/metrics');
-                return res.data;
-            } catch {
-                return mockMetrics;
-            }
+            const res = await apiClient.get(`/unit-economics/${orgId}/metrics`);
+            return res.data;
         },
+        enabled: !!orgId,
     });
 
     // Fetch decision scenarios
     const { data: decisions } = useQuery({
-        queryKey: ['unit-economics-decisions'],
+        queryKey: ['unit-economics-decisions', orgId],
         queryFn: async () => {
-            try {
-                const res = await apiClient.get('/unit-economics/org-1/decisions');
-                return res.data;
-            } catch {
-                return mockDecisions;
-            }
+            const res = await apiClient.get(`/unit-economics/${orgId}/decisions`);
+            return res.data;
         },
+        enabled: !!orgId,
     });
 
     // Fetch cohort data
     const { data: cohorts } = useQuery({
-        queryKey: ['unit-economics-cohorts'],
+        queryKey: ['unit-economics-cohorts', orgId],
         queryFn: async () => {
-            try {
-                const res = await apiClient.get('/unit-economics/org-1/cohorts');
-                return res.data;
-            } catch {
-                return mockCohorts;
-            }
+            const res = await apiClient.get(`/unit-economics/${orgId}/cohorts`);
+            return res.data;
         },
+        enabled: !!orgId,
     });
 
     const m = metrics || mockMetrics;

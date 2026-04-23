@@ -7,71 +7,74 @@ import { FileUpload } from '@/components/dashboard/file-upload';
 import { DefaultMonthlyComparison } from '@/components/dashboard/monthly-comparison';
 import { DefaultCashFlowForecast } from '@/components/dashboard/cash-flow-forecast';
 import { ExpenseBreakdown } from '@/components/dashboard/expense-breakdown';
-import { useQuery } from '@tanstack/react-query';
-import { financialService } from '@/services/financial-service';
-import { useAuthStore } from '@/store/auth-store';
+import { useCFOState, formatCurrency, getTimeSince } from '@/store/cfo-state-store';
 import {
     TrendingUp,
     TrendingDown,
     BarChart3,
-    PieChart,
-    ArrowUpRight,
-    ArrowDownRight,
     Loader2,
     FileSpreadsheet,
     Brain,
     Sparkles,
-    Calendar
+    Wallet,
+    Flame,
+    Clock,
+    AlertTriangle,
+    Database,
+    RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function AnalyticsPage() {
-    const user = useAuthStore((state) => state.user);
+    const { data: cfoState, isLoading, isError } = useCFOState();
 
-    const { data: stats, isLoading } = useQuery({
-        queryKey: ['financial-stats', user?.organizationId],
-        queryFn: () => financialService.getStats(user?.organizationId || ''),
-        enabled: !!user?.organizationId,
-    });
-
-    const metrics = [
+    // Derive metrics from CFOState — no hardcoded data
+    const metrics = cfoState ? [
         {
-            label: 'Revenue Growth',
-            value: '+18%',
-            trend: 'up',
-            change: 'vs last month',
-            icon: TrendingUp,
+            label: 'Cash in Bank',
+            value: formatCurrency(cfoState.summary.cashInBank),
+            trend: cfoState.delta.cashChangeAmount !== null ? (cfoState.delta.cashChangeAmount >= 0 ? 'up' : 'down') : 'stable',
+            change: cfoState.delta.cashChangeAmount !== null
+                ? `${cfoState.delta.cashChangeAmount >= 0 ? '+' : ''}${formatCurrency(cfoState.delta.cashChangeAmount)} vs last period`
+                : 'No historical data',
+            icon: Wallet,
             color: 'text-emerald-500',
             bgColor: 'bg-emerald-500/10',
         },
         {
-            label: 'Burn Rate',
-            value: '₹2.4L/mo',
-            trend: 'up',
-            change: '+15% MoM',
-            icon: TrendingDown,
-            color: 'text-rose-500',
-            bgColor: 'bg-rose-500/10',
+            label: 'Monthly Burn',
+            value: formatCurrency(cfoState.summary.netBurn),
+            trend: cfoState.summary.burnTrend === 'increasing' ? 'up' : cfoState.summary.burnTrend === 'decreasing' ? 'good' : 'stable',
+            change: cfoState.delta.burnChangePercent !== null
+                ? `${cfoState.delta.burnChangePercent >= 0 ? '+' : ''}${cfoState.delta.burnChangePercent.toFixed(1)}% vs last period`
+                : cfoState.summary.burnTrend,
+            icon: Flame,
+            color: cfoState.summary.burnTrend === 'increasing' ? 'text-rose-500' : 'text-amber-500',
+            bgColor: cfoState.summary.burnTrend === 'increasing' ? 'bg-rose-500/10' : 'bg-amber-500/10',
         },
         {
-            label: 'Cash Runway',
-            value: '7.2 mo',
-            trend: 'down',
-            change: '-0.5 from last month',
-            icon: Calendar,
-            color: 'text-amber-500',
-            bgColor: 'bg-amber-500/10',
+            label: 'Runway',
+            value: cfoState.deathClock.daysLeft !== null ? `${Math.round(cfoState.deathClock.daysLeft / 30)} mo` : 'N/A',
+            trend: cfoState.delta.runwayChangeDays !== null ? (cfoState.delta.runwayChangeDays >= 0 ? 'up' : 'down') : 'stable',
+            change: cfoState.delta.runwayChangeDays !== null
+                ? `${cfoState.delta.runwayChangeDays >= 0 ? '+' : ''}${cfoState.delta.runwayChangeDays} days vs last period`
+                : 'No historical data',
+            icon: Clock,
+            color: (cfoState.deathClock.daysLeft !== null && cfoState.deathClock.daysLeft < 180) ? 'text-rose-500' : 'text-emerald-500',
+            bgColor: (cfoState.deathClock.daysLeft !== null && cfoState.deathClock.daysLeft < 180) ? 'bg-rose-500/10' : 'bg-emerald-500/10',
         },
         {
-            label: 'Expense Ratio',
-            value: '68%',
-            trend: 'stable',
-            change: 'Revenue vs Expenses',
-            icon: PieChart,
+            label: 'Receivables',
+            value: formatCurrency(cfoState.receivables.totalOutstanding),
+            trend: cfoState.receivables.totalOutstanding > 0 ? 'pending' : 'clear',
+            change: cfoState.receivables.expectedInflows.length > 0
+                ? `${cfoState.receivables.expectedInflows.length} expected inflows`
+                : 'No pending inflows',
+            icon: TrendingUp,
             color: 'text-primary',
             bgColor: 'bg-primary/10',
         },
-    ];
+    ] : [];
 
     return (
         <DashboardLayout>
@@ -85,181 +88,207 @@ export default function AnalyticsPage() {
                             </div>
                             Financial Analytics
                         </h1>
-                        <p className="text-slate-400 mt-2">Deep insights powered by AI analysis of your financial data.</p>
+                        <p className="text-slate-400 mt-2">Insights powered by your real financial data.</p>
                     </div>
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 border border-primary/20">
-                        <Sparkles className="w-4 h-4 text-primary" />
-                        <span className="text-xs text-primary font-bold">AI-Enhanced Analytics</span>
-                    </div>
+                    {cfoState && (
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+                            <RefreshCw className="w-3 h-3 text-slate-500" />
+                            <span className="text-[10px] text-slate-500 font-bold">
+                                Data: {getTimeSince(cfoState.trust.lastSyncedAt)}
+                            </span>
+                            <span className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                cfoState.trust.dataQuality === 'high' ? 'bg-emerald-500' :
+                                    cfoState.trust.dataQuality === 'medium' ? 'bg-amber-500' : 'bg-rose-500'
+                            )} />
+                        </div>
+                    )}
                 </header>
 
-                {/* Quick Metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {metrics.map((metric, i) => (
-                        <div key={i} className="glass-card rounded-2xl p-5 relative overflow-hidden group hover:scale-[1.02] transition-transform">
-                            <div className="flex justify-between items-start mb-3">
-                                <div className={cn("p-2 rounded-xl", metric.bgColor)}>
-                                    <metric.icon className={cn("w-4 h-4", metric.color)} />
-                                </div>
-                                {metric.trend === 'up' && <ArrowUpRight className="w-4 h-4 text-emerald-500" />}
-                                {metric.trend === 'down' && <ArrowDownRight className="w-4 h-4 text-rose-500" />}
-                            </div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">{metric.label}</p>
-                            <p className="text-xl font-black text-white">{metric.value}</p>
-                            <p className="text-[10px] text-slate-500 mt-1">{metric.change}</p>
-                        </div>
-                    ))}
-                </div>
+                {/* Loading State */}
+                {isLoading && (
+                    <div className="flex items-center justify-center py-20">
+                        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                    </div>
+                )}
 
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column - Forecasts & Charts */}
-                    <div className="lg:col-span-2 space-y-8">
-                        {/* Cash Flow Forecast */}
-                        <DefaultCashFlowForecast />
+                {/* Error State */}
+                {isError && (
+                    <div className="glass-card rounded-3xl p-12 text-center border-rose-500/20">
+                        <AlertTriangle className="w-12 h-12 text-rose-500/50 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold text-white mb-2">Unable to load analytics</h2>
+                        <p className="text-slate-400">Ensure your backend is running and financial data is connected.</p>
+                    </div>
+                )}
 
-                        {/* Revenue vs Expenses Chart */}
-                        <div className="glass-card rounded-3xl p-8 min-h-[300px] relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-indigo-500 to-primary" />
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-sm font-bold text-white uppercase tracking-widest">Revenue vs Expenses</h3>
-                                <div className="flex gap-4">
-                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 uppercase tracking-widest">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                        Revenue
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 uppercase tracking-widest">
-                                        <div className="w-2 h-2 rounded-full bg-rose-500" />
-                                        Expenses
-                                    </div>
-                                </div>
-                            </div>
+                {/* No Data State */}
+                {cfoState?.noData && (
+                    <div className="glass-card rounded-3xl p-12 text-center border-dashed border-white/10">
+                        <Database className="w-16 h-16 text-slate-500/30 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold text-white mb-3">No Financial Data Yet</h2>
+                        <p className="text-slate-400 max-w-md mx-auto mb-8">
+                            Connect your bank account or upload a CSV to see real analytics powered by your actual financial data.
+                        </p>
+                        <a href="/integrations" className="px-6 py-3 rounded-2xl bg-primary text-white text-sm font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-all inline-flex items-center gap-2">
+                            <Database className="w-4 h-4" />
+                            Connect Data Source
+                        </a>
+                    </div>
+                )}
 
-                            {/* Chart Bars */}
-                            <div className="flex items-end justify-between gap-3 mt-6" style={{ height: '180px' }}>
-                                {[
-                                    { month: 'Sep', revenue: 220000, expenses: 180000 },
-                                    { month: 'Oct', revenue: 250000, expenses: 195000 },
-                                    { month: 'Nov', revenue: 272000, expenses: 210000 },
-                                    { month: 'Dec', revenue: 290000, expenses: 220000 },
-                                    { month: 'Jan', revenue: 320000, expenses: 240000 },
-                                    { month: 'Feb', revenue: 345000, expenses: 250000 },
-                                ].map((data, i) => {
-                                    const maxVal = 400000;
-                                    const revenueHeight = Math.round((data.revenue / maxVal) * 160);
-                                    const expenseHeight = Math.round((data.expenses / maxVal) * 160);
-                                    return (
-                                        <div key={data.month} className="flex-1 flex flex-col items-center">
-                                            <div className="flex gap-1 items-end" style={{ height: '160px' }}>
-                                                <motion.div
-                                                    initial={{ height: 0 }}
-                                                    animate={{ height: revenueHeight }}
-                                                    transition={{ duration: 0.5, delay: i * 0.1 }}
-                                                    className="w-5 bg-emerald-500 rounded-t cursor-pointer hover:bg-emerald-400 transition-colors"
-                                                    title={`Revenue: ₹${(data.revenue / 100000).toFixed(1)}L`}
-                                                />
-                                                <motion.div
-                                                    initial={{ height: 0 }}
-                                                    animate={{ height: expenseHeight }}
-                                                    transition={{ duration: 0.5, delay: i * 0.1 + 0.05 }}
-                                                    className="w-5 bg-rose-500 rounded-t cursor-pointer hover:bg-rose-400 transition-colors"
-                                                    title={`Expenses: ₹${(data.expenses / 100000).toFixed(1)}L`}
-                                                />
-                                            </div>
-                                            <span className="text-[10px] text-slate-500 uppercase font-bold mt-2">{data.month}</span>
+                {/* Main Content — only shown when we have real data */}
+                {cfoState && !cfoState.noData && (
+                    <>
+                        {/* Quick Metrics — derived from CFOState */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {metrics.map((metric, i) => (
+                                <div key={i} className="glass-card rounded-2xl p-5 relative overflow-hidden group hover:scale-[1.02] transition-transform">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className={cn("p-2 rounded-xl", metric.bgColor)}>
+                                            <metric.icon className={cn("w-4 h-4", metric.color)} />
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                        {metric.trend === 'up' && <TrendingUp className="w-4 h-4 text-emerald-500" />}
+                                        {metric.trend === 'down' && <TrendingDown className="w-4 h-4 text-rose-500" />}
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">{metric.label}</p>
+                                    <p className="text-xl font-black text-white">{metric.value}</p>
+                                    <p className="text-[10px] text-slate-500 mt-1">{metric.change}</p>
+                                </div>
+                            ))}
                         </div>
 
-                        {/* AI Insights */}
-                        <div className="glass-card rounded-3xl p-6 border-primary/20 bg-primary/5">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 bg-primary/20 rounded-xl">
-                                    <Brain className="w-5 h-5 text-primary" />
-                                </div>
-                                <h4 className="text-sm font-bold text-white uppercase tracking-widest">AI-Generated Insights</h4>
+                        {/* Main Content Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Left Column - Forecasts & Charts */}
+                            <div className="lg:col-span-2 space-y-8">
+                                {/* Cash Flow Forecast */}
+                                <DefaultCashFlowForecast />
+
+                                {/* Category Breakdown from CFOState */}
+                                {cfoState.categoryBreakdown.length > 0 && (
+                                    <div className="glass-card rounded-3xl p-8 relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-indigo-500 to-primary" />
+                                        <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">Expense by Category</h3>
+                                        <div className="space-y-3">
+                                            {cfoState.categoryBreakdown.slice(0, 6).map((cat, i) => (
+                                                <div key={cat.category} className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3 flex-1">
+                                                        <div className="w-2 h-2 rounded-full bg-primary" style={{ opacity: 1 - (i * 0.12) }} />
+                                                        <span className="text-sm text-white font-medium flex-1">{cat.category}</span>
+                                                        <span className="text-xs text-slate-500">{cat.pct.toFixed(0)}%</span>
+                                                    </div>
+                                                    <div className="w-32 ml-4">
+                                                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                                                            <motion.div
+                                                                initial={{ width: 0 }}
+                                                                animate={{ width: `${cat.pct}%` }}
+                                                                transition={{ duration: 0.5, delay: i * 0.1 }}
+                                                                className="h-full bg-primary rounded-full"
+                                                                style={{ opacity: 1 - (i * 0.12) }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-sm text-white font-bold ml-4 w-20 text-right">
+                                                        {formatCurrency(cat.amount)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* AI Insights from CFOState */}
+                                {cfoState.insights.length > 0 && (
+                                    <div className="glass-card rounded-3xl p-6 border-primary/20 bg-primary/5">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="p-2 bg-primary/20 rounded-xl">
+                                                <Brain className="w-5 h-5 text-primary" />
+                                            </div>
+                                            <h4 className="text-sm font-bold text-white uppercase tracking-widest">AI-Generated Insights</h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {cfoState.insights.slice(0, 4).map((insight, i) => (
+                                                <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/5">
+                                                    <div className="flex items-start gap-2">
+                                                        <span className={cn(
+                                                            "text-[8px] font-black px-1.5 py-0.5 rounded uppercase mt-0.5 shrink-0",
+                                                            insight.severity === 'critical' ? "bg-rose-500/20 text-rose-400" :
+                                                                insight.severity === 'high' ? "bg-amber-500/20 text-amber-400" :
+                                                                    "bg-primary/20 text-primary"
+                                                        )}>
+                                                            {insight.type}
+                                                        </span>
+                                                        <div>
+                                                            <p className="text-xs text-white font-bold">{insight.title}</p>
+                                                            <p className="text-xs text-slate-400 mt-0.5">{insight.body}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="space-y-3">
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                    <p className="text-xs text-slate-300">
-                                        💡 <strong>SaaS Optimization:</strong> Your subscriptions increased 23% this quarter. Consider auditing for unused Figma and Notion seats.
+
+                            {/* Right Column */}
+                            <div className="space-y-6">
+                                {/* Monthly Comparison */}
+                                <DefaultMonthlyComparison />
+
+                                {/* Expense Breakdown */}
+                                <ExpenseBreakdown />
+
+                                {/* Import Data */}
+                                <div className="glass-card rounded-3xl p-6">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="p-2 bg-indigo-500/20 rounded-xl">
+                                            <FileSpreadsheet className="w-5 h-5 text-indigo-400" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-bold text-white uppercase tracking-widest">Import Data</h3>
+                                            <p className="text-[10px] text-slate-500">Tally, Excel, CSV</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mb-4">
+                                        Upload financial documents for instant AI-powered analysis.
                                     </p>
+                                    <FileUpload />
                                 </div>
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                    <p className="text-xs text-slate-300">
-                                        📊 <strong>Revenue Concentration:</strong> Top 3 clients contribute 68% of revenue. Diversification recommended to reduce risk.
-                                    </p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-white/5 border border-white/5">
-                                    <p className="text-xs text-slate-300">
-                                        🚀 <strong>Growth Trajectory:</strong> At current growth rate (18% MoM), you'll reach profitability in ~8 months.
-                                    </p>
+
+                                {/* CFOState Summary */}
+                                <div className="glass-card rounded-3xl p-6">
+                                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Financial Summary</h4>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-slate-400">Monthly Revenue</span>
+                                            <span className="text-sm font-bold text-white">
+                                                {formatCurrency(cfoState.summary.monthlyRevenue)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-slate-400">Monthly Expenses</span>
+                                            <span className="text-sm font-bold text-rose-500">
+                                                {formatCurrency(cfoState.summary.monthlyExpenses)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-slate-400">Net Burn</span>
+                                            <span className={cn("text-sm font-bold", cfoState.summary.netBurn > 0 ? 'text-rose-500' : 'text-emerald-500')}>
+                                                {formatCurrency(cfoState.summary.netBurn)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-slate-400">Runway</span>
+                                            <span className="text-sm font-bold text-emerald-500">
+                                                {cfoState.summary.runwayMonths.toFixed(1)} months
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="space-y-6">
-                        {/* Monthly Comparison */}
-                        <DefaultMonthlyComparison />
-
-                        {/* Expense Breakdown */}
-                        <ExpenseBreakdown />
-
-                        {/* Import Data */}
-                        <div className="glass-card rounded-3xl p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 bg-indigo-500/20 rounded-xl">
-                                    <FileSpreadsheet className="w-5 h-5 text-indigo-400" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-white uppercase tracking-widest">Import Data</h3>
-                                    <p className="text-[10px] text-slate-500">Tally, Excel, CSV</p>
-                                </div>
-                            </div>
-                            <p className="text-xs text-slate-400 mb-4">
-                                Upload financial documents for instant AI-powered analysis.
-                            </p>
-                            <FileUpload />
-                        </div>
-
-                        {/* Quick Stats */}
-                        <div className="glass-card rounded-3xl p-6">
-                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Quick Stats</h4>
-                            {isLoading ? (
-                                <div className="flex justify-center py-8">
-                                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-slate-400">Total Revenue</span>
-                                        <span className="text-sm font-bold text-white">
-                                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(stats?.totalRevenue || 320000)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-slate-400">Monthly Burn</span>
-                                        <span className="text-sm font-bold text-rose-500">
-                                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(stats?.monthlyBurn || 240000)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-slate-400">Cash Runway</span>
-                                        <span className="text-sm font-bold text-emerald-500">{stats?.cashRunway || '7.2 Months'}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-slate-400">Gross Margin</span>
-                                        <span className="text-sm font-bold text-primary">72%</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
         </DashboardLayout>
     );
