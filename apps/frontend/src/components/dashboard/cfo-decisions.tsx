@@ -34,8 +34,12 @@ export function CfoDecisions({ engine, state }: CfoDecisionsProps) {
     const [isUpdating, setIsUpdating] = React.useState(false);
     const [recalcMessage, setRecalcMessage] = React.useState<string | null>(null);
 
-    const primaryDecision = dailyFocus.fix;
-    const secondaryDecisions = engine.decisions.filter(d => d.id !== primaryDecision?.id);
+    // Filter out velocity leaks since they are handled strictly by the Leak Detector Sidebar
+    const validDecisions = engine.decisions.filter(d => d.impactRunwayDays === undefined || d.impactRunwayDays >= 0);
+    const primaryDecision = dailyFocus.fix && (dailyFocus.fix.impactRunwayDays === undefined || dailyFocus.fix.impactRunwayDays >= 0) 
+        ? dailyFocus.fix 
+        : validDecisions[0];
+    const secondaryDecisions = validDecisions.filter(d => d.id !== primaryDecision?.id);
     
     // Gated Intensity UI Logic
     const isCrisis = (currentRunway <= 3) || (decisionMemory?.pendingDecisions >= 3);

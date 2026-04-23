@@ -10,6 +10,8 @@ import { CfoBehaviorInsightPanel } from '@/components/dashboard/cfo-behavior-ins
 import { DecisionTimeline } from '@/components/dashboard/decision-timeline';
 import { CriticalInterventionOverlay } from '@/components/dashboard/critical-intervention-overlay';
 import { SurvivalChecklist } from '@/components/dashboard/SurvivalChecklist';
+import { BurnBar } from '@/components/dashboard/burn-bar';
+import { LeakDetectorSidebar } from '@/components/dashboard/leak-detector-sidebar';
 import { apiClient } from '@/lib/api-client';
 import {
     Skull,
@@ -144,9 +146,18 @@ function DashboardContent({ state }: { state: CFOState }) {
 
                     <CfoHero state={state} />
 
+                    <BurnBar state={state} />
+
                     {isCrisis && <SurvivalChecklist />}
 
-                    <CfoDecisions engine={state.decisionEngine} state={state} />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2">
+                            <CfoDecisions engine={state.decisionEngine} state={state} />
+                        </div>
+                        <div className="lg:col-span-1">
+                            <LeakDetectorSidebar decisions={state.decisionEngine.decisions} />
+                        </div>
+                    </div>
 
                     {!isCrisis && (
                         <div className="pt-8 border-t border-white/5">

@@ -29,12 +29,12 @@ export function KeyMetrics({ state }: KeyMetricsProps) {
 
     const metrics = [
         {
-            label: 'Runway',
-            value: state.isInfiniteRunway ? 'Infinite' : (summary.runwayMonths >= 36 ? '> 36 months' : `${summary.runwayMonths.toFixed(1)} months`),
-            subValue: state.isInfiniteRunway || summary.runwayMonths >= 36 ? 'Capital is not your constraint' : null,
+            label: 'Real Runway',
+            value: summary.isSustainable ? 'Sustainable' : (summary.runwayMonths >= 36 ? '> 36 months' : `${summary.runwayMonths.toFixed(1)} months`),
+            subValue: summary.isSustainable ? 'Capital is not your constraint' : `Includes 18% buffer (-${fmt(summary.ghostLiabilities)})`,
             icon: Clock,
             trend: delta.prevRunwayMonths ? getDelta(summary.runwayMonths, delta.prevRunwayMonths) : null,
-            color: state.isInfiniteRunway || summary.runwayMonths >= 12 ? 'text-emerald-400' : summary.runwayMonths >= 6 ? 'text-amber-400' : 'text-rose-400',
+            color: summary.isSustainable || summary.runwayMonths >= 12 ? 'text-emerald-400' : summary.runwayMonths >= 6 ? 'text-amber-400' : 'text-rose-400',
         },
         {
             label: 'Monthly Net Burn',
