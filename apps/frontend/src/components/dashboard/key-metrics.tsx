@@ -99,7 +99,7 @@ export function KeyMetrics({ state }: KeyMetricsProps) {
                                 {m.subValue}
                             </div>
                         )}
-                        {m.trend && (
+                        {m.trend && !(m.label.toLowerCase().includes('runway') && summary.isSustainable) && (
                             <div className="text-[10px] font-medium text-slate-500 mt-1">
                                 {m.trend.direction === 'up' ? 'Increase' : 'Decrease'} from {m.label.toLowerCase().includes('runway') ? 'last month' : 'last check'}
                             </div>

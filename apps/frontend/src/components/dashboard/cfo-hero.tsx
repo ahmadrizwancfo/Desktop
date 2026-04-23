@@ -14,7 +14,7 @@ interface CfoHeroProps {
 }
 
 export function CfoHero({ state }: CfoHeroProps) {
-    const { narrative, dashboardMode, generatedAt, dynamicConfidence, changeDrivers, versionId, delta } = state;
+    const { narrative, dashboardMode, generatedAt, dynamicConfidence, versionId, delta } = state;
     const [isRefreshing, setIsRefreshing] = React.useState(false);
     const queryClient = useQueryClient();
     const router = useRouter();
@@ -33,7 +33,7 @@ export function CfoHero({ state }: CfoHeroProps) {
     const isWarning = dashboardMode === 'WARNING';
     const ConfidenceIcon = dynamicConfidence.score >= 80 ? CheckCircle2 : dynamicConfidence.score >= 50 ? AlertCircle : Info;
 
-    const hasSignificantChanges = changeDrivers.length > 0 || (delta.runwayChangeDays && Math.abs(delta.runwayChangeDays) > 0);
+    const hasSignificantChanges = (delta.runwayChangeDays && Math.abs(delta.runwayChangeDays) > 0);
 
     return (
         <motion.section
@@ -189,38 +189,7 @@ export function CfoHero({ state }: CfoHeroProps) {
                     </div>
                 </div>
 
-                {/* Change Drivers Layer */}
-                {hasSignificantChanges ? (
-                    <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {changeDrivers.map((driver, i) => (
-                            <div key={i} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors group">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{driver.label}</span>
-                                    {driver.trend === 'up' ? 
-                                        <ArrowUpRight className="w-4 h-4 text-rose-500" /> : 
-                                        <ArrowDownRight className="w-4 h-4 text-emerald-500" />
-                                    }
-                                </div>
-                                <div className="text-xl font-black text-white mb-1">
-                                    {driver.delta > 0 ? '+' : ''}₹{(Math.abs(driver.delta)/1000).toFixed(0)}K
-                                </div>
-                                <p className="text-[10px] font-medium text-slate-400 leading-tight">
-                                    {driver.trend === 'up' ? 'Increased' : 'Decreased'} spending by ₹{(Math.abs(driver.delta)/1000).toFixed(0)}K, {driver.impactOnRunwayMonths > 0 ? 'gaining' : 'reducing'} runway by {Math.abs(driver.impactOnRunwayMonths)} months.
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="mt-8 flex items-center gap-3 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 max-w-fit">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
-                            No significant financial changes since last analysis
-                        </span>
-                    </div>
-                )}
-
-                {/* The 5-Second Evidence */}
-                <KeyMetrics state={state} />
+                {/* Key Metrics extracted to page layout */}
             </div>
         </motion.section>
     );

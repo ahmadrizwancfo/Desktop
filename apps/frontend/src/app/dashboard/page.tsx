@@ -12,6 +12,7 @@ import { CriticalInterventionOverlay } from '@/components/dashboard/critical-int
 import { SurvivalChecklist } from '@/components/dashboard/SurvivalChecklist';
 import { BurnBar } from '@/components/dashboard/burn-bar';
 import { LeakDetectorSidebar } from '@/components/dashboard/leak-detector-sidebar';
+import { KeyMetrics } from '@/components/dashboard/key-metrics';
 import { apiClient } from '@/lib/api-client';
 import {
     Skull,
@@ -146,15 +147,20 @@ function DashboardContent({ state }: { state: CFOState }) {
 
                     <CfoHero state={state} />
 
-                    <BurnBar state={state} />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                        {/* Main Interaction Area */}
+                        <div className="lg:col-span-2 flex flex-col gap-12">
+                            <KeyMetrics state={state} />
+                            
+                            <BurnBar state={state} />
 
-                    {isCrisis && <SurvivalChecklist />}
+                            {isCrisis && <SurvivalChecklist />}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2">
                             <CfoDecisions engine={state.decisionEngine} state={state} />
                         </div>
-                        <div className="lg:col-span-1">
+
+                        {/* Right-Hand Intervention Rail */}
+                        <div className="lg:col-span-1 flex flex-col gap-8">
                             <LeakDetectorSidebar decisions={state.decisionEngine.decisions} />
                         </div>
                     </div>

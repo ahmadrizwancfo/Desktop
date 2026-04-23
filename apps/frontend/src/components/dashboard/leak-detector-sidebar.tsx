@@ -45,7 +45,10 @@ export function LeakDetectorSidebar({ decisions }: LeakDetectorSidebarProps) {
                         className="bg-rose-500/5 group border border-rose-500/20 rounded-xl p-4 hover:bg-rose-500/10 transition-colors"
                     >
                         <div className="flex items-start justify-between mb-2">
-                            <h4 className="text-xs font-black text-white uppercase tracking-wider">{leak.title}</h4>
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-3 h-3 text-rose-500" />
+                                <h4 className="text-xs font-black text-white uppercase tracking-wider">{leak.title}</h4>
+                            </div>
                             <div className="flex items-center gap-1 bg-red-500/20 px-2 py-1 rounded text-[10px] font-black text-red-400">
                                 <TrendingDown className="w-3 h-3" />
                                 {Math.abs(leak.impactRunwayDays || 0)} Days Lost
