@@ -1,0 +1,47 @@
+﻿M  apps/backend/package-lock.json
+M  apps/backend/package.json
+MM apps/backend/prisma/schema.prisma
+ M apps/backend/src/app.controller.ts
+MM apps/backend/src/app.module.ts
+ M apps/backend/src/auth/auth.controller.ts
+ M apps/backend/src/auth/auth.service.ts
+M  apps/backend/src/financial-metrics/financial-metrics.service.ts
+ M apps/backend/src/integrations/banking/banking.controller.ts
+ M apps/backend/src/integrations/banking/banking.service.ts
+ M apps/backend/src/integrations/banking/providers/sandbox.provider.ts
+A  apps/backend/src/integrations/integrations.controller.ts
+A  apps/backend/src/integrations/integrations.module.ts
+A  apps/backend/src/integrations/integrations.service.ts
+A  apps/backend/src/integrations/quickbooks.service.ts
+A  apps/backend/src/integrations/razorpay.service.ts
+A  apps/backend/src/integrations/zoho.service.ts
+ M apps/backend/src/notifications/smart-notifications.service.ts
+ M apps/backend/src/prisma/prisma.service.ts
+M  apps/frontend/src/app/dashboard/page.tsx
+M  apps/frontend/src/app/globals.css
+A  apps/frontend/src/app/integrations/page.tsx
+MM apps/frontend/src/app/onboarding/page.tsx
+MM apps/frontend/src/app/page.tsx
+M  apps/frontend/src/components/dashboard/cfo-summary-card.tsx
+M  apps/frontend/src/components/dashboard/decision-cards.tsx
+M  apps/frontend/src/components/dashboard/why-drill-down.tsx
+A  apps/frontend/src/components/landing/background-system.tsx
+AM apps/frontend/src/components/landing/dashboard-preview.tsx
+MM apps/frontend/src/components/landing/faq-accordion.tsx
+MM apps/frontend/src/components/landing/feature-showcase.tsx
+MM apps/frontend/src/components/landing/hero-section.tsx
+AM apps/frontend/src/components/landing/how-it-works.tsx
+MM apps/frontend/src/components/landing/pricing-table.tsx
+MM apps/frontend/src/components/landing/problem-solution.tsx
+M  apps/frontend/src/components/layout/dashboard-layout.tsx
+M  apps/frontend/src/components/layout/header.tsx
+A  apps/frontend/src/components/layout/page-transition.tsx
+M  apps/frontend/src/components/layout/sidebar.tsx
+ M apps/frontend/src/components/modals/create-contact-modal.tsx
+M  apps/frontend/src/lib/demo-data.ts
+M  apps/frontend/src/lib/utils.ts
+?? PRODUCTION_STATUS.md
+?? apps/backend/prisma/migrations/20260405105929_add_transaction_dedup_constraint/
+?? apps/backend/src/contacts/
+?? apps/frontend/frontend_error.txt
+?? git_status.txt

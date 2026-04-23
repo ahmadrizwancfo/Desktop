@@ -393,6 +393,8 @@ export interface CFOState {
         monthlyExpenses: number;
         netBurn: number;
         runwayMonths: number;
+        ghostLiabilities: number;
+        isSustainable: boolean;
         burnTrend: 'increasing' | 'decreasing' | 'stable' | 'unknown';
         revenueTrend: 'growing' | 'declining' | 'stable' | 'unknown';
         prevMonthlyRevenue: number;

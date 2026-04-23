@@ -51,6 +51,8 @@ export interface CfoBrainReport {
         netBurn: number;
         cashInBank: number;
         runwayMonths: number;
+        isSustainable: boolean;
+        ghostLiabilities: number;
         topExpenseCategory: string;
         topExpenseAmount: number;
         burnTrend: 'increasing' | 'decreasing' | 'stable' | 'unknown';
@@ -194,13 +196,23 @@ export class CfoBrainService {
          * FORMULA: Cash = Total available balance across all active accounts.
          */
         const cashInBank = bankAccounts.reduce((s, a) => s + Number(a.balance), 0);
+        
+        /**
+         * FORMULA: Ghost Liabilities (Conservative Buffer) = GST + TDS approximations (18% of monthly revenue)
+         */
+        const ghostLiabilities = monthlyRevenue * 0.18;
 
         /**
-         * FORMULA: Runway = cash / netBurn (capped at 36.0 for trust)
+         * FORMULA: Real Runway = (Cash - Ghost_Liabilities) / Net Burn.
          */
-        const runwayMonths = netBurn > 0 
-            ? Math.min(Math.round((cashInBank / netBurn) * 10) / 10, 36.0) 
-            : 36.0;
+        let isSustainable = false;
+        let runwayMonths = 999;
+        
+        if (netBurn <= 0) {
+            isSustainable = true;
+        } else {
+            runwayMonths = Math.min(Math.round(((cashInBank - ghostLiabilities) / Math.max(0.1, netBurn)) * 10) / 10, 36.0);
+        }
 
         // ── 3. Category breakdown with trends ────────────────────────────────
         const allCategories = new Set([...Object.keys(categorySums), ...Object.keys(prevCategorySums)]);
@@ -287,6 +299,8 @@ export class CfoBrainService {
             netBurn,
             cashInBank,
             runwayMonths,
+            isSustainable,
+            ghostLiabilities,
             burnTrend,
             revenueTrend,
             categoryBreakdown,
@@ -308,6 +322,8 @@ export class CfoBrainService {
                 netBurn,
                 cashInBank,
                 runwayMonths,
+                isSustainable,
+                ghostLiabilities,
                 topExpenseCategory: topCategory?.category || 'N/A',
                 topExpenseAmount: topCategory?.amount || 0,
                 burnTrend,
@@ -407,7 +423,7 @@ export class CfoBrainService {
                 categoryBreakdown, burnTrend, profile } = ctx;
 
         // R1: Runway risk
-        if (netBurn > 0) {
+        if (netBurn > 0 && !ctx.isSustainable) {
             let severity: CfoBrainInsight['severity'] = 'low';
             if (runwayMonths < 3) severity = 'critical';
             else if (runwayMonths < 6) severity = 'high';
@@ -420,8 +436,8 @@ export class CfoBrainService {
             insights.push({
                 type: 'RISK',
                 severity,
-                title: runwayMonths < 6 ? 'Runway is dangerously low' : 'Cash runway projection',
-                body: `At current burn of ${fmt(netBurn)}/mo with ${fmt(cashInBank)} in the bank, you have ${runwayMonths >= 999 ? '∞' : runwayMonths.toFixed(1)} months of runway.${fundraiseCaveat}`,
+                title: runwayMonths < 6 ? 'Runway is dangerously low' : 'Real Cash runway projection',
+                body: `At current burn of ${fmt(netBurn)}/mo with ${fmt(cashInBank)} in bank (minus ${fmt(ctx.ghostLiabilities)} expected tax), you have ${runwayMonths >= 999 ? '∞' : runwayMonths.toFixed(1)} months of real runway.${fundraiseCaveat}`,
                 metric: `${runwayMonths >= 999 ? '∞' : runwayMonths.toFixed(1)} months`,
                 confidence: 0.97,
                 source: 'projection',
@@ -607,6 +623,8 @@ export class CfoBrainService {
         netBurn: number;
         cashInBank: number;
         runwayMonths: number;
+        isSustainable: boolean;
+        ghostLiabilities: number;
         burnTrend: CfoBrainReport['summary']['burnTrend'];
         revenueTrend: CfoBrainReport['summary']['revenueTrend'];
         categoryBreakdown: CategorySpend[];
@@ -619,6 +637,7 @@ export class CfoBrainService {
     }): DecisionEngineV1Output {
         const {
             monthlyRevenue, monthlyExpenses, netBurn, cashInBank, runwayMonths,
+            isSustainable, ghostLiabilities,
             burnTrend, revenueTrend, categoryBreakdown, prevRevenue, prevExpenses,
             totalTransactions, dataQuality, profile, integrationsCount
         } = ctx;

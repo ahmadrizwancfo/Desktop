@@ -98,7 +98,7 @@ export default function DashboardPage() {
 
 function DashboardContent({ state }: { state: CFOState }) {
     const router = useRouter();
-    const isCrisis = state.summary.runwayMonths < 3;
+    const isCrisis = state.summary.runwayMonths < 3 && !state.summary.isSustainable;
     const isSafeMode = state.trustIntelligence?.autoPilot.mode === 'SAFE_MODE';
     const rollbackRate = state.trustIntelligence?.autoPilot.rollbackRate || 0;
     const [showDeepInsights, setShowDeepInsights] = useState(false);
@@ -122,8 +122,8 @@ function DashboardContent({ state }: { state: CFOState }) {
         >
             <div className={cn(
                 "min-h-screen transition-all duration-1000 -m-10 p-10 relative overflow-hidden",
-                state.dashboardMode === 'CRITICAL' ? "bg-rose-500/[0.03]" : 
-                state.dashboardMode === 'WARNING' ? "bg-amber-500/[0.02]" : ""
+                !state.summary.isSustainable && state.dashboardMode === 'CRITICAL' ? "bg-rose-500/[0.03]" : 
+                !state.summary.isSustainable && state.dashboardMode === 'WARNING' ? "bg-amber-500/[0.02]" : ""
             )}>
                 <div className="max-w-5xl mx-auto pb-32 px-4 flex flex-col gap-12">
                      {!isCrisis && <CommandBar state={state} />}

@@ -148,32 +148,45 @@ export class DecisionEngineService {
             }
         }
 
-        // Efficiencies
+        // Efficiencies and Cost Hikes (Wartime V4 Override)
         state.changeDrivers.forEach(driver => {
             if (driver.trend === 'up' && driver.impactOnRunwayMonths < -0.3) {
-                const delta = Math.abs(driver.impactOnRunwayMonths);
+                const deltaDays = Math.round(Math.abs(driver.impactOnRunwayMonths) * 30.4);
+                
+                // Hard Logic Override for Fixed Costs (Rent, Payroll, Subscriptions)
+                const isFixed = ['rent', 'payroll', 'software', 'subscriptions', 'salary', 'wages', 'office'].some(k => driver.label.toLowerCase().includes(k) || driver.category?.toLowerCase().includes(k));
+                
+                const title = isFixed ? `CRITICAL LEAK: ${driver.label} Increased` : `Suggested Improvement: Optimize ${driver.label}`;
+                const message = isFixed 
+                    ? `Warning: ${driver.label} increased by ₹${this.fmtAmt(driver.delta)}. You just traded ${deltaDays} days of life for this. Was it worth it?`
+                    : `Efficiency opportunity: Reduce overspending on ${driver.label} by ₹${this.fmtAmt(driver.delta)}/month.`;
+                const type = isFixed ? 'mandate' : 'recommendation';
+                const urgency = isFixed ? 'high' : 'medium';
+
                 const decisionParams = {
                     key: `OPTIMIZE_${driver.label.toUpperCase().replace(/\s+/g, '_')}`,
-                    type: 'recommendation',
-                    priority: 2,
-                    urgency: 'medium',
-                    recommendationStrength: 'suggested',
-                    title: `Suggested Improvement: Optimize ${driver.label}`,
-                    message: `Efficiency opportunity: Reduce overspending on ${driver.label} by ₹${this.fmtAmt(driver.delta)}/month.`,
+                    type,
+                    priority: isFixed ? 4 : 2,
+                    urgency,
+                    recommendationStrength: isFixed ? 'strong' : 'suggested',
+                    title,
+                    message,
                     tradeOffs: this.getTradeOffs(stage, 'margin_low'),
-                    rationale: `Reducing ₹${this.fmtAmt(driver.delta)}/month from ${driver.label} adds exactly ${Math.round(delta * 30.4)} days to your runway immediately.`,
+                    rationale: isFixed 
+                        ? `Cost expansions in fixed categories are permanent subtractions from your runway.` 
+                        : `Reducing ₹${this.fmtAmt(driver.delta)}/month from ${driver.label} adds exactly ${deltaDays} days to your runway immediately.`,
                     startupStage: stage,
                     confidence,
                     stability,
-                    impactRunwayDays: Math.round(delta * 30.4),
-                    impactBurnMonthly: driver.delta,
+                    impactRunwayDays: isFixed ? -deltaDays : deltaDays,
+                    impactBurnMonthly: isFixed ? -driver.delta : driver.delta,
                     executionPlan: this.getExecutionPlan('OPTIMIZE_SPEND', state, driver.label),
                     actionPayload: { type: 'simulate_cost_cut', preloadedScenario: { categories: [driver.category || driver.label] } }
                 };
                 rawDecisions.push(this.createDecision({
                     ...decisionParams,
                     alternative: this.generateAlternative(decisionParams as any, metrics, stage)
-                } as any, 50, delta));
+                } as any, 50, Math.abs(driver.impactOnRunwayMonths)));
             }
         });
 

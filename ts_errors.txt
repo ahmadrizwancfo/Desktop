@@ -1,0 +1,41 @@
+﻿[96msrc/ai/ai.service.spec.ts[0m:[93m72[0m:[93m21[0m - [91merror[0m[90m TS2339: [0mProperty 'totalIncome' does not exist on type 'any[]'.
+
+[7m72[0m       expect(result.totalIncome).toBe(0);
+[7m  [0m [91m                    ~~~~~~~~~~~[0m
+
+[96msrc/ai/ai.service.spec.ts[0m:[93m73[0m:[93m21[0m - [91merror[0m[90m TS2339: [0mProperty 'totalExpenses' does not exist on type 'any[]'.
+
+[7m73[0m       expect(result.totalExpenses).toBe(0);
+[7m  [0m [91m                    ~~~~~~~~~~~~~[0m
+
+[96msrc/auth/auth.service.spec.ts[0m:[93m163[0m:[93m36[0m - [91merror[0m[90m TS2339: [0mProperty 'findOrCreateMockUser' does not exist on type 'AuthService'.
+
+[7m163[0m       const result = await service.findOrCreateMockUser(profile);
+[7m   [0m [91m                                   ~~~~~~~~~~~~~~~~~~~~[0m
+
+[96msrc/auth/auth.service.spec.ts[0m:[93m184[0m:[93m36[0m - [91merror[0m[90m TS2339: [0mProperty 'findOrCreateMockUser' does not exist on type 'AuthService'.
+
+[7m184[0m       const result = await service.findOrCreateMockUser(profile);
+[7m   [0m [91m                                   ~~~~~~~~~~~~~~~~~~~~[0m
+
+[96mtest/app.e2e-spec.ts[0m:[93m155[0m:[93m11[0m - [91merror[0m[90m TS2345: [0mArgument of type 'Test' is not assignable to parameter of type 'never'.
+
+[7m155[0m           request(app.getHttpServer())
+[7m   [0m [91m          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[7m156[0m             .post('/api/auth/login')
+[7m   [0m [91m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[7m157[0m             .send({ email: 'test@test.com', password: 'wrong' })
+[7m   [0m [91m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96mtest/app.e2e-spec.ts[0m:[93m164[0m:[93m47[0m - [91merror[0m[90m TS2339: [0mProperty 'status' does not exist on type 'never'.
+
+[7m164[0m       const rateLimited = results.some(r => r.status === 429);
+[7m   [0m [91m                                              ~~~~~~[0m
+
+
+Found 6 errors in 3 files.
+
+Errors  Files
+     2  src/ai/ai.service.spec.ts[90m:72[0m
+     2  src/auth/auth.service.spec.ts[90m:163[0m
+     2  test/app.e2e-spec.ts[90m:155[0m
