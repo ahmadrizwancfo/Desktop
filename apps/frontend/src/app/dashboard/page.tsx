@@ -147,9 +147,9 @@ function DashboardContent({ state }: { state: CFOState }) {
 
                     <CfoHero state={state} />
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                    <div className="flex flex-col xl:flex-row items-start gap-6 xl:gap-8 mt-8">
                         {/* Main Interaction Area */}
-                        <div className="lg:col-span-2 flex flex-col gap-12">
+                        <div className="flex-1 min-w-0 flex flex-col gap-8 w-full">
                             <KeyMetrics state={state} />
                             
                             <BurnBar state={state} />
@@ -160,7 +160,7 @@ function DashboardContent({ state }: { state: CFOState }) {
                         </div>
 
                         {/* Right-Hand Intervention Rail */}
-                        <div className="lg:col-span-1 flex flex-col gap-8">
+                        <div className="w-full xl:w-[380px] shrink-0 flex flex-col gap-8 sticky top-8">
                             <LeakDetectorSidebar decisions={state.decisionEngine.decisions} />
                         </div>
                     </div>

@@ -61,14 +61,14 @@ export function KeyMetrics({ state }: KeyMetricsProps) {
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8 pb-8 border-b border-white/5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-8 pb-8 border-b border-white/5">
             {metrics.map((m, i) => (
                 <motion.div
                     key={m.label}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1 }}
-                    className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col gap-3 relative group overflow-hidden"
+                    className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col gap-3 relative group"
                 >
                     <div className="flex items-start justify-between">
                         <div className="p-2 rounded-lg bg-white/5 group-hover:bg-primary/10 transition-colors">

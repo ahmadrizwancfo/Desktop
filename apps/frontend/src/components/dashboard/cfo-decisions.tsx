@@ -109,7 +109,7 @@ export function CfoDecisions({ engine, state }: CfoDecisionsProps) {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         className={cn(
-                            "glass-card rounded-[2.5rem] p-10 border-l-[12px] relative overflow-hidden group shadow-2xl transition-all duration-700",
+                            "glass-card rounded-[2.5rem] p-10 border-l-[12px] relative group shadow-2xl transition-all duration-700",
                             urgency === 'critical' ? 'border-l-rose-500' : 'border-l-primary',
                             isCrisis && "ring-2 ring-rose-500/30 ring-offset-4 ring-offset-black",
                             isUpdating && "opacity-50 pointer-events-none"

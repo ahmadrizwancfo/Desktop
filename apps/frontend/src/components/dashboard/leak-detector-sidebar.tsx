@@ -16,7 +16,7 @@ export function LeakDetectorSidebar({ decisions }: LeakDetectorSidebarProps) {
 
     if (leaks.length === 0) {
         return (
-            <div className="w-full h-full bg-[#111111] border border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+            <div className="w-full h-auto bg-[#111111] border border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
                 <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-3">
                     <div className="w-4 h-4 rounded-full bg-emerald-500" />
                 </div>
