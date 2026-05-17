@@ -77,9 +77,11 @@ export class CfoBriefService {
             ? topDecision.recommendedActions[0] as any
             : null;
         
-        const topRecommendation = topActionObj && topActionObj.action 
-            ? String(topActionObj.action) 
-            : topActionObj ? String(topActionObj) : 'Focus on keeping the revenue growing and controlling fixed costs.';
+        const topRecommendation = topActionObj
+            ? (typeof topActionObj === 'object'
+                ? (topActionObj.task || topActionObj.action || JSON.stringify(topActionObj))
+                : String(topActionObj))
+            : 'Focus on keeping the revenue growing and controlling fixed costs.';
 
         const summaryText = `Your runway is currently ${metrics.runwayMonths.toFixed(1)} months. Burn is ${burnChangeStr} and Revenue trend is ${revenueTrendStr} versus the previous period.`;
 

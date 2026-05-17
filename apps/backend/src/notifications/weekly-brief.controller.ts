@@ -192,8 +192,12 @@ export class WeeklyBriefController {
             : { domain: 'NONE', type: 'No critical risks', severity: 'LOW', summary: 'All systems healthy' };
 
         // Top recommendation from highest-severity decision
-        const topRecommendation = topDecision?.recommendedActions?.[0]
-            || 'Continue optimizing operations';
+        const topActionObj = topDecision?.recommendedActions?.[0];
+        const topRecommendation = topActionObj
+            ? (typeof topActionObj === 'object'
+                ? (topActionObj.task || topActionObj.action || JSON.stringify(topActionObj))
+                : String(topActionObj))
+            : 'Continue optimizing operations';
 
         // ── COMPARE VS LAST WEEK ──────────────────────────────────────────────
         let changeVsLastWeek: any = null;

@@ -248,7 +248,11 @@ export default function WeeklyBriefPage() {
                                 <div>
                                     <p className="text-[10px] text-primary uppercase tracking-widest font-bold mb-1">Recommendation</p>
                                     <p className="text-sm font-bold text-white">
-                                        {brief?.recommendation || 'Continue optimizing operations'}
+                                        {brief?.recommendation
+                                            ? (typeof brief.recommendation === 'object'
+                                                ? (brief.recommendation.task || brief.recommendation.action || JSON.stringify(brief.recommendation))
+                                                : String(brief.recommendation))
+                                            : 'Continue optimizing operations'}
                                     </p>
                                 </div>
                             </div>
