@@ -33,6 +33,7 @@ import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { useStartupProfileStore } from '@/store/startup-profile-store';
+import { useCfoStateStore } from '@/store/cfo-state-store';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,6 +69,15 @@ interface CfoDecision {
     aiExplanation: AiExplanation | null;
     reversibility: 'high' | 'medium' | 'low';
     impactLine?: string;
+    
+    // v4.0 Execution Engine
+    impactExplanation?: string;
+    consequenceExplanation?: string;
+    consequenceBasis?: string;
+    secondOrderEffects?: string[];
+    oneThingReasoning?: string;
+    investorNarrative?: string;
+    statusV4?: 'pending' | 'in_progress' | 'done' | 'ignored';
 }
 
 // ─── UI Maps ──────────────────────────────────────────────────────────────────
@@ -191,6 +201,7 @@ const DecisionCard = memo(function DecisionCard({
     onDismiss: (id: string) => void;
     onStatusChange: (id: string, status: Status) => void;
 }) {
+    const { state, isInvestorMode } = useCfoStateStore();
     const [expanded, setExpanded] = useState(false);
     const [tracked, setTracked] = useState(false); // FIX: prevent double-submit
 
@@ -345,13 +356,65 @@ const DecisionCard = memo(function DecisionCard({
                         )}
                         {/* FIX: Confidence bar instead of just text */}
                         <ConfidenceBar value={decision.confidence} severity={decision.severity} />
-                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold ml-auto', STATUS_STYLES[decision.status])}>
-                            {decision.status}
-                        </span>
+                        
+                        {decision.statusV4 && (
+                            <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-black ml-auto uppercase tracking-widest', 
+                                decision.statusV4 === 'done' ? 'bg-emerald-500/20 text-emerald-400' :
+                                decision.statusV4 === 'in_progress' ? 'bg-amber-500/20 text-amber-400' :
+                                'bg-white/10 text-slate-400'
+                            )}>
+                                {decision.statusV4.replace('_', ' ')}
+                            </span>
+                        )}
                     </div>
 
+                    {/* v4.0 IMPACT / CONSEQUENCE SIGNALS */}
+                    {(decision.impactExplanation || (decision.consequenceExplanation && !isInvestorMode)) && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {decision.impactExplanation && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                                    <Zap className="w-3 h-3 text-emerald-500" />
+                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">
+                                        {isInvestorMode ? "Efficiency Gain" : decision.impactExplanation}
+                                    </span>
+                                </div>
+                            )}
+                            {decision.consequenceExplanation && !isInvestorMode && (
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-500/5 border border-rose-500/10 rounded-lg">
+                                        <AlertTriangle className="w-3 h-3 text-rose-500" />
+                                        <span className="text-[9px] font-black text-rose-500/70 uppercase tracking-widest">
+                                            {decision.consequenceExplanation}
+                                        </span>
+                                    </div>
+                                    {decision.consequenceBasis && (
+                                        <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest ml-1">
+                                            Basis: {decision.consequenceBasis}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Decision title */}
-                    <h3 className="font-bold text-white text-base leading-tight mb-2 text-editorial tracking-tight">{decisionLabel}</h3>
+                    <h3 className={cn(
+                        "font-black uppercase tracking-tight leading-tight mb-2 text-editorial",
+                        isInvestorMode ? "text-slate-200 text-sm" : "text-white text-base"
+                    )}>
+                        {isInvestorMode ? (decision.investorNarrative || decisionLabel) : decisionLabel}
+                    </h3>
+
+                    {/* v5.0 Second Order Effects in Card */}
+                    {!expanded && decision.secondOrderEffects && decision.secondOrderEffects.length > 0 && (
+                        <div className="flex gap-1.5 mb-3">
+                            {decision.secondOrderEffects.slice(0, 2).map((effect, idx) => (
+                                <div key={idx} className="px-1.5 py-0.5 bg-white/5 border border-white/5 rounded text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                                    {effect}
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     {decision.impactLine && (
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-full font-bold text-xs mb-3">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -191,6 +191,11 @@ export default function InvestorReadinessPage() {
     const [dataRoomLink, setDataRoomLink] = useState<string | null>(null);
     const [showGoalMenu, setShowGoalMenu] = useState(false);
     const [showReportModal, setShowReportModal] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Goal-Based Context Store
     const { primaryGoal, businessModel, setProfile } = useCompanyProfileStore();
@@ -834,7 +839,7 @@ export default function InvestorReadinessPage() {
                                         <p className="text-sm text-white font-mono mt-1 truncate">{dataRoomLink}</p>
                                         <p className="text-[10px] text-slate-600 mt-2 flex items-center gap-1">
                                             <Shield className="w-3 h-3" />
-                                            Numbers frozen at {new Date().toLocaleDateString()} • Audit trail enabled
+                                            Numbers frozen at {isMounted ? new Date().toLocaleDateString() : '...'} • Audit trail enabled
                                         </p>
                                     </motion.div>
                                 )}
@@ -850,6 +855,7 @@ export default function InvestorReadinessPage() {
                                     <button
                                         key={doc.type}
                                         onClick={() => toggleDoc(doc.type)}
+                                        suppressHydrationWarning
                                         className={cn(
                                             "p-4 rounded-xl border text-left transition-all",
                                             selectedDocs.includes(doc.type)

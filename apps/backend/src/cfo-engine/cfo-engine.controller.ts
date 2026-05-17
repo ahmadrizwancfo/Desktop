@@ -23,6 +23,7 @@ import { CfoForecastService } from './cfo-forecast.service';
 import { CfoExecutionService } from './cfo-execution.service';
 import { CfoAutoExecutionService } from './cfo-auto-execution.service';
 import { CfoAutoPilotService } from './cfo-auto-pilot.service';
+import { CfoResolutionService } from './cfo-resolution.service';
 
 class UpdateStatusDto {
     @IsEnum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED'])
@@ -46,6 +47,7 @@ export class CfoEngineController {
         private readonly executionService: CfoExecutionService,
         private readonly autoExecService: CfoAutoExecutionService,
         private readonly autoPilot: CfoAutoPilotService,
+        private readonly resolutionService: CfoResolutionService,
     ) { }
 
     @Post('actions/start-shadow')
@@ -85,6 +87,40 @@ export class CfoEngineController {
         this.stateService.invalidateCache(orgId);
         
         return { message: 'Mandate claimed as done. CFO will now verify.' };
+    }
+
+    @Post('onboarding/complete')
+    async completeOnboarding(@Request() req: any) {
+        const orgId = req.user.organizationId;
+        if (!orgId) throw new NotFoundException('No organization found.');
+        
+        await this.prisma.organization.update({
+            where: { id: orgId },
+            data: { isFirstTimeUser: false }
+        });
+        
+        return { message: 'Onboarding completed.' };
+    }
+
+    @Post('sync/force')
+    async forceSync(@Request() req: any) {
+        const orgId = req.user.organizationId;
+        if (!orgId) throw new NotFoundException('No organization found.');
+        
+        const profile = await this.profileService.findByUser(req.user.id);
+        if (!profile) throw new NotFoundException('No startup profile found.');
+
+        // Re-run the diagnostic engine to detect auto-resolutions
+        await this.engineService.runEngine(profile.id, req.user.id);
+        
+        this.stateService.invalidateCache(orgId);
+        const newState = await this.stateService.getState(orgId, req.user.id);
+        
+        return { 
+            message: 'Intelligence re-synchronized.',
+            lastUpdated: newState.generatedAt,
+            confidence: newState.dynamicConfidence
+        };
     }
 
     @Post('state/mandate-feedback/:id')
@@ -149,6 +185,34 @@ export class CfoEngineController {
     }
 
 
+
+    @Post('state/decision-update-status/:id')
+    async updateDecisionStatus(
+        @Param('id') id: string, 
+        @Body() body: { status: 'pending' | 'in_progress' | 'done' | 'ignored' },
+        @Request() req: any
+    ) {
+        const orgId = req.user.organizationId;
+        if (!orgId) throw new NotFoundException('No organization found.');
+        
+        const statusMap: Record<string, string> = {
+            'pending': 'OPEN',
+            'in_progress': 'REVIEWING',
+            'done': 'RESOLVED',
+            'ignored': 'IGNORED'
+        };
+
+        await this.prisma.cfoDecision.update({
+            where: { id },
+            data: { 
+                status: (statusMap[body.status] || 'OPEN') as any,
+                lastActionAt: new Date()
+            }
+        });
+
+        this.stateService.invalidateCache(orgId);
+        return { success: true, status: body.status };
+    }
 
     // ─── AI CFO Metrics Endpoints ──────────────────────────────────────────────
     
@@ -318,6 +382,32 @@ export class CfoEngineController {
     }
 
     /**
+     * v4.0 Manual Override for Ghost Transactions
+     */
+    @Post('state/ghost-override')
+    async ghostOverride(@Body() body: { decisionId: string; comment: string }, @Request() req: any) {
+        return this.stateService.markGhostAsValid(req.user.id, body.decisionId, body.comment);
+    }
+
+    /**
+     * v4.1 Mastermind Shortcut: Bulk Resolve Suspense Queue
+     */
+    @Post('reconcile/bulk-resolve')
+    async bulkResolve(@Request() req: any) {
+        const orgId = req.user.organizationId;
+        if (!orgId) throw new NotFoundException('No organization found.');
+        return this.stateService.bulkResolve(orgId);
+    }
+
+    /**
+     * v4.0 Phoenix Raise Options with Lock Detection
+     */
+    @Get('resolution/options')
+    async getResolutionOptions(@Request() req: any) {
+        return this.resolutionService.getPhoenixRaiseOptions(req.user.id);
+    }
+
+    /**
      * Log a simulation for behavioral pattern detection and auditing.
      */
     @Post('state/simulation-log')
@@ -415,5 +505,89 @@ export class CfoEngineController {
 
         this.stateService.invalidateCache(orgId);
         return { message: 'Auto-Pilot action cancelled.' };
+    }
+
+    // ── HISTORY ENDPOINT ──────────────────────────────────────────────────────
+    
+    @Get('history')
+    async getHistory(@Request() req: any) {
+        const orgId = req.user.organizationId;
+        if (!orgId) throw new NotFoundException('No organization found.');
+
+        // Last 6 CFO state snapshots
+        const snapshots = await this.prisma.cfoStateSnapshot.findMany({
+            where: { organizationId: orgId },
+            orderBy: { generatedAt: 'desc' },
+            take: 6,
+            select: {
+                id: true,
+                runwayMonths: true,
+                cashInBank: true,
+                monthlyRevenue: true,
+                monthlyExpenses: true,
+                netBurn: true,
+                burnTrend: true,
+                revenueTrend: true,
+                dataQuality: true,
+                generatedAt: true,
+                runwayChangeDays: true,
+                burnChangePercent: true,
+                cashChangeAmount: true,
+            }
+        });
+
+        // Recent decision events (acted/ignored)
+        const decisions = await this.prisma.cfoDecisionEvent.findMany({
+            where: { organizationId: orgId },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            select: {
+                id: true,
+                decisionId: true,
+                decisionStatement: true,
+                optionChosen: true,
+                acted: true,
+                resolved: true,
+                runwayAtShown: true,
+                runwayAtResolved: true,
+                runwayDelta: true,
+                createdAt: true,
+                actedAt: true,
+            }
+        });
+
+        // Financial snapshots for trend
+        const financials = await this.prisma.financialSnapshot.findMany({
+            where: { organizationId: orgId },
+            orderBy: { snapshotDate: 'desc' },
+            take: 6,
+            select: {
+                revenue: true,
+                expenses: true,
+                cashBalance: true,
+                burn: true,
+                snapshotDate: true,
+            }
+        });
+
+        // Profile freshness
+        const profile = await this.prisma.startupProfile.findFirst({
+            where: { organizationId: orgId },
+            select: {
+                dataInputMethod: true,
+                lastFinancialUpdate: true,
+                updatedAt: true,
+            }
+        });
+
+        return {
+            snapshots,
+            decisions,
+            financials,
+            profile: {
+                dataInputMethod: profile?.dataInputMethod || 'SLIDER',
+                lastFinancialUpdate: profile?.lastFinancialUpdate || profile?.updatedAt,
+            }
+        };
     }
 }

@@ -126,9 +126,9 @@ export class IntegrationsController {
 
     @Get('zoho/auth')
     @UseGuards(JwtAuthGuard)
-    async zohoAuth(@GetUser() user: any, @Res() res: Response) {
+    async zohoAuth(@GetUser() user: any) {
         const url = this.zohoService.getAuthUrl(user.id);
-        return res.redirect(url);
+        return { url };
     }
 
     @Get('zoho/callback')
@@ -150,9 +150,9 @@ export class IntegrationsController {
 
     @Get('quickbooks/auth')
     @UseGuards(JwtAuthGuard)
-    async quickbooksAuth(@GetUser() user: any, @Res() res: Response) {
+    async quickbooksAuth(@GetUser() user: any) {
         const url = this.quickbooksService.getAuthUrl(user.id);
-        return res.redirect(url);
+        return { url };
     }
 
     @Get('quickbooks/callback')

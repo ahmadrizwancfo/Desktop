@@ -33,7 +33,7 @@ export function Header() {
     const currentRoleConfig = roleConfig[currentRole];
 
     return (
-        <header className="h-20 border-b border-white/5 bg-background/30 backdrop-blur-xl sticky top-0 z-40 px-10 flex items-center justify-between group/header transition-all duration-500 hover:bg-background/40">
+        <header className="h-20 border-b border-white/5 bg-background/30 backdrop-blur-xl sticky top-0 z-40 px-8 flex items-center justify-between group/header transition-all duration-500 hover:bg-background/40">
             {/* Subtle Header Bottom Glow */}
             <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover/header:opacity-100 transition-opacity duration-700" />
             <div className="flex items-center gap-6 w-[450px]">

@@ -28,6 +28,7 @@ export class DecisionEngineService {
     generateDecisions(state: CFOState, previousSnapshots: any[] = []): DecisionOutput {
         const rawDecisions: Decision[] = [];
         const alerts: DecisionAlert[] = [];
+        const persona = state.founderPersona || 'disciplined';
         
         const runway = state.summary.runwayMonths;
         const stage = this.getStartupStage(runway);
@@ -88,7 +89,7 @@ export class DecisionEngineService {
                 rawDecisions.push(this.createDecision({
                     ...decisionParams,
                     alternative: this.generateAlternative(decisionParams as any, metrics, stage)
-                } as any, 100, delta));
+                } as any, 100, delta, persona, 'based on current cash burn velocity', ['Increases survival probability', 'Improves hiring flexibility', 'Signals discipline to investors']));
             } else {
                 // Normal Mode: Strong Recommendation
                 const fundraiseDelta = 1.5;
@@ -118,7 +119,7 @@ export class DecisionEngineService {
                 rawDecisions.push(this.createDecision({
                     ...decisionParams,
                     alternative: this.generateAlternative(decisionParams as any, metrics, stage)
-                } as any, 70, fundraiseDelta));
+                } as any, 70, fundraiseDelta, persona, 'based on current runway and growth targets', ['Unlocks expansion capital', 'Improves market momentum', 'Reduces founder dilution risk']));
             }
         }
 
@@ -144,7 +145,7 @@ export class DecisionEngineService {
                 rawDecisions.push(this.createDecision({
                     ...decisionParams,
                     alternative: this.generateAlternative(decisionParams as any, metrics, stage)
-                } as any, 40, 0.5));
+                } as any, 40, 0.5, persona));
             }
         }
 
@@ -186,7 +187,7 @@ export class DecisionEngineService {
                 rawDecisions.push(this.createDecision({
                     ...decisionParams,
                     alternative: this.generateAlternative(decisionParams as any, metrics, stage)
-                } as any, 50, Math.abs(driver.impactOnRunwayMonths)));
+                } as any, 50, Math.abs(driver.impactOnRunwayMonths), persona));
             }
         });
 
@@ -227,10 +228,13 @@ export class DecisionEngineService {
         const secondaryQueue = rawDecisions.filter(d => d.id !== primaryDecision?.id);
 
         // ── 3. DAILY FOCUS (1-1-1) ─────────────────────────────
+        const topMandate = processedMandates.find(m => m.statusV4 === 'pending') || processedMandates[0] || recommendations[0] || null;
+        
         const dailyFocus = {
-            fix: primaryDecision,
-            support: secondaryQueue[0] || null,
-            watch: state.negativeTrends[0] || { metric: 'Runway', message: 'Stable but monitoring burn spikes.' }
+            fix: topMandate,
+            support: secondaryQueue.find(d => d.id !== topMandate?.id && d.type === 'recommendation') || null,
+            watch: state.negativeTrends[0] || { metric: 'Runway', message: 'Stable but monitoring burn spikes.' },
+            oneThing: topMandate // v4.0 Spotlight
         };
 
         // ── 4. HOUSEKEEPING ────────────────────────────────────
@@ -244,11 +248,91 @@ export class DecisionEngineService {
             });
         });
 
+        // ── 5. AI GUARDRAILS — Confidence-based language & strength capping ──
+        const confidenceLabel = (state.dynamicConfidence as any).label || 
+            (confidenceScore > 70 ? 'HIGH' : confidenceScore > 40 ? 'MEDIUM' : 'LOW');
+        
+        for (const d of rawDecisions) {
+            // A. Cap recommendation strength for LOW confidence
+            if (confidenceLabel === 'LOW') {
+                d.recommendationStrength = 'suggested';
+                if (!d.message.startsWith('With limited data')) {
+                    d.message = `With limited data available, ${d.message.charAt(0).toLowerCase()}${d.message.slice(1)}`;
+                }
+                d.confidence = { score: confidenceScore, label: 'Low' };
+            } else if (confidenceLabel === 'MEDIUM') {
+                if (d.recommendationStrength === 'strong' && confidenceScore < 60) {
+                    d.recommendationStrength = 'suggested';
+                }
+                if (!d.message.startsWith('Based on your current data')) {
+                    d.message = `Based on your current data, ${d.message.charAt(0).toLowerCase()}${d.message.slice(1)}`;
+                }
+            }
+            // HIGH = no prefix needed
+
+            // B. Hedged language: replace "will" with "may/likely"
+            d.message = d.message
+                .replace(/\bwill definitely\b/gi, 'is likely to')
+                .replace(/\bwill improve\b/gi, 'may improve')
+                .replace(/\bthis will\b/gi, 'this may')
+                .replace(/\bYou will\b/g, 'You may');
+            
+            if (d.rationale) {
+                d.rationale = d.rationale
+                    .replace(/\bwill definitely\b/gi, 'is likely to')
+                    .replace(/\bwill improve\b/gi, 'may improve');
+            }
+        }
+
+        // C. Add global disclaimer for LOW confidence
+        if (confidenceLabel === 'LOW') {
+            alerts.unshift({
+                id: 'LOW_CONFIDENCE_GLOBAL',
+                title: 'Limited Data Accuracy',
+                message: 'Insights may be inaccurate due to incomplete data. Connect your bank or enter detailed financials for stronger analysis.',
+                type: 'confidence',
+                severity: 'high'
+            });
+        }
+
+        // v4.0 COMPLETION METRICS
+        const completedCount = rawDecisions.filter(d => d.statusV4 === 'done').length;
+        const totalActable = rawDecisions.filter(d => d.statusV4 !== 'ignored').length;
+        const completionRate = totalActable > 0 ? (completedCount / totalActable) * 100 : 100;
+
+        // v5.0 RELIEF LAYER
+        let stabilizationMessage = "";
+        if (completionRate >= 80) {
+            stabilizationMessage = "System stabilized. You handled key risks exceptionally well this week.";
+        } else if (completionRate >= 50) {
+            stabilizationMessage = "Financial position improving. Strategic actions are taking effect.";
+        }
+
+        // v6.0 INVESTOR LAYER
+        const investorTrustScore = Math.round((completionRate * 0.6) + (state.dynamicConfidence.score * 0.4));
+        const weeklyInvestorUpdate = `**Weekly Investor Update**
+        
+**Performance Overview**
+- Runway: ${state.summary.runwayMonths.toFixed(1)} months
+- Current Burn: ₹${Math.round(state.summary.monthlyExpenses / 1000)}k
+- Financial Discipline Score: ${investorTrustScore}/100
+
+**Key Improvements**
+- ${completedCount} critical financial actions resolved this week.
+- ${stabilizationMessage || "Operational focus maintained on runway preservation."}
+
+**Primary Strategic Focus**
+- ${topMandate?.investorNarrative || "Strategic liquidity optimization."}
+
+**Current Outlook**
+- Data Integrity: ${state.dynamicConfidence.score}% confidence.
+- Risk Level: ${this.calculateGlobalUrgency(runway).toUpperCase()}`;
+
         return {
-            summary: primaryDecision ? primaryDecision.message : 'Financial operations performing within nominal bounds.',
-            primaryDecisionId: primaryDecision?.id || null,
+            summary: this.generateRationale(state),
+            primaryDecisionId: topMandate?.id || null,
             urgency: this.calculateGlobalUrgency(runway),
-            decisions: rawDecisions.slice(0, 5), 
+            decisions: rawDecisions,
             alerts,
             opportunities: [], 
             confidenceAdjusted: lowConfidence,
@@ -257,9 +341,13 @@ export class DecisionEngineService {
             dailyFocus,
             previousRunway: prevRunway,
             currentRunway: runway,
-            ownershipNote: "Final decision is yours. This is based on available data.",
+            ownershipNote: "Final execution is yours. This is based on available data.",
             tone: (runway <= 3 || lowConfidence) ? 'urgent' : (runway < 12 || stability === 'volatile') ? 'cautious' : 'strategic',
             stability,
+            completionRate,
+            stabilizationMessage,
+            investorTrustScore,
+            weeklyInvestorUpdate
         };
     }
 
@@ -345,7 +433,14 @@ export class DecisionEngineService {
         };
     }
 
-    private createDecision(params: Partial<Decision> & { key: string }, urgencyValue: number, impactValue: number): Decision {
+    private createDecision(
+        params: Partial<Decision> & { key: string }, 
+        urgencyValue: number, 
+        impactValue: number, 
+        persona: string = 'disciplined',
+        basis?: string,
+        secondOrderEffects?: string[]
+    ): Decision {
         const id = crypto.createHash('md5').update(params.key).digest('hex').substring(0, 8);
         const decisionHash = crypto.createHash('md5')
             .update(`${params.key}|${params.status}|${params.message}`)
@@ -360,15 +455,60 @@ export class DecisionEngineService {
         const reversibility = this.getReversibility(params.key);
         const impactLine = this.getImpactLine(params.key, impactValue);
 
+        // v4.0 Execution Engine Logic
+        const impactExplanation = impactValue > 0 ? `If done: Runway +${impactValue.toFixed(1)}m` : `If done: Stability improved`;
+        const consequenceExplanation = `If ignored: Potential loss of ${Math.round(impactValue * 30.4 * 0.8)} days of runway within 14 days`;
+        
+        let personaRationale = params.rationale || "";
+        if (persona === 'chaotic') {
+            personaRationale = `⚠️ URGENT for Chaos: ${personaRationale} Let's fix the basics before scaling.`;
+        } else if (persona === 'disciplined') {
+            personaRationale = `✅ Strategic: ${personaRationale} Optimizing for maximum efficiency.`;
+        }
+
+        const statusMap: Record<string, 'pending' | 'in_progress' | 'done' | 'ignored'> = {
+            'NEW': 'pending',
+            'OPEN': 'pending',
+            'REVIEWING': 'in_progress',
+            'IMPLEMENTING': 'in_progress',
+            'RESOLVED': 'done',
+            'FIXED': 'done',
+            'IGNORED': 'ignored'
+        };
+
+        // v5.0 Strategic Depth
+        const oneThingReasoningMap: Record<string, string> = {
+            'RUNWAY_SURVIVAL': 'It directly addresses your imminent insolvency risk.',
+            'FUNDRAISE_MANDATE': 'Securing capital is the primary bottleneck for your next growth phase.',
+            'STABILIZE_DATA': 'We cannot make high-stakes decisions on volatile data signals.',
+            'BURN_SPIKE': 'Uncontrolled burn expansion will derail your runway projections faster than revenue can compensate.'
+        };
+
+        // v6.0 Investor Layer
+        const investorNarrativeMap: Record<string, string> = {
+            'RUNWAY_SURVIVAL': 'Strategic liquidity management to extend operational runway.',
+            'FUNDRAISE_MANDATE': 'Capitalization planning for upcoming growth phase.',
+            'STABILIZE_DATA': 'Enhancing financial data integrity and reporting precision.',
+            'BURN_SPIKE': 'Operational efficiency optimization and burn management.'
+        };
+
         return {
             id,
             decisionKey: params.key,
             decisionHash,
             priorityScore,
-            status: 'NEW', 
+            status: params.status || 'NEW',
+            statusV4: statusMap[params.status || 'NEW'],
             executionPlan: [],
             reversibility,
             impactLine,
+            impactExplanation,
+            consequenceExplanation,
+            rationale: personaRationale,
+            consequenceBasis: basis || "based on last 14-day burn trend",
+            secondOrderEffects: secondOrderEffects || [],
+            oneThingReasoning: oneThingReasoningMap[params.key] || "This action has the highest immediate impact on your survival metrics.",
+            investorNarrative: investorNarrativeMap[params.key] || params.key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
             ...params
         } as Decision;
     }

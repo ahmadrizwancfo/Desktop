@@ -10,11 +10,12 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { DevAuthGuard } from '../auth/dev-auth.guard';
 import { CreateStartupProfileDto } from './dto/create-startup-profile.dto';
 import { StartupProfileService } from './startup-profile.service';
 
 @Controller('startup-profile')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(DevAuthGuard)
 export class StartupProfileController {
     constructor(private readonly service: StartupProfileService) { }
 

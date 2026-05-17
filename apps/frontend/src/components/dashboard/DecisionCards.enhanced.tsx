@@ -33,7 +33,7 @@ import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { useStartupProfileStore } from '@/store/startup-profile-store';
-import { useCfoStateStore } from '@/store/cfo-state-store';
+import { useCfoStateStore, formatRunway } from '@/store/cfo-state-store';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -191,6 +191,7 @@ const DecisionCard = memo(function DecisionCard({
   const [tracked, setTracked] = useState(false); 
   const cfoState = useCfoStateStore((s) => s.state);
   const summary = cfoState?.summary;
+  const isCrisis = summary && summary.runwayMonths < 3 && summary.runwayMonths > 0;
 
   const domain = DOMAIN_META[decision.decisionDomain];
   const DomainIcon = domain?.Icon ?? AlertTriangle;
@@ -382,8 +383,14 @@ const DecisionCard = memo(function DecisionCard({
                         </div>
                       )}
                       <div className="pt-2 mt-2 border-t border-white/5 flex justify-between items-center">
-                        <span className="text-indigo-400 text-[11px] font-black uppercase tracking-wider">Runway</span>
-                        <span className="text-indigo-400 text-lg font-black tracking-tighter tabular-nums">{summary.runwayMonths.toFixed(1)} Months</span>
+                        <span className={cn(
+                          "text-[11px] font-black uppercase tracking-wider",
+                          isCrisis ? "text-rose-400" : "text-indigo-400"
+                        )}>Runway</span>
+                        <span className={cn(
+                          "text-lg font-black tracking-tighter tabular-nums font-mono",
+                          isCrisis ? "text-rose-400" : "text-indigo-400"
+                        )}>{formatRunway(summary.runwayMonths)}</span>
                       </div>
                     </div>
                   </div>

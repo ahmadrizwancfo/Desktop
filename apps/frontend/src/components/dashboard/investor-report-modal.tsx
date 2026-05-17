@@ -12,6 +12,8 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { useStartupProfileStore } from '@/store/startup-profile-store';
+import { useCfoStateStore, formatRunway } from '@/store/cfo-state-store';
+import { cn } from '@/lib/utils';
 
 interface InvestorReportModalProps {
     isOpen: boolean;
@@ -21,9 +23,16 @@ interface InvestorReportModalProps {
 export function InvestorReportModal({ isOpen, onClose }: InvestorReportModalProps) {
     const user = useAuthStore((state) => state.user);
     const profile = useStartupProfileStore((s) => s.profile);
+    const cfoState = useCfoStateStore((s) => s.state);
+    const resolutionPath = useCfoStateStore((s) => s.resolutionPath);
+
     const reportRef = useRef<HTMLDivElement>(null);
     const [copied, setCopied] = useState(false);
     const [downloading, setDownloading] = useState(false);
+
+    const isCrisis = cfoState && cfoState.summary.runwayMonths < 3 && cfoState.summary.runwayMonths > 0;
+    const isResolutionMode = !!resolutionPath;
+    const reportTitleText = isResolutionMode ? 'Strategic Restructuring / Exit Update' : (isCrisis ? 'Wartime Survival Update' : 'Monthly Investor Update');
 
     // Fetch financial data
     const { data: stats } = useQuery({
@@ -48,9 +57,13 @@ export function InvestorReportModal({ isOpen, onClose }: InvestorReportModalProp
     const companyName = profile?.companyName || 'Your Startup';
     const monthlyRevenue = Number(stats?.totalRevenue || profile?.monthlyRevenue || 0);
     const monthlyBurn = Number(stats?.monthlyBurn || profile?.monthlyExpenses || 0);
-    const cashInBank = Number(profile?.cashInBank || 0);
+    
+    // Wartime Math: Tax-Adjusted Capital (Indian Ghost Hard-Lock)
+    const grossCash = Number(profile?.cashInBank || 0);
+    const survivalCapital = isCrisis ? grossCash * 0.72 : grossCash; // 28% Locked
+    
     const netBurn = monthlyBurn - monthlyRevenue;
-    const runway = netBurn > 0 ? cashInBank / netBurn : 999;
+    const runway = cfoState ? cfoState.summary.runwayMonths : (netBurn > 0 ? grossCash / netBurn : 999);
     const teamSize = profile?.teamSize || 0;
     const now = new Date();
     const monthName = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -106,27 +119,29 @@ export function InvestorReportModal({ isOpen, onClose }: InvestorReportModalProp
                 </head>
                 <body>
                     <h1>${companyName}</h1>
-                    <p class="subtitle">Monthly Investor Update — ${monthName}</p>
+                    <p class="subtitle">${reportTitleText} — ${monthName}</p>
                     
-                    <h2>Key Metrics</h2>
+                    <h2>Key Metrics ${isCrisis ? '(Survival Mode)' : ''}</h2>
                     <div class="metric-grid">
                         <div class="metric">
-                            <p class="metric-label">Monthly Revenue</p>
+                            <p class="metric-label">${isCrisis ? 'Net Recovery' : 'Monthly Revenue'}</p>
                             <p class="metric-value" style="color: #10b981">${formatCurrency(monthlyRevenue)}</p>
                         </div>
                         <div class="metric">
-                            <p class="metric-label">Monthly Burn</p>
+                            <p class="metric-label">${isCrisis ? 'Burn Severity' : 'Monthly Burn'}</p>
                             <p class="metric-value" style="color: #f43f5e">${formatCurrency(monthlyBurn)}</p>
                         </div>
                         <div class="metric">
-                            <p class="metric-label">Runway</p>
-                            <p class="metric-value" style="color: ${runway < 6 ? '#f43f5e' : runway < 12 ? '#f59e0b' : '#10b981'}">${runway >= 999 ? 'Profitable' : runway.toFixed(1) + ' mo'}</p>
+                            <p class="metric-label">${isCrisis ? 'Oxygen Clock' : 'Runway'}</p>
+                            <p class="metric-value" style="color: ${runway < 3 ? '#f43f5e' : runway < 6 ? '#f59e0b' : '#10b981'}">
+                                ${isCrisis ? formatRunway(runway) : (runway >= 999 ? 'Profitable' : runway.toFixed(1) + ' mo')}
+                            </p>
                         </div>
                     </div>
                     <div class="metric-grid">
                         <div class="metric">
-                            <p class="metric-label">Cash in Bank</p>
-                            <p class="metric-value">${formatCurrency(cashInBank)}</p>
+                            <p class="metric-label">${isCrisis ? 'Survival Capital' : 'Cash in Bank'}</p>
+                            <p class="metric-value">${formatCurrency(survivalCapital)}</p>
                         </div>
                         <div class="metric">
                             <p class="metric-label">Net Burn</p>
@@ -138,7 +153,7 @@ export function InvestorReportModal({ isOpen, onClose }: InvestorReportModalProp
                         </div>
                     </div>
 
-                    <h2>Key Decisions</h2>
+                    <h2>${isCrisis ? 'Defensive Action Log' : 'Key Decisions'}</h2>
                     ${(decisions || []).map((d: any) => `
                         <div class="decision">
                             <p class="decision-title">${d.title || d.decisionDomain || 'Strategic Decision'}</p>
@@ -160,12 +175,12 @@ export function InvestorReportModal({ isOpen, onClose }: InvestorReportModalProp
     };
 
     const generatePlainTextReport = () => {
-        return `${companyName} — Monthly Investor Update\n${monthName}\n\n` +
+        return `${companyName} — ${reportTitleText}\n${monthName}\n\n` +
             `KEY METRICS\n` +
             `─────────────────────────────\n` +
             `MRR:           ${formatCurrency(monthlyRevenue)}\n` +
             `Monthly Burn:  ${formatCurrency(monthlyBurn)}\n` +
-            `Cash in Bank:  ${formatCurrency(cashInBank)}\n` +
+            `Cash in Bank:  ${formatCurrency(grossCash)}\n` +
             `Runway:        ${runway >= 999 ? 'Profitable' : runway.toFixed(1) + ' months'}\n` +
             `Team Size:     ${teamSize}\n\n` +
             `KEY DECISIONS\n` +
@@ -224,32 +239,38 @@ export function InvestorReportModal({ isOpen, onClose }: InvestorReportModalProp
                         {/* Company Header */}
                         <div>
                             <h1 className="text-2xl font-bold text-white">{companyName}</h1>
-                            <p className="text-slate-400 text-sm">Monthly Investor Update — {monthName}</p>
+                            <p className="text-slate-400 text-sm">{reportTitleText} — {monthName}</p>
                         </div>
 
                         {/* Key Metrics Grid */}
                         <div>
-                            <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-4">Key Metrics</h3>
+                            <h3 className={cn(
+                                "text-[10px] font-bold uppercase tracking-widest mb-4",
+                                isCrisis ? "text-rose-500" : "text-primary"
+                            )}>{isCrisis ? 'Survival Status (Wartime)' : 'Key Metrics'}</h3>
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">MRR</p>
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{isCrisis ? 'Recovery' : 'MRR'}</p>
                                     <p className="text-xl font-black text-emerald-400 mt-1">{formatCurrency(monthlyRevenue)}</p>
                                 </div>
                                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Monthly Burn</p>
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{isCrisis ? 'Burn Severity' : 'Monthly Burn'}</p>
                                     <p className="text-xl font-black text-rose-400 mt-1">{formatCurrency(monthlyBurn)}</p>
                                 </div>
                                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Runway</p>
-                                    <p className={`text-xl font-black mt-1 ${runway < 6 ? 'text-rose-400' : runway < 12 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                        {runway >= 999 ? 'Profitable' : `${runway.toFixed(1)} mo`}
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{isCrisis ? 'Oxygen Left' : 'Runway'}</p>
+                                    <p className={cn(
+                                        "text-xl font-black mt-1",
+                                        runway < 3 ? 'text-rose-400' : runway < 6 ? 'text-amber-400' : 'text-emerald-400'
+                                    )}>
+                                        {isCrisis ? formatRunway(runway) : (runway >= 999 ? 'Profitable' : `${runway.toFixed(1)} mo`)}
                                     </p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-3 gap-4 mt-3">
                                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Cash in Bank</p>
-                                    <p className="text-xl font-black text-white mt-1">{formatCurrency(cashInBank)}</p>
+                                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{isCrisis ? 'Survival Capital' : 'Cash in Bank'}</p>
+                                    <p className="text-xl font-black text-white mt-1">{formatCurrency(survivalCapital)}</p>
                                 </div>
                                 <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                                     <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Net Burn</p>
@@ -264,7 +285,10 @@ export function InvestorReportModal({ isOpen, onClose }: InvestorReportModalProp
 
                         {/* Key Decisions */}
                         <div>
-                            <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-4">Major Decisions This Month</h3>
+                            <h3 className={cn(
+                                "text-[10px] font-bold uppercase tracking-widest mb-4",
+                                isCrisis ? "text-rose-500" : "text-primary"
+                            )}>{isCrisis ? 'Defensive Action Log' : 'Major Decisions This Month'}</h3>
                             <div className="space-y-3">
                                 {decisions && decisions.length > 0 ? decisions.map((d: any, i: number) => (
                                     <div key={i} className="p-4 rounded-xl bg-white/5 border-l-2 border-primary">

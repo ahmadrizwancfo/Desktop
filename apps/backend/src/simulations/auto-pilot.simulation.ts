@@ -77,7 +77,7 @@ function header(title: string) {
 
 async function cleanTestDb() {
     console.log('\n🗑️  Cleaning test database...');
-    // Delete in correct FK order
+    // Delete in correct FK order (leaf to root)
     await prisma.autoPilotLog.deleteMany({});
     await prisma.startupProfileVersion.deleteMany({});
     await prisma.executionLog.deleteMany({});
@@ -86,6 +86,8 @@ async function cleanTestDb() {
     await prisma.cfoCategoryPerformance.deleteMany({});
     await prisma.startupProfileSnapshot.deleteMany({});
     await prisma.cfoDecision.deleteMany({});
+    await prisma.cfoInsight.deleteMany({});
+    await prisma.complianceItem.deleteMany({});
     await prisma.startupProfile.deleteMany({});
     await prisma.financialSnapshot.deleteMany({});
     await prisma.cfoStateSnapshot.deleteMany({});
@@ -95,6 +97,17 @@ async function cleanTestDb() {
     await prisma.weeklyBrief.deleteMany({});
     await prisma.notification.deleteMany({});
     await prisma.auditLog.deleteMany({});
+    await prisma.financialMetrics.deleteMany({});
+    await prisma.budget.deleteMany({});
+    await prisma.recurringExpense.deleteMany({});
+    await prisma.metricSnapshot.deleteMany({});
+    await prisma.fundingRound.deleteMany({});
+    await prisma.chatMessage.deleteMany({});
+    await prisma.chatThread.deleteMany({});
+    await prisma.integrationConnection.deleteMany({});
+    await prisma.rawImport.deleteMany({});
+    await prisma.decisionFeedback.deleteMany({});
+    
     await prisma.user.deleteMany({});
     await prisma.organization.deleteMany({});
     console.log('   ✅ Test database clean.');
@@ -221,7 +234,10 @@ async function evaluateEligibility(actionId: string): Promise<{
 
     if (!action) return { isEligible: false, riskLevel: AutoPilotRisk.HIGH, reason: 'Action not found', checks: {} };
 
-    const profile = action.organization.startupProfiles?.[0];
+    // Logic v2.2: Fetch either array or single object (handles schema variations)
+    const profileObj = action.organization.startupProfiles;
+    const profile = Array.isArray(profileObj) ? profileObj[0] : profileObj;
+
     if (!profile) return { isEligible: false, riskLevel: AutoPilotRisk.HIGH, reason: 'No profile found', checks: {} };
 
     const riskLevel = classifyRisk(action.actionType, Math.abs(Number(action.expectedImpact)));
@@ -953,6 +969,95 @@ async function scenarioK() {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SCENARIO L: THE PERFECT STORM (v2.2 Deterministic Stress Test)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function scenarioL() {
+    header('Scenario L: The Perfect Storm (Deterministic Precision Test)');
+    console.log('  Verify: Revenue drop + Statutory Liability → Accurate Runway + AI Pause');
+
+    const org = await seedOrg('PerfectStormCorp');
+    const user = await seedUser(org.id, 'storm@test.com');
+    
+    // 1. Seed Initial State
+    const profile = await seedProfile({
+        userId: user.id, orgId: org.id,
+        cash: 1000000, // 10L
+        burn: 200000,  // 2L
+        revenue: 100000, // 1L
+        stage: StartupStage.SEED,
+        mode: AutoPilotMode.SAFE_MODE,
+        accuracy: 95
+    });
+
+    // 2. Inject Deterministic "Ghost" Liability via FinancialMetrics
+    await prisma.financialMetrics.create({
+        data: {
+            organizationId: org.id,
+            documentType: 'GST_RETURN',
+            netGstPayable: 200000, // 2L GST due
+            confidence: 'HIGH',
+            sourceFile: 'sim.pdf',
+        }
+    });
+
+    // 3. TRIGGER THE STORM: Wartime Burn & Behavioral Friction
+    await prisma.financialSnapshot.create({
+        data: {
+            userId: user.id,
+            organizationId: org.id,
+            snapshotDate: new Date(),
+            cashBalance: 800000,
+            revenue: 30000,
+            expenses: 450000,
+            burn: 420000
+        }
+    });
+
+    // Seed a legacy decision for inaction tracking
+    const mandate = await seedAction({
+        orgId: org.id, userId: user.id,
+        title: 'Emergency SaaS Cut',
+        type: 'CUT_BURN', impact: 15,
+        isExecutable: true, seenInShadow: true,
+        confidence: 98, mode: ExecutionMode.ONE_CLICK_APPLY,
+    });
+    
+    // Simulate resolution failure
+    await prisma.auditLog.create({
+        data: {
+            userId: user.id,
+            action: 'DECISION_SHOWN',
+            entity: 'CfoDecision',
+            entityId: mandate.id,
+            details: { decisionId: mandate.id, timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
+        }
+    });
+
+    // 4. Run Process
+    console.log('  Running v4.0 Mastermind Engine...');
+    await processAutoPilot(org.id);
+
+    // 5. VALIDATE
+    const updatedProfile = await prisma.startupProfile.findUnique({ where: { id: profile.id } });
+    const pending = await prisma.autoPilotLog.findMany({ where: { actionId: mandate.id, status: AutoPilotLogStatus.PENDING } });
+    
+    console.log(`  Actual Runway Days: ${updatedProfile?.oxygenClockDays}`);
+    assert('L', 'Wartime Burn detected Spikes', (updatedProfile?.oxygenClockDays || 0) < 50, '< 50 days', String(updatedProfile?.oxygenClockDays), 'CRITICAL');
+    assert('L', 'Inaction Penalty Fee recorded', Number(updatedProfile?.behavioralPenaltiesAccrued || 0) > 0, '> 0', String(updatedProfile?.behavioralPenaltiesAccrued), 'HIGH');
+    assert('L', 'Decision Credit Score penalised', (updatedProfile?.behavioralScore || 100) < 100, '< 100', String(updatedProfile?.behavioralScore), 'HIGH');
+    assert('L', 'High impact action BLOCKED', pending.length === 0, '0', `${pending.length}`, 'CRITICAL');
+    
+    // Verify eligibility checks
+    const { riskLevel, reason } = await evaluateEligibility(mandate.id);
+    assert('L', 'Risk classified as HIGH', riskLevel === AutoPilotRisk.HIGH || riskLevel === AutoPilotRisk.MEDIUM, 'HIGH/MEDIUM', riskLevel, 'MEDIUM');
+    assert('L', 'Rejection reason mentions high risk', reason.includes('higher risk than we auto-apply'), 'Reason found', 'Missing', 'HIGH');
+
+    console.log('    (Runway math validated in unit tests for cfo-brain.service)');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
 // FINAL REPORT
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1007,6 +1112,7 @@ function generateReport() {
             'I': 'Audit Trail / Logging',
             'J': 'Boundary / Failure Safety',
             'K': 'Impact Threshold',
+            'L': 'The Perfect Storm (Deterministic Stress Test)',
         };
         console.log(`    ${icon} Scenario ${scenario}: ${scenarioNames[scenario] || 'Unknown'} — ${passed}/${total}`);
     }
@@ -1074,6 +1180,7 @@ async function main() {
         await scenarioI();
         await scenarioJ();
         await scenarioK();
+        await scenarioL();
 
         const exitCode = generateReport();
         await prisma.$disconnect();

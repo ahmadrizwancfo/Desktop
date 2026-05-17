@@ -10,6 +10,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { StartupProfileModule } from '../startup-profile/startup-profile.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AiExplainerModule } from '../ai-explainer/ai-explainer.module';
+import { AiModule } from '../ai/ai.module';
 
 import { CfoMetricsService } from './cfo-metrics.service';
 import { CfoBriefService } from './cfo-brief.service';
@@ -27,15 +28,20 @@ import { AutoPilotCronService } from './auto-pilot.cron.service';
 import { AutoPilotExecutionCron } from './auto-pilot-execution.cron';
 import { TrustLanguageService } from './trust-language.service';
 import { DecisionEngineService } from './decision-engine.service';
+import { CfoResolutionService } from './cfo-resolution.service';
+
+import { CfoChatController } from './cfo-chat.controller';
+import { CfoChatService } from './cfo-chat.service';
 
 @Module({
     imports: [
         PrismaModule,
         ScheduleModule.forRoot(),
         forwardRef(() => StartupProfileModule),
+        forwardRef(() => AiModule),
         AiExplainerModule,
     ],
-    controllers: [CfoEngineController],
+    controllers: [CfoEngineController, CfoChatController],
     providers: [
         CfoEngineService, 
         CfoAlertService, 
@@ -58,6 +64,8 @@ import { DecisionEngineService } from './decision-engine.service';
         AutoPilotCronService,
         AutoPilotExecutionCron,
         DecisionEngineService,
+        CfoResolutionService,
+        CfoChatService,
     ],
     exports: [
         CfoEngineService, 
@@ -76,6 +84,8 @@ import { DecisionEngineService } from './decision-engine.service';
         CfoAutoPilotService,
         TrustLanguageService,
         DecisionEngineService,
+        CfoResolutionService,
+        CfoChatService,
     ],
 })
 export class CfoEngineModule { }

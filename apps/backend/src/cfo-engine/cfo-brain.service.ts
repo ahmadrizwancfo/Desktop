@@ -1,5 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiService } from '../ai/ai.service';
+import { CfoBehaviorService } from './cfo-behavior.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,11 +61,36 @@ export interface CfoBrainReport {
         revenueTrend: 'growing' | 'declining' | 'stable' | 'unknown';
         prevMonthlyRevenue: number;
         prevNetBurn: number;
+        avgBurn3m: number;
     };
     insights: CfoBrainInsight[];
     categoryBreakdown: CategorySpend[];
     /** V1 Decision Engine: Death Clock, Forced Decisions, Action Plans */
     decisionEngine: DecisionEngineV1Output;
+    dailyBrief?: {
+        headline: string;
+        narrative: string;
+        cached: boolean;
+        isCrisis: boolean;
+        // v3.0 Daily Loop
+        signal: string;
+        attention: string;
+        action: string;
+        momentum: string;
+    };
+    predictiveSignals?: {
+        runwayBreachDate?: string;
+        runwayBreachDays?: number;
+        alertMessage: string;
+        confidence: 'high' | 'medium' | 'low';
+    };
+    behavioralMetrics?: {
+        score: number;
+        totalInactionFee: number;
+        runwayDelta: number;
+        isWartime: boolean;
+        momentumScore: number; // v3.0
+    };
 }
 
 interface CategorySpend {
@@ -102,7 +129,12 @@ function pct(n: number): string {
 export class CfoBrainService {
     private readonly logger = new Logger(CfoBrainService.name);
 
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        @Inject(forwardRef(() => AiService))
+        private aiService: AiService,
+        private behaviorService: CfoBehaviorService
+    ) {}
 
     /**
      * Generate a full CFO Brain report for an organization.
@@ -121,26 +153,22 @@ export class CfoBrainService {
         const now = new Date();
         const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-        // Current period transactions (last 30 days)
-        const currentTxs = await this.prisma.transaction.findMany({
+        // Fetch 3 months of transactions for Weighted Burn calculation
+        const allTxs = await this.prisma.transaction.findMany({
             where: {
                 bankAccountId: { in: accountIds },
-                date: { gte: thirtyDaysAgo },
+                date: { gte: ninetyDaysAgo },
                 deletedAt: null,
             },
             select: { amount: true, type: true, category: true, date: true, description: true },
         });
 
-        // Previous period transactions (30–60 days ago) for trend comparison
-        const prevTxs = await this.prisma.transaction.findMany({
-            where: {
-                bankAccountId: { in: accountIds },
-                date: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-                deletedAt: null,
-            },
-            select: { amount: true, type: true, category: true },
-        });
+        // Split into buckets
+        const m1Txs = allTxs.filter(t => t.date >= thirtyDaysAgo);
+        const m2Txs = allTxs.filter(t => t.date >= sixtyDaysAgo && t.date < thirtyDaysAgo);
+        const m3Txs = allTxs.filter(t => t.date >= ninetyDaysAgo && t.date < sixtyDaysAgo);
 
         // Historical snapshots for trend analysis
         const resolvedUserId = userId || await this.getOrgOwner(organizationId);
@@ -154,35 +182,58 @@ export class CfoBrainService {
         // StartupProfile for context
         const profile = await this.prisma.startupProfile.findFirst({
             where: { organizationId },
-            select: { stage: true, primaryGoal: true, teamSize: true },
+            select: { stage: true, primaryGoal: true, teamSize: true, id: true, isTaxBufferUnlocked: true },
         });
 
         // ── 2. Aggregate metrics (SSOT AUTHORITY LAYER) ──────────────────────
         // CORE PRINCIPLE: Strictly use 30-day trailing windows for all metrics.
-        let monthlyRevenue = 0, monthlyExpenses = 0;
+        
+        const calculateBurn = (txs: any[]) => {
+            const exp = txs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0);
+            const rev = txs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0);
+            return Math.max(0, exp - rev);
+        };
+
+        const burnM1 = calculateBurn(m1Txs);
+        const burnM2 = calculateBurn(m2Txs);
+        const burnM3 = calculateBurn(m3Txs);
+
+        /**
+         * v4.0 VOLATILITY-AWARE BURN ENGINE
+         * Peacetime: 50/30/20 weight
+         * Wartime Trigger: M1 > (3m_Avg * 1.3)
+         * Wartime: 80/10/10 weight
+         */
+        const simple3mAvg = (burnM1 + burnM2 + burnM3) / 3;
+        const isWartime = burnM1 > (simple3mAvg * 1.3);
+
+        const avgBurn3m = isWartime
+            ? (0.8 * burnM1) + (0.1 * burnM2) + (0.1 * burnM3)
+            : (0.5 * burnM1) + (0.3 * burnM2) + (0.2 * burnM3);
+
+        const currentTxs = m1Txs;
+        const prevTxs = m2Txs;
+
+        const monthlyRevenue = currentTxs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0);
+        const monthlyExpenses = currentTxs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0);
+
+        const prevRevenue = prevTxs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0);
+        const prevExpenses = prevTxs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0);
+
         const categorySums: Record<string, number> = {};
         const prevCategorySums: Record<string, number> = {};
-        let prevRevenue = 0, prevExpenses = 0;
 
         for (const tx of currentTxs) {
-            const amt = Number(tx.amount);
-            if (tx.type === 'INCOME') {
-                monthlyRevenue += amt;
-            } else {
-                monthlyExpenses += amt;
+            if (tx.type === 'EXPENSE') {
                 const cat = tx.category || 'General';
-                categorySums[cat] = (categorySums[cat] || 0) + amt;
+                categorySums[cat] = (categorySums[cat] || 0) + Number(tx.amount);
             }
         }
 
         for (const tx of prevTxs) {
-            const amt = Number(tx.amount);
-            if (tx.type === 'INCOME') {
-                prevRevenue += amt;
-            } else {
-                prevExpenses += amt;
+            if (tx.type === 'EXPENSE') {
                 const cat = tx.category || 'General';
-                prevCategorySums[cat] = (prevCategorySums[cat] || 0) + amt;
+                prevCategorySums[cat] = (prevCategorySums[cat] || 0) + Number(tx.amount);
             }
         }
 
@@ -198,20 +249,67 @@ export class CfoBrainService {
         const cashInBank = bankAccounts.reduce((s, a) => s + Number(a.balance), 0);
         
         /**
-         * FORMULA: Ghost Liabilities (Conservative Buffer) = GST + TDS approximations (18% of monthly revenue)
+         * FORMULA: Smart Ghost Liabilities (Conservative Buffer)
+         * v2.2 Deterministic Engine:
+         * 1. Check FinancialMetrics for actual 'gstLiability' or 'netGstPayable'.
+         * 2. If exists: Use Actual Liability + 10% TDS Buffer (0.10 * bankBalance).
+         * 3. Else: Fallback to 28% Safety Estimate (0.28 * bankBalance).
          */
-        const ghostLiabilities = monthlyRevenue * 0.18;
+        /**
+         * v4.0 INDIAN GHOST v2 (HIERARCHY OF TRUTH)
+         * 1. Query StatutoryLiability model for precise debt (Zoho/Tally/Manual).
+         * 2. Fallback to 28% bank estimate if no precise records found.
+         */
+        const realDebtRecs = await this.prisma.statutoryLiability.findMany({
+            where: { organizationId, status: 'PENDING' }
+        });
+        const realDebtTotal = realDebtRecs.reduce((s, d) => s + Number(d.amount), 0);
+
+        const latestFinancials = await this.prisma.financialMetrics.findFirst({
+            where: { organizationId },
+            orderBy: { uploadedAt: 'desc' }
+        });
+
+        const bankBalance = cashInBank;
+        let ghostLiabilities = 0;
+        let isEstimated = true;
+
+        if (realDebtTotal > 0) {
+            ghostLiabilities = realDebtTotal;
+            isEstimated = false;
+        } else if (latestFinancials && (latestFinancials.gstLiability || latestFinancials.netGstPayable)) {
+            const actualGst = Number(latestFinancials.netGstPayable || latestFinancials.gstLiability || 0);
+            const tdsBuffer = bankBalance * 0.10;
+            ghostLiabilities = actualGst + tdsBuffer;
+            isEstimated = false;
+        } else {
+            // Safety Fallback (28%: 18% GST + 10% TDS)
+            ghostLiabilities = bankBalance * 0.28;
+            isEstimated = true;
+        }
 
         /**
          * FORMULA: Real Runway = (Cash - Ghost_Liabilities) / Net Burn.
+         * 
+         * v4.0 PHOENIX FREEZE:
+         * If isCrisisMode (Predicted Runway < 3m), the Statutory Buffer is FROZEN.
+         * isTaxBufferUnlocked is ignored to prevent fatal compliance risks.
          */
         let isSustainable = false;
         let runwayMonths = 999;
         
-        if (netBurn <= 0) {
+        // Initial estimate for crisis detection
+        const rawRunway = netBurn > 0 ? (bankBalance / netBurn) : 999;
+        const isCrisisMode = rawRunway < 3.0;
+
+        const effectiveGhostAmount = (profile?.isTaxBufferUnlocked && !isCrisisMode) ? 0 : ghostLiabilities;
+
+        if (netBurn <= 0 && avgBurn3m <= 0) {
             isSustainable = true;
         } else {
-            runwayMonths = Math.min(Math.round(((cashInBank - ghostLiabilities) / Math.max(0.1, netBurn)) * 10) / 10, 36.0);
+            const spendableCash = Math.max(0, bankBalance - effectiveGhostAmount);
+            // Use volatility-aware avgBurn3m for the "Oxygen Clock"
+            runwayMonths = Math.min(Math.round((spendableCash / Math.max(0.1, avgBurn3m)) * 10) / 10, 36.0);
         }
 
         // ── 3. Category breakdown with trends ────────────────────────────────
@@ -312,6 +410,120 @@ export class CfoBrainService {
             integrationsCount,
         });
 
+        // ── 7. v3.0 Predictive Signals ─────────────────────────────────────
+        const predictiveSignals = this.computePredictiveSignals({
+            monthlyRevenue,
+            monthlyExpenses,
+            netBurn,
+            cashInBank,
+            runwayMonths,
+            isSustainable,
+            ghostLiabilities,
+            topExpenseCategory: topCategory?.category || 'N/A',
+            topExpenseAmount: topCategory?.amount || 0,
+            burnTrend,
+            revenueTrend,
+            prevMonthlyRevenue: prevRevenue,
+            prevNetBurn: Math.max(0, prevExpenses - prevRevenue),
+            avgBurn3m
+        });
+
+        // ── 8. Daily Brief Interpretation Layer with Caching (v2.2) ──────────
+        const isCurrentlyCritical = runwayMonths < 3 && !isSustainable;
+        
+        const lastInsight = await this.prisma.cfoInsight.findFirst({
+            where: { startupProfileId: profile?.id, type: 'DAILY_BRIEF' },
+            orderBy: { generatedAt: 'desc' }
+        });
+
+        // ── 9. v4.0 Behavioral Intelligence & v3.0 Momentum ─────────────────
+        let behavioralMetrics = {
+            score: 100,
+            totalInactionFee: 0,
+            runwayDelta: 0,
+            isWartime: isWartime,
+            momentumScore: 100
+        };
+
+        if (profile?.id) {
+            const behaviorSnap = await this.behaviorService.getBehavioralSnapshot(profile.id);
+            const lastSnap = await this.prisma.cfoStateSnapshot.findFirst({
+                where: { organizationId },
+                orderBy: { generatedAt: 'desc' }
+            });
+            const delta = lastSnap ? (runwayMonths - lastSnap.runwayMonths) : 0;
+            
+            // v3.0 Momentum: 100 is base, +10 for improvement, -10 for decline
+            const momentum = delta > 0 ? 110 : (delta < 0 ? 90 : 100);
+
+            behavioralMetrics = {
+                score: behaviorSnap.behaviorScore,
+                totalInactionFee: behaviorSnap.inactionPenaltiesTotal,
+                runwayDelta: Math.round(delta * 10) / 10,
+                isWartime: isWartime,
+                momentumScore: momentum
+            };
+        }
+
+        let dailyBrief;
+        const burnFluctuation = lastInsight ? Math.abs((netBurn - Number(lastInsight.netBurnAtInsight)) / (Number(lastInsight.netBurnAtInsight) || 1)) : 1.0;
+        const modeChanged = lastInsight ? lastInsight.isCrisisMode !== isCurrentlyCritical : true;
+
+        if (modeChanged || burnFluctuation > 0.10 || !lastInsight) {
+            this.logger.log(`Triggering AI Interpretation (Burn: ${Math.round(burnFluctuation * 100)}%, Mode: ${modeChanged})`);
+            
+            const aiContext = `
+                Runway: ${runwayMonths.toFixed(1)} months
+                Cash: ${fmt(cashInBank)}
+                Burn: ${fmt(netBurn)}
+                Revenue Change: ${pct(((monthlyRevenue - prevRevenue) / (prevRevenue || 1)) * 100)} (${revenueTrend})
+                Predictive: ${predictiveSignals?.alertMessage || "Analyzing..."}
+                Status: ${isCurrentlyCritical ? 'Needs Attention' : 'Stable'}
+                Modeling Variance: ${behavioralMetrics.runwayDelta < 0 ? 'YES' : 'NO'}
+                Wartime: ${isWartime ? 'YES' : 'NO'}
+            `;
+
+            // v3.0 Dual Prompt: Narrative + 3-item Loop
+            const interpretation = await this.aiService.interpretFinancialStateV3(organizationId, aiContext, behavioralMetrics.score);
+            const headline = isCurrentlyCritical ? "⚠️ ACTION REQUIRED" : "📊 MASTERMIND v4.2 ACTIVE";
+
+            if (profile?.id) {
+                const savedHeight = await this.prisma.cfoInsight.create({
+                    data: {
+                        startupProfileId: profile.id,
+                        headline,
+                        narrative: interpretation.narrative,
+                        netBurnAtInsight: netBurn,
+                        isCrisisMode: isCurrentlyCritical
+                    }
+                });
+
+                dailyBrief = {
+                    headline: savedHeight.headline,
+                    narrative: savedHeight.narrative,
+                    cached: false,
+                    isCrisis: isCurrentlyCritical,
+                    signal: interpretation.signal,
+                    attention: interpretation.attention,
+                    action: interpretation.action,
+                    momentum: interpretation.momentum
+                };
+            }
+        } else if (lastInsight) {
+            this.logger.log('Serving CACHED daily brief interpretation.');
+            dailyBrief = {
+                headline: lastInsight.headline,
+                narrative: lastInsight.narrative,
+                cached: true,
+                isCrisis: isCrisisMode,
+                signal: "Reviewing financial trajectory...",
+                attention: "Focus on burn consistency.",
+                action: "Maintain cost controls.",
+                momentum: "Stable growth trend."
+            };
+        }
+
+
         return {
             generatedAt: new Date().toISOString(),
             organizationId,
@@ -330,10 +542,14 @@ export class CfoBrainService {
                 revenueTrend,
                 prevMonthlyRevenue: prevRevenue,
                 prevNetBurn: Math.max(0, prevExpenses - prevRevenue),
+                avgBurn3m,
             },
+            predictiveSignals,
             insights,
             categoryBreakdown,
             decisionEngine,
+            dailyBrief,
+            behavioralMetrics: behavioralMetrics,
         };
     }
 
@@ -377,8 +593,8 @@ export class CfoBrainService {
                     severity: revenueChange < -15 ? 'high' : revenueChange < 0 ? 'medium' : 'low',
                     title: revenueChange > 0 ? 'Revenue is growing' : 'Revenue declined',
                     body: revenueChange > 0
-                        ? `Revenue grew ${pct(revenueChange)} month-over-month: ${fmt(prevRevenue)} → ${fmt(monthlyRevenue)}. Keep momentum — your trajectory supports sustainable scaling.`
-                        : `Revenue dropped ${pct(revenueChange)} from ${fmt(prevRevenue)} → ${fmt(monthlyRevenue)}. Identify if this is seasonal, client churn, or pipeline delay.`,
+                        ? `Revenue grew ${pct(revenueChange)} month-over-month: ${fmt(prevRevenue)} → ${fmt(monthlyRevenue)}. Trajectory suggests sustainable compounding.`
+                        : `Revenue dropped ${pct(revenueChange)} from ${fmt(prevRevenue)} → ${fmt(monthlyRevenue)}. CFO Audit: Possible Seasonal Dip or Customer Churn. Verify pipeline conversion immediately.`,
                     metric: fmt(monthlyRevenue) + '/mo',
                     confidence: 0.93,
                     source: 'trend_analysis',
@@ -899,5 +1115,87 @@ export class CfoBrainService {
             noDataCase: false,
             isInfiniteRunway,
         };
+    }
+
+    private computePredictiveSignals(summary: CfoBrainReport['summary']): CfoBrainReport['predictiveSignals'] {
+        const { runwayMonths, netBurn, avgBurn3m } = summary;
+
+        if (runwayMonths >= 36 || netBurn <= 0) {
+            return {
+                alertMessage: "Runway is stable. No liquidity breaches predicted within the next 12 months.",
+                confidence: 'high'
+            };
+        }
+
+        // v3.0 Anticipatory Logic
+        // If current burn > 3m average, we are accelerating.
+        const isAccelerating = netBurn > (avgBurn3m * 1.1);
+        const accelerationFactor = isAccelerating ? (netBurn / (avgBurn3m || 1)) : 1.0;
+        
+        // Predict when runway hits 3 months (CRITICAL BREACH)
+        const monthsToBreach = Math.max(0, runwayMonths - 3);
+        const adjustedMonthsToBreach = monthsToBreach / accelerationFactor;
+        const daysToBreach = Math.round(adjustedMonthsToBreach * 30.44);
+        
+        const breachDate = new Date();
+        breachDate.setDate(breachDate.getDate() + daysToBreach);
+
+        let alertMessage = `At current burn, your runway will drop below 3 months in ${daysToBreach} days.`;
+        if (isAccelerating) {
+            alertMessage = `Burn acceleration detected. If this trend continues, you'll hit a critical 3-month runway breach within ${daysToBreach} days (approx. ${breachDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}).`;
+        }
+
+        return {
+            runwayBreachDate: breachDate.toISOString(),
+            runwayBreachDays: daysToBreach,
+            alertMessage,
+            confidence: isAccelerating ? 'medium' : 'high'
+        };
+    }
+
+    async generateWeeklyBrief(organizationId: string): Promise<any> {
+        const profile = await this.prisma.startupProfile.findFirst({ where: { organizationId }});
+        if (!profile) return null;
+
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+
+        const snapshots = await this.prisma.financialSnapshot.findMany({
+            where: { organizationId, snapshotDate: { gte: weekAgo } },
+            orderBy: { snapshotDate: 'asc' }
+        });
+
+        if (snapshots.length < 2) return null;
+
+        const first = snapshots[0];
+        const last = snapshots[snapshots.length - 1];
+
+        const context = `
+            Week Start: ${first.snapshotDate.toLocaleDateString()}
+            Week End: ${last.snapshotDate.toLocaleDateString()}
+            Runway Change: ${Number(first.burn) > 0 ? (Number(first.cashBalance)/Number(first.burn)).toFixed(1) : '99'} -> ${Number(last.burn) > 0 ? (Number(last.cashBalance)/Number(last.burn)).toFixed(1) : '99'} months
+            Cash Change: ${fmt(Number(first.cashBalance))} -> ${fmt(Number(last.cashBalance))}
+            Burn Change: ${fmt(Number(first.burn))} -> ${fmt(Number(last.burn))}
+        `;
+
+        const report = await this.aiService.generateWeeklyNarrative(organizationId, context);
+
+        return await this.prisma.weeklyBrief.create({
+            data: {
+                organizationId,
+                userId: profile.userId,
+                weekStart: weekAgo,
+                summaryText: report.improved,
+                topRisk: report.risk,
+                topRecommendation: report.priority,
+                metricsJson: {
+                    improved: report.improved,
+                    worsened: report.worsened,
+                    risk: report.risk,
+                    priority: report.priority,
+                    cashChange: Number(last.cashBalance) - Number(first.cashBalance)
+                }
+            }
+        });
     }
 }

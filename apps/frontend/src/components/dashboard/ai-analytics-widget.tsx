@@ -105,8 +105,8 @@ export function AiAnalyticsWidget() {
         },
         {
             label: 'Total Cost',
-            value: `$${analytics.usage.totalCost.toFixed(2)}`,
-            subValue: `~$${analytics.costEstimates.monthlyProjected.toFixed(0)}/mo projected`,
+            value: `₹${analytics.usage.totalCost.toFixed(2)}`,
+            subValue: `~₹${analytics.costEstimates.monthlyProjected.toFixed(0)}/mo projected`,
             icon: DollarSign,
             color: 'text-rose-400',
             bg: 'bg-rose-500/10',
@@ -199,7 +199,7 @@ export function AiAnalyticsWidget() {
                                     }}
                                     labelStyle={{ color: '#f8fafc' }}
                                     formatter={(value, name) => [
-                                        String(name) === 'cost' ? `$${Number(value || 0).toFixed(3)}` : value,
+                                        String(name) === 'cost' ? `₹${Number(value || 0).toFixed(3)}` : value,
                                         String(name).charAt(0).toUpperCase() + String(name).slice(1)
                                     ]}
                                 />

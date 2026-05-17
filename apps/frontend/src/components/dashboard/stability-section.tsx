@@ -13,7 +13,7 @@ import {
     ArrowUpRight,
     ArrowDownRight
 } from 'lucide-react';
-import { CFOState, formatCurrency } from '@/store/cfo-state-store';
+import { CFOState, formatCurrency, formatRunway } from '@/store/cfo-state-store';
 import { cn } from '@/lib/utils';
 
 interface StabilitySectionProps {
@@ -24,7 +24,7 @@ export function StabilitySection({ state }: StabilitySectionProps) {
     const { summary: s } = state;
     
     const metrics = [
-        { title: 'Total Runway', value: `${s.runwayMonths} months`, trend: 2, icon: Gem, color: 'text-indigo-400' },
+        { title: 'Total Runway', value: formatRunway(s.runwayMonths), trend: 2, icon: Gem, color: 'text-indigo-400' },
         { title: 'Monthly Burn', value: formatCurrency(s.netBurn), trend: -5, icon: Flame, color: 'text-rose-400', isPositiveGood: false },
         { title: 'Est. Revenue', value: formatCurrency(s.monthlyRevenue), trend: 12, icon: TrendingUp, color: 'text-emerald-400' },
         { title: 'Total Expenses', value: formatCurrency(s.monthlyExpenses), trend: 3, icon: Calculator, color: 'text-slate-400', isPositiveGood: false },
@@ -61,23 +61,23 @@ export function StabilitySection({ state }: StabilitySectionProps) {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.1 }}
-                            className="p-5 rounded-2xl bg-[#0a0f1e] border-2 border-white/5 hover:border-white/10 transition-all group"
+                            className="p-6 rounded-2xl bg-white/[0.01] border border-white/[0.03] hover:bg-white/[0.03] hover:border-white/[0.05] transition-all group"
                         >
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
-                                    <m.icon className={cn("w-5 h-5", m.color)} />
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="w-10 h-10 rounded-xl bg-white/[0.03] flex items-center justify-center border border-white/[0.05] grayscale group-hover:grayscale-0 transition-all">
+                                    <m.icon className={cn("w-5 h-5 opacity-40 group-hover:opacity-100 transition-opacity", m.color)} />
                                 </div>
                                 <div className={cn(
-                                    "flex items-center gap-0.5 text-[10px] font-black",
-                                    isGood ? "text-emerald-400" : "text-rose-400"
+                                    "flex items-center gap-0.5 text-[9px] font-black opacity-40 group-hover:opacity-100 transition-opacity",
+                                    isGood ? "text-emerald-500" : "text-rose-500"
                                 )}>
                                     {m.trend > 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
                                     {Math.abs(m.trend)}%
                                 </div>
                             </div>
                             
-                            <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-1">{m.title}</p>
-                            <h3 className="text-xl font-black text-white tracking-tight">{m.value}</h3>
+                            <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest mb-1 group-hover:text-slate-500 transition-colors">{m.title}</p>
+                            <h3 className="text-xl font-black text-white/70 group-hover:text-white tracking-tight transition-colors">{m.value}</h3>
                         </motion.div>
                     );
                 })}

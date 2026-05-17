@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { motion } from 'framer-motion';
 import {
     Mail, Send, Clock, TrendingUp, TrendingDown,
     AlertTriangle, CheckCircle2, Loader2, Settings,
-    Zap, ArrowRight, Calendar, Shield, Minus
+    Zap, ArrowRight, Calendar, Shield, Minus,
+    Download, FileText, Crown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
+import { canAccess } from '@/lib/feature-gates';
+import { UpgradePrompt } from '@/components/ui/upgrade-prompt';
+import { toast } from 'sonner';
 
 const CHANNELS = [
     { id: 'EMAIL', label: 'Email', icon: Mail, enabled: true, description: 'Sent to your registered email' },
@@ -29,6 +33,8 @@ export default function WeeklyBriefPage() {
     const [selectedChannels, setSelectedChannels] = useState<string[]>(['EMAIL']);
     const [frequency, setFrequency] = useState<'WEEKLY' | 'BIWEEKLY'>('WEEKLY');
     const [sendSuccess, setSendSuccess] = useState(false);
+    const [pdfGenerating, setPdfGenerating] = useState(false);
+    const briefRef = useRef<HTMLDivElement>(null);
 
     // Fetch brief preview data
     const { data: brief, isLoading } = useQuery({
@@ -58,6 +64,35 @@ export default function WeeklyBriefPage() {
                 ? prev.filter((c) => c !== channelId)
                 : [...prev, channelId]
         );
+    };
+
+    const handlePdfDownload = async () => {
+        if (!canAccess('pdfExports')) {
+            toast.error('PDF export is available on the Pro plan.');
+            return;
+        }
+        if (!briefRef.current) return;
+        setPdfGenerating(true);
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const jsPDF = (await import('jspdf')).default;
+            const canvas = await html2canvas(briefRef.current, {
+                backgroundColor: '#0a0f1e',
+                scale: 2,
+                useCORS: true,
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save(`FounderCFO-Brief-${new Date().toISOString().split('T')[0]}.pdf`);
+            toast.success('PDF downloaded successfully!');
+        } catch (err) {
+            toast.error('PDF generation failed. Try again.');
+        } finally {
+            setPdfGenerating(false);
+        }
     };
 
     const formatCurrency = (amount: number) => {
@@ -99,6 +134,7 @@ export default function WeeklyBriefPage() {
 
                 {/* Brief Preview Card */}
                 <motion.div
+                    ref={briefRef}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="glass-card rounded-3xl overflow-hidden border-2 border-primary/20"
@@ -218,6 +254,33 @@ export default function WeeklyBriefPage() {
                             </div>
                         </div>
 
+                        {/* Compliance Snapshot */}
+                        <div className="mt-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 rounded-xl bg-amber-500/20 mt-0.5">
+                                    <Shield className="w-5 h-5 text-amber-400" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-[10px] text-amber-400 uppercase tracking-widest font-bold mb-1">Compliance Radar</p>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-slate-400">• GSTR-3B Filing — due 20th of every month</p>
+                                        <p className="text-xs text-slate-400">• TDS Deposit — due 7th of every month</p>
+                                        <p className="text-xs text-slate-400">• Advance Tax — quarterly (15 Jun / 15 Sep / 15 Dec / 15 Mar)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Professional Disclaimer */}
+                        <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                            <p className="text-[8px] text-slate-600 leading-relaxed">
+                                <AlertTriangle className="w-2 h-2 inline mr-1" />
+                                This brief is auto-generated by FounderCFO's AI engine and is not a substitute for professional chartered accountant advice.
+                                All figures are derived from uploaded bank statements and may not reflect complete financial position.
+                                Consult a licensed CA before making critical financial decisions.
+                            </p>
+                        </div>
+
                         {/* Footer */}
                         <div className="mt-4 flex items-center justify-between text-[10px] text-slate-600">
                             <p>Generated by FounderCFO Decision Engine</p>
@@ -312,6 +375,31 @@ export default function WeeklyBriefPage() {
                         </div>
 
                         <div className="mt-auto space-y-3">
+                            {/* PDF Download */}
+                            <button
+                                onClick={handlePdfDownload}
+                                disabled={pdfGenerating}
+                                className="w-full py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                            >
+                                {pdfGenerating ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Generating PDF...</>
+                                ) : (
+                                    <><Download className="w-4 h-4" /> Download as PDF</>
+                                )}
+                                {!canAccess('pdfExports') && (
+                                    <span className="ml-1 text-[8px] text-amber-400 font-black uppercase">Pro</span>
+                                )}
+                            </button>
+
+                            {/* Board Deck (gated) */}
+                            {!canAccess('boardDeck') ? (
+                                <UpgradePrompt feature="Board-Ready Deck" featureKey="boardDeck" />
+                            ) : (
+                                <button className="w-full py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all">
+                                    <FileText className="w-4 h-4" /> Generate Board Deck
+                                </button>
+                            )}
+
                             {/* Send Now Button */}
                             <button
                                 onClick={() => sendMutation.mutate()}
@@ -325,20 +413,11 @@ export default function WeeklyBriefPage() {
                                 )}
                             >
                                 {sendMutation.isPending ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Sending Brief...
-                                    </>
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending Brief...</>
                                 ) : sendSuccess ? (
-                                    <>
-                                        <CheckCircle2 className="w-4 h-4" />
-                                        Brief Sent!
-                                    </>
+                                    <><CheckCircle2 className="w-4 h-4" /> Brief Sent!</>
                                 ) : (
-                                    <>
-                                        <Send className="w-4 h-4" />
-                                        Send Brief Now
-                                    </>
+                                    <><Send className="w-4 h-4" /> Send Brief Now</>
                                 )}
                             </button>
 

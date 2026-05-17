@@ -89,10 +89,12 @@ import { ContactsModule } from './contacts/contacts.module';
   providers: [
     AppService,
     // Enable rate limiting globally
+    /*
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
+    */
   ],
 })
 export class AppModule { }

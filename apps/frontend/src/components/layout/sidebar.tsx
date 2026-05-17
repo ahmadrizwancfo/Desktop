@@ -22,7 +22,9 @@ import {
     Calculator,
     Mail,
     Database,
-    Zap
+    Zap,
+    History,
+    PenLine
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/ui/logo';
@@ -30,11 +32,11 @@ import { Logo } from '@/components/ui/logo';
 const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'AI CFO', href: '/ai-cfo', icon: BrainCircuit, premium: true },
+    { name: 'History', href: '/history', icon: History },
     { name: 'Weekly Brief', href: '/weekly-brief', icon: Mail, premium: true },
     { name: 'Scenario Simulator', href: '/simulator', icon: TrendingUp, premium: true },
     { name: 'Investor Readiness', href: '/investor-readiness', icon: Target, premium: true },
     { name: 'Unit Economics', href: '/unit-economics', icon: Calculator, premium: true },
-    { name: 'Accounts', href: '/accounts', icon: Wallet },
     { name: 'Invoices', href: '/invoices', icon: Receipt },
     { name: 'Expenses', href: '/expenses', icon: Receipt },
     { name: 'Customers & Vendors', href: '/customers-vendors', icon: Users },
@@ -45,19 +47,38 @@ const navItems = [
 
 import { useAuthStore } from '@/store/auth-store';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { RefreshCw } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const logout = useAuthStore((state) => state.logout);
+    const queryClient = useQueryClient();
+    const [syncing, setSyncing] = React.useState(false);
 
     const handleLogout = () => {
         logout();
         router.push('/login');
     };
 
+    const handleForceSync = async () => {
+        setSyncing(true);
+        try {
+            await apiClient.post('/cfo-engine/sync/force');
+            await queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
+            toast.success('Intelligence Re-Synchronized');
+        } catch (e) {
+            toast.error('Sync failed. Check API link.');
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     return (
-        <div className="w-64 h-screen fixed left-0 top-0 glass-premium border-r border-white/5 flex flex-col p-6 z-50">
+        <div className="w-64 h-full glass-premium border-r border-white/5 flex flex-col pt-6 px-6 pb-10 z-50 flex-shrink-0">
             {/* Logo Section */}
             <Link href="/dashboard" className="flex items-center gap-4 mb-12 group">
                 <div>
@@ -88,7 +109,7 @@ export function Sidebar() {
                             {isActive && (
                                 <motion.div 
                                     layoutId="active-pill"
-                                    className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" 
+                                    className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-full shadow-[0_0_100px_rgba(99,102,241,0.5)]" 
                                 />
                             )}
                             
@@ -114,6 +135,17 @@ export function Sidebar() {
                         </Link>
                     );
                 })}
+
+                <button
+                    onClick={handleForceSync}
+                    disabled={syncing}
+                    className="w-full group mt-6 flex items-center justify-between px-4 py-3 rounded-[1.25rem] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                >
+                    <div className="flex items-center gap-3">
+                        <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />
+                        <span>{syncing ? 'Synchronizing...' : 'Force Intelligence Sync'}</span>
+                    </div>
+                </button>
             </nav>
 
             {/* Footer Actions */}
@@ -134,6 +166,7 @@ export function Sidebar() {
                 </Link>
                 <button
                     onClick={handleLogout}
+                    suppressHydrationWarning
                     className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-rose-500/80 hover:text-rose-400 hover:bg-rose-500/10 transition-all font-bold group/logout"
                 >
                     <LogOut className="w-4 h-4 group-hover/logout:-translate-x-1 transition-transform" />

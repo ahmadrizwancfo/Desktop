@@ -66,4 +66,8 @@ export class CreateStartupProfileDto {
     @IsString()
     @IsOptional()
     notificationPreference?: string;
+
+    @IsString()
+    @IsOptional()
+    dataInputMethod?: string;
 }

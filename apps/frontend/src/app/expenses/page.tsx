@@ -4,20 +4,34 @@ import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { CreateExpenseModal } from '@/components/modals/create-expense-modal';
 import { ExpenseBreakdown } from '@/components/dashboard/expense-breakdown';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { useCFOState, formatCurrency } from '@/store/cfo-state-store';
-import { Receipt, TrendingDown, Filter, Download, Plus, Search, Loader2, CheckCircle2, XCircle, Lightbulb, AlertTriangle, TrendingUp, Zap } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Receipt, TrendingDown, Filter, Download, Plus, Search, Loader2, CheckCircle2, XCircle, Lightbulb, AlertTriangle, TrendingUp, Zap, Pencil, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { DecisionBadge } from '@/components/ui/decision-badge';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+
+const INDIAN_CATEGORIES = [
+    'Salary & Payroll', 'TDS Deducted', 'GST Paid', 'Marketing & Ads',
+    'Rent & Utilities', 'Vendor Payments', 'Travel', 'Software & Tools',
+    'Professional Fees', 'Founder Draw', 'Tax Payments', 'Others', 'Uncategorized'
+];
+
+type FilterTab = 'all' | 'needs_review' | 'uncategorized' | 'high_value';
 
 export default function ExpensesPage() {
     const user = useAuthStore((state) => state.user);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showBreakdown, setShowBreakdown] = useState(true);
+    const [filterTab, setFilterTab] = useState<FilterTab>('all');
+    const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+    const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+    const [editNotesValue, setEditNotesValue] = useState('');
+    const queryClient = useQueryClient();
 
     // THE ONE SOURCE: CFOState
     const { data: cfoState } = useCFOState();
@@ -42,15 +56,44 @@ export default function ExpensesPage() {
         enabled: !!user?.organizationId,
     });
 
-    // Filter expenses by search term
+    // Mutation: inline category/notes edit
+    const updateExpenseMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
+            const res = await apiClient.patch(`/expenses/${id}`, data);
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['expenses'] });
+            queryClient.invalidateQueries({ queryKey: ['expenses-stats'] });
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
+            toast.success('Transaction updated. Refreshing analysis...');
+            setEditingCategoryId(null);
+            setEditingNotesId(null);
+        },
+        onError: () => {
+            toast.error('Failed to update. Try again.');
+        }
+    });
+
+    // Filter expenses by search term + filter tab
     const filteredExpenses = expenses?.filter((expense: any) => {
         const vendor = (expense.metadata as any)?.vendor || '';
         const description = expense.description || '';
         const category = expense.category || '';
+        const status = (expense.metadata as any)?.status || 'PENDING';
         const searchLower = searchTerm.toLowerCase();
-        return vendor.toLowerCase().includes(searchLower) ||
+        const matchesSearch = vendor.toLowerCase().includes(searchLower) ||
             description.toLowerCase().includes(searchLower) ||
             category.toLowerCase().includes(searchLower);
+
+        if (!matchesSearch) return false;
+
+        switch (filterTab) {
+            case 'needs_review': return status === 'PENDING';
+            case 'uncategorized': return !category || category === 'Uncategorized' || category === 'Others';
+            case 'high_value': return Number(expense.amount) >= 50000;
+            default: return true;
+        }
     }) || [];
 
     const localFormatCurrency = (amount: number) => {
@@ -131,13 +174,38 @@ export default function ExpensesPage() {
                                 />
                             </div>
                             <button className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-bold flex items-center gap-2 hover:bg-white/10 transition-all">
-                                <Filter className="w-4 h-4" />
-                                Filter
-                            </button>
-                            <button className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white font-bold flex items-center gap-2 hover:bg-white/10 transition-all">
                                 <Download className="w-4 h-4" />
                                 Export
                             </button>
+                        </div>
+
+                        {/* Filter Tabs */}
+                        <div className="flex gap-2">
+                            {[
+                                { key: 'all' as FilterTab, label: 'All', count: expenses?.length || 0 },
+                                { key: 'needs_review' as FilterTab, label: 'Needs Review', count: expenses?.filter((e: any) => (e.metadata as any)?.status === 'PENDING').length || 0 },
+                                { key: 'uncategorized' as FilterTab, label: 'Uncategorized', count: expenses?.filter((e: any) => !e.category || e.category === 'Uncategorized' || e.category === 'Others').length || 0 },
+                                { key: 'high_value' as FilterTab, label: 'High Value (>₹50K)', count: expenses?.filter((e: any) => Number(e.amount) >= 50000).length || 0 },
+                            ].map(tab => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setFilterTab(tab.key)}
+                                    className={cn(
+                                        "px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                                        filterTab === tab.key
+                                            ? "bg-primary/20 text-primary border border-primary/30"
+                                            : "bg-white/5 text-slate-500 border border-white/10 hover:text-white hover:bg-white/10"
+                                    )}
+                                >
+                                    {tab.label}
+                                    <span className={cn(
+                                        "text-[10px] px-1.5 py-0.5 rounded-md",
+                                        filterTab === tab.key ? "bg-primary/30" : "bg-white/5"
+                                    )}>
+                                        {tab.count}
+                                    </span>
+                                </button>
+                            ))}
                         </div>
 
                         {/* Expenses Table */}
@@ -179,7 +247,31 @@ export default function ExpensesPage() {
                                                             <span className="font-bold text-white">{metadata.vendor || 'Unknown'}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="p-4 text-slate-400">{expense.category}</td>
+                                                    <td className="p-4">
+                                                        {editingCategoryId === expense.id ? (
+                                                            <select
+                                                                defaultValue={expense.category || 'Uncategorized'}
+                                                                onChange={(e) => {
+                                                                    updateExpenseMutation.mutate({ id: expense.id, data: { category: e.target.value } });
+                                                                }}
+                                                                onBlur={() => setEditingCategoryId(null)}
+                                                                autoFocus
+                                                                className="bg-slate-800 border border-primary/30 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-primary"
+                                                            >
+                                                                {INDIAN_CATEGORIES.map(cat => (
+                                                                    <option key={cat} value={cat}>{cat}</option>
+                                                                ))}
+                                                            </select>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setEditingCategoryId(expense.id)}
+                                                                className="text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors group"
+                                                            >
+                                                                {expense.category || 'Uncategorized'}
+                                                                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </button>
+                                                        )}
+                                                    </td>
                                                     <td className="p-4 font-bold text-white">₹{Number(expense.amount).toLocaleString('en-IN')}</td>
                                                     <td className="p-4 text-slate-400">{new Date(expense.date).toLocaleDateString('en-IN')}</td>
                                                     <td className="p-4">
@@ -193,7 +285,11 @@ export default function ExpensesPage() {
                                                         <div className="flex items-center justify-end gap-2">
                                                             {status === 'PENDING' && (
                                                                 <>
-                                                                    <button className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors" title="Verify">
+                                                                    <button
+                                                                        onClick={() => updateExpenseMutation.mutate({ id: expense.id, data: { metadata: { ...metadata, status: 'VERIFIED' } } })}
+                                                                        className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition-colors"
+                                                                        title="Verify"
+                                                                    >
                                                                         <CheckCircle2 className="w-4 h-4" />
                                                                     </button>
                                                                     <button className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors" title="Reject">

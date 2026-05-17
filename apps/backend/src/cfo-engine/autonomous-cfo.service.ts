@@ -43,7 +43,7 @@ export class AutonomousCfoService {
         
         const { summary, deathClock, behavioralAudit, trustIntelligence } = state;
         const runway = summary.runwayMonths;
-        const riskProfile = behavioralAudit?.riskProfile || 'Balanced';
+        const riskProfile = behavioralAudit?.riskProfile || 'PROACTIVE';
 
         const isRecalibrating = trustIntelligence?.isRecalibrating || false;
 
@@ -63,7 +63,7 @@ export class AutonomousCfoService {
         if (runway < 6) {
             warnings.push(`Survival is at risk: At current burn, you have only ${Math.round(runway * 30)} days left.`);
         }
-        if (behavioralAudit?.behaviorScore < 50) {
+        if ((behavioralAudit?.behaviorScore || 100) < 50) {
             warnings.push(`You are 2 bad decisions away from a permanent cash crisis.`);
         }
         if (isRecalibrating) {
@@ -96,7 +96,7 @@ export class AutonomousCfoService {
             });
         }
 
-        if (runway >= 6 && runway < 12 && riskProfile === 'Aggressive') {
+        if (runway >= 6 && runway < 12 && riskProfile === 'CHAOTIC') {
             const s = getSuppression('LIQUIDITY');
             priorityActions.push({
                 title: 'Stabilize Monthly Expenses',
@@ -112,7 +112,7 @@ export class AutonomousCfoService {
         }
 
         // 🟡 3. BEHAVIORAL NUDGES
-        if (riskProfile === 'Conservative' && runway > 12) {
+        if (riskProfile === 'PROACTIVE' && runway > 12) {
             const s = getSuppression('GROWTH');
             opportunities.push({
                 title: 'Enable Growth Mode',
@@ -151,7 +151,7 @@ export class AutonomousCfoService {
         let summaryText = 'Your financial state is stable, but disciplined growth is required.';
         if (runway < 6) summaryText = 'Survival mode ACTIVE. Every rupee of burn must be justified.';
         if (isRecalibrating) summaryText = 'SYSTEM RE-CALIBRATION: High variance detected in recent outcomes. trustZone downgraded.';
-        if (riskProfile === 'Aggressive') summaryText += ' WARNING: Your decision patterns are high-risk.';
+        if (riskProfile === 'CHAOTIC') summaryText += ' WARNING: Your decision patterns are high-risk.';
 
         return {
             priorityActions,

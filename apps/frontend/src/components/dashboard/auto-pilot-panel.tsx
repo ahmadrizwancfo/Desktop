@@ -104,39 +104,39 @@ export function AutoPilotPanel({ state }: AutoPilotPanelProps) {
                         {isSafeMode ? <ShieldAlert className="w-5 h-5" /> : <Cpu className="w-5 h-5" />}
                     </div>
                     <div>
-                        <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                        <h2 className="text-sm font-black text-white/80 uppercase tracking-widest flex items-center gap-2 group-hover:text-white transition-colors">
                             {isSafeMode ? 'Auto-Pilot (Safe Mode)' : 'Auto-Pilot Intelligence'}
-                            {isSafeMode && <span className="bg-indigo-500 text-[8px] px-1.5 py-0.5 rounded text-white animate-pulse">PROTECTED</span>}
+                            {isSafeMode && <span className="bg-indigo-500/50 text-[8px] px-1.5 py-0.5 rounded text-white animate-pulse">PROTECTED</span>}
                         </h2>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">
+                        <p className="text-[10px] text-slate-600 font-bold uppercase tracking-tight">
                             {isSafeMode ? 'Manual Approval Enforced' : 'Autonomous Decision Engine'}
                         </p>
                     </div>
                 </div>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 opacity-70 group-hover:opacity-100 transition-opacity">
                     {trustIntelligence?.envUncertaintyScore !== undefined && trustIntelligence.envUncertaintyScore > 30 && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20">
-                            <Wind className="w-3 h-3 text-rose-400 animate-pulse" />
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/5 border border-rose-500/10">
+                            <Wind className="w-3 h-3 text-rose-400 opacity-50" />
                             <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Uncertainty Lock</span>
                         </div>
                     )}
                     
                     <div className="text-right">
-                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-0.5">Confidence Score</p>
-                        <div className="flex items-center gap-2">
-                            <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-0.5">Confidence Score</p>
+                        <div className="flex items-center gap-2 text-slate-400 group-hover:text-white transition-colors">
+                            <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden">
                                 <motion.div 
                                     initial={{ width: 0 }}
                                     animate={{ width: `${state.dynamicConfidence.score}%` }}
                                     className={cn(
-                                        "h-full rounded-full",
+                                        "h-full rounded-full opacity-60",
                                         state.dynamicConfidence.score > 80 ? "bg-emerald-500" : 
                                         state.dynamicConfidence.score > 60 ? "bg-amber-500" : "bg-rose-500"
                                     )}
                                 />
                             </div>
-                            <span className="text-[10px] font-black text-white">{state.dynamicConfidence.score}%</span>
+                            <span className="text-[10px] font-black">{state.dynamicConfidence.score}%</span>
                         </div>
                     </div>
                 </div>

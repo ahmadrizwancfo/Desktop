@@ -43,7 +43,7 @@ export function SocialProof() {
             {/* Stats Grid */}
             <div className="max-w-6xl mx-auto px-6 mt-20 grid grid-cols-2 md:grid-cols-4 gap-8">
                 {[
-                    { label: "Transactions Processed", value: "$50M+" },
+                    { label: "Transactions Processed", value: "₹50Cr+" },
                     { label: "Active Founders", value: "500+" },
                     { label: "Hours Saved", value: "10k+" },
                     { label: "Compliance Score", value: "100%" }

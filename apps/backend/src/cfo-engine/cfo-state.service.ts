@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CfoBrainService, CfoBrainReport } from './cfo-brain.service';
 import { CfoForecastService } from './cfo-forecast.service';
-import { CfoBehaviorService } from './cfo-behavior.service';
+import { BehavioralRiskProfile, CfoBehaviorService } from './cfo-behavior.service';
 import { AutonomousCfoService } from './autonomous-cfo.service';
 import { CfoExecutionService } from './cfo-execution.service';
 import { DecisionEngineService } from './decision-engine.service';
@@ -192,6 +192,19 @@ export interface Decision {
     stability: 'stable' | 'volatile';
     status: 'NEW' | 'REVIEWING' | 'IMPLEMENTING' | 'FIXED' | 'IGNORED';
     actionPayload?: ActionPayload;
+    
+    // v4.0 Execution Engine
+    impactExplanation?: string; // "If done: Runway +0.4m"
+    consequenceExplanation?: string; // "If ignored: Runway -0.8m in 10 days"
+    statusV4?: 'pending' | 'in_progress' | 'done' | 'ignored';
+
+    // v5.0 Strategic Layer
+    consequenceBasis?: string; // e.g. "based on last 14-day burn trend"
+    secondOrderEffects?: string[]; // e.g. ["Hiring flexibility", "Survival probability"]
+    oneThingReasoning?: string; // "This is the one thing because..."
+    
+    // v6.0 Investor Layer
+    investorNarrative?: string; // e.g. "Burn optimization to extend liquidity"
 }
 
 export interface DecisionHistoryItem {
@@ -217,12 +230,21 @@ export interface DecisionOutput {
         fix: Decision | null;
         support: Decision | null;
         watch: any;
+        oneThing: Decision | null; // v4.0
     };
     previousRunway: number;
     currentRunway: number;
     ownershipNote?: string;
     tone: 'urgent' | 'cautious' | 'strategic';
     stability: 'stable' | 'volatile';
+    completionRate?: number; // v4.0 (0-100)
+    
+    // v5.0 Relief Layer
+    stabilizationMessage?: string; // "System stabilized. Good call handling key risks."
+
+    // v6.0 Investor Layer
+    investorTrustScore?: number;
+    weeklyInvestorUpdate?: string;
 }
 
 export interface DecisionAlert {
@@ -397,12 +419,19 @@ export interface CFOState {
         };
     }>;
     
+    /** v4.1 Suspense Alert: Unclassified outflows requiring attention */
+    suspenseAlert?: {
+        amount: number;
+        count: number;
+        isCritical: boolean;
+        message: string;
+    };
+
     trustIntelligence?: {
-        cfoAccuracyScore: number;
-        totalEvaluatedActions: number;
-        isRecalibrating: boolean;
-        cautionMultiplier: number;
-        envUncertaintyScore: number;
+        dataQuality: 'LOW' | 'MEDIUM' | 'HIGH';
+        confidenceScore: number;
+        reasoning: string;
+        warnings: TrustWarning[];
         autoPilot: {
             mode: string;
             maxImpact: number;
@@ -417,6 +446,8 @@ export interface CFOState {
             isSuppressed: boolean;
             failureReason?: string;
         }>;
+        cfoAccuracyScore: number;
+        isRecalibrating: boolean;
     };
 
     dynamicConfidence: {
@@ -433,7 +464,12 @@ export interface CFOState {
     changeDrivers: ChangeDriver[];
     versionId: string;
 
-    behavioralAudit?: any; // Personalized CFO insights based on pattern memory
+    behavioralAudit?: {
+        behaviorScore: number;
+        riskProfile: BehavioralRiskProfile;
+        avgConfidence: number;
+        complianceScore: number;
+    }; 
     autonomousRecommendations?: any; // Commands from the AutonomousCFOEngine
     activeMandates?: any[]; // For Execution Tracking
 
@@ -461,6 +497,8 @@ export interface CFOState {
     noData: boolean;
     isDemo: boolean;
     isInfiniteRunway?: boolean;
+    uncategorizedOutflows?: any[];
+    founderPersona?: 'disciplined' | 'reactive' | 'chaotic';
 }
 
 export interface DecisionOption {
@@ -525,13 +563,49 @@ export class CfoStateService {
 
     async getState(organizationId: string, userId?: string): Promise<CFOState> {
         const cached = this.cache.get(organizationId);
+        const startupProfile = await this.prisma.startupProfile.findFirst({
+            where: { organizationId }
+        });
+
+        // v4.1 Mastermind Partner: Detect Unrecognized Transactions & Suspense Queue
+        const { ghostAlerts, uncategorizedOutflows, stats, oldestSuspenseDays } = await this.reconcile(organizationId);
+        
+        const unexplainedTotal = uncategorizedOutflows.reduce((sum, o) => sum + o.amount, 0);
+        
+        // v4.2 Escalation Logic
+        let suspenseMessage = `There are ${uncategorizedOutflows.length} unrecognized transactions (₹${unexplainedTotal.toLocaleString()}) needing classification.`;
+        if (oldestSuspenseDays >= 6) {
+            suspenseMessage = `Attention: Key financial signals may be unreliable due to ${uncategorizedOutflows.length} unclassified transactions from ${oldestSuspenseDays} days ago.`;
+        } else if (oldestSuspenseDays >= 3) {
+            suspenseMessage = `Accuracy Risk: Unrecognized transactions (₹${unexplainedTotal.toLocaleString()}) may impact the precision of your runway insights.`;
+        }
+
+        const suspenseAlert = unexplainedTotal > 0 ? {
+            amount: unexplainedTotal,
+            count: uncategorizedOutflows.length,
+            isCritical: unexplainedTotal > 10000 || oldestSuspenseDays >= 6,
+            message: suspenseMessage
+        } : undefined;
+
+        // Log unrecognized detections for behavioral engine (no penalty, just accuracy tracking)
+        if (ghostAlerts.length > 0 && startupProfile) {
+            for (const alert of ghostAlerts) {
+                 await this.behaviorService.logInteraction(
+                    startupProfile.id,
+                    alert.id.replace('unrecognized_', ''),
+                    'UNRECOGNIZED_TRANSACTION'
+                );
+            }
+        }
+
         if (cached && cached.expiresAt > Date.now()) {
             this.logger.debug(`CFOState cache HIT for org ${organizationId}`);
             return cached.state;
         }
 
-        const startupProfile = await this.prisma.startupProfile.findFirst({
-            where: { organizationId }
+        const org = await this.prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { isFirstTimeUser: true, createdAt: true }
         });
 
         this.logger.log(`Generating CFOState v2 for org ${organizationId}`);
@@ -557,8 +631,9 @@ export class CfoStateService {
         // ── 6. Cash forecast (GAP 3: daily granular flow) ─────────────────
         const cashForecast = this.computeCashForecast(s, receivables);
 
-        // ── 7. Weighted Burn Spike Detection (CRITICAL UPDATE) ────────────
-        const { weightedBurn, burnSpike } = await this.calculateWeightedBurn(organizationId, s.netBurn);
+        // ── 7. Weighted Burn Spike Detection (CRITICAL UPDATE v2.2) ───────
+        const weightedBurn = brainReport.summary.avgBurn3m;
+        const burnSpike = weightedBurn > 0 ? (s.netBurn - weightedBurn) / weightedBurn : 0;
         
         // ── 8. Primary risk (v2.2 order shift) ────────────────────────────
         const primaryRisk = this.extractPrimaryRisk(engine, brainReport);
@@ -580,6 +655,15 @@ export class CfoStateService {
             s,
             startupProfile
         );
+        
+        // ── 11a. Probation Reset Logic ────────────────────────────────────
+        if (org?.isFirstTimeUser && dashboardMode === 'CRITICAL' && daysBetween(org.createdAt, new Date()) < 7) {
+            this.logger.warn(`Organization ${organizationId} hit CRITICAL during probation. Resetting clock.`);
+            await this.prisma.organization.update({
+                where: { id: organizationId },
+                data: { createdAt: new Date() } // Reset the 7-day timer
+            });
+        }
         
         // ── 9a. Update Profile Insights (Peak Cash & Mode tracking) ───────
         if (startupProfile) {
@@ -629,7 +713,9 @@ export class CfoStateService {
                 categorizationPercent,
                 dataCoverageDays,
                 monthlyRevenue: s.monthlyRevenue,
-                lastSync
+                lastSync,
+                dataInputMethod: (startupProfile?.dataInputMethod as string) || 'SLIDER',
+                lastFinancialUpdate: startupProfile?.lastFinancialUpdate?.toISOString() || null,
             }
         );
 
@@ -663,8 +749,11 @@ export class CfoStateService {
         // ── 18. GAP 2: Decision Memory ────────────────────────────────────
         const decisionMemory = await this.computeDecisionMemory(organizationId, s.runwayMonths);
 
-        // ── 19. GAP 7: Unified Narrative ──────────────────────────────────
-        const narrative = this.buildNarrative(s, deathClock, delta, decisionMemory, engine.tone);
+        // ── 19. Behavioral Audit ──────────────────────────────────────────
+        const behaviorAudit = userId ? await this.behaviorService.analyzeFounderBehavior(userId) : null;
+
+        // ── 20. GAP 7: Unified Narrative ──────────────────────────────────
+        const narrative = this.buildNarrative(s, deathClock, delta, decisionMemory, engine.tone, behaviorAudit);
 
         // ── 20. FOUNDER PRESSURE: Critical Alerts ─────────────────────────
         const transientAlerts = this.buildCriticalAlerts(s, deathClock, receivables, categoryBreakdown, delta);
@@ -693,15 +782,15 @@ export class CfoStateService {
 
         // ── 22. Behavior Audit ──────────────────────────────────────────── (CLEANED UP TRENDS)
 
-        // ── 23. Behavioral Audit ──────────────────────────────────────────
-        const behaviorAudit = userId ? await this.behaviorService.analyzeFounderBehavior(userId) : null;
-
         // ── 24. CFO Execution & Compliance ────────────────────────────────
         const autonomousRecommendations = this.autoCfoService.generateCfoActions({ 
             summary: s, 
             deathClock, 
             behavioralAudit: behaviorAudit 
         } as any);
+        
+        // ── RECONCILIATION LAYER (HIERARCHY OF TRUTH) ─────────────────────
+        criticalAlerts.push(...ghostAlerts);
 
         if (userId && organizationId) {
             await this.executionService.syncMandates(userId, organizationId, autonomousRecommendations);
@@ -739,10 +828,25 @@ export class CfoStateService {
             orderBy: { executeAt: 'asc' }
         });
 
+        const accuracyScore = (stats.bankMatched + stats.userVerified + (stats.estimated * 0.7)) / (100) * 100;
+        const confidenceLevel = accuracyScore > 90 ? 'high' : (accuracyScore > 70 ? 'medium' : 'low');
+
         const trustIntelligence = {
-            cfoAccuracyScore: startupProfile?.cfoAccuracyScore || 85,
+            cfoAccuracyScore: Math.round(accuracyScore),
+            accuracyBreakdown: {
+                bankMatched: Math.round(stats.bankMatched),
+                userVerified: Math.round(stats.userVerified),
+                estimated: Math.round(stats.estimated)
+            },
+            confidenceLevel,
+            confidenceMetadata: {
+                runway: confidenceLevel,
+                burn: accuracyScore > 80 ? 'high' : 'medium',
+                revenue: 'high', // Usually direct from bank
+                receivables: receivables.runwayExtensionDays > 0 ? 'medium' : 'high'
+            },
             totalEvaluatedActions: startupProfile?.totalEvaluatedActions || 0,
-            isRecalibrating: (startupProfile?.rollbackRate || 0) > 0.20 || (startupProfile?.isTrustZoneDowngraded || false),
+            isRecalibrating: (startupProfile?.rollbackRate || 0) > 0.20 || (startupProfile?.isTrustZoneDowngraded || false) || (accuracyScore < 60),
             cautionMultiplier: startupProfile?.cautionMultiplier || 1.0,
             envUncertaintyScore: startupProfile?.envUncertaintyScore || 0,
             autoPilot: {
@@ -770,6 +874,7 @@ export class CfoStateService {
         const preDecisionState: any = {
             companyStatus,
             dashboardMode,
+            isFirstTimeUser: org?.isFirstTimeUser ?? false,
             dynamicConfidence,
             deathClock,
             primaryRisk,
@@ -788,17 +893,25 @@ export class CfoStateService {
             criticalAlerts,
             todaysActions,
             negativeTrends,
-             inertiaMetrics: {
+            inertiaMetrics: {
                 ignoredAlerts: startupProfile?.ignoredAlertsCount || 0,
                 daysSinceLastAction: startupProfile?.daysSinceLastAction || 0
             },
+            predictiveSignals: brainReport.predictiveSignals,
+            dailyBrief: brainReport.dailyBrief,
+            weeklyBrief: await this.prisma.weeklyBrief.findFirst({
+                where: { organizationId },
+                orderBy: { createdAt: 'desc' }
+            }),
             modeExplanation,
             decisionTimeline: await this.getDecisionTimeline(organizationId),
             trustIntelligence,
+            suspenseAlert,
             behavioralAudit: behaviorAudit ? {
                 ...behaviorAudit,
                 complianceScore: startupProfile?.complianceScore || 100,
-                escalationLevel
+                escalationLevel,
+                momentumScore: brainReport.behavioralMetrics?.momentumScore || 100
             } : null,
             autonomousRecommendations,
             activeMandates: activeMandates,
@@ -815,6 +928,11 @@ export class CfoStateService {
             noData: engine.noDataCase,
             isDemo: engine.noDataCase,
             isInfiniteRunway: engine.isInfiniteRunway,
+
+            // v4.0 Execution Engine
+            founderPersona: (behaviorAudit?.riskProfile === 'PROACTIVE' ? 'disciplined' : 
+                            behaviorAudit?.riskProfile === 'REACTIONARY' ? 'reactive' : 
+                            behaviorAudit?.riskProfile === 'CHAOTIC' ? 'chaotic' : 'disciplined') as any
         };
 
         // ── 26a. DEMO DATA OVERRIDE (For Early Users) ───────────────────
@@ -879,6 +997,18 @@ export class CfoStateService {
                 if (dbDecision) {
                     decision.status = dbDecision.status as any;
                     decision.id = dbDecision.id;
+                    
+                    // v4.0 Status Mapping
+                    const v4Map: Record<string, string> = {
+                        'OPEN': 'pending',
+                        'REVIEWING': 'in_progress',
+                        'IMPLEMENTING': 'in_progress',
+                        'RESOLVED': 'done',
+                        'FIXED': 'done',
+                        'IGNORED': 'ignored'
+                    };
+                    decision.statusV4 = (v4Map[dbDecision.status] || 'pending') as any;
+
                     // Sync execution plan from DB if it exists
                     if (dbDecision.recommendedActions && Array.isArray(dbDecision.recommendedActions)) {
                         decision.executionPlan = dbDecision.recommendedActions as any;
@@ -1611,7 +1741,18 @@ export class CfoStateService {
         delta: CFOStateDelta,
         decisionMemory: DecisionMemory,
         tone: 'urgent' | 'cautious' | 'strategic',
+        behavioralAudit?: any
     ): Narrative {
+        // v4.0 CHAOTIC INTERVENTION NARRATIVE
+        if (behavioralAudit?.riskProfile === 'CHAOTIC') {
+            const overdueCount = behavioralAudit?.overdueLiabilities || 'X';
+            return {
+                headline: "Your profile is currently marked as CHAOTIC.",
+                summary: `You have ${overdueCount} unresolved Statutory Late Payments. The Mastermind has locked your 'Phoenix Raise' options until statutory integrity is restored. Fix these items to move to REACTIONARY status.`,
+                tone: 'urgent'
+            };
+        }
+
         const runway = s.runwayMonths >= 36 ? '> 36 months' : `${s.runwayMonths.toFixed(1)} months`;
         const trend = s.burnTrend === 'increasing' ? 'Burn rising' : 
                      s.burnTrend === 'decreasing' ? 'Burn decreasing' : 'Burn is stable';
@@ -2273,25 +2414,6 @@ export class CfoStateService {
 
     // ── 3-MONTH WEIGHTED BURN & MODE (CRITICAL DECISION) ──────────────────────
 
-    private async calculateWeightedBurn(organizationId: string, currentBurn: number): Promise<{ weightedBurn: number; burnSpike: number }> {
-        // Fetch last 2 periodic snapshots
-        const snapshots = await this.prisma.cfoStateSnapshot.findMany({
-            where: { organizationId },
-            orderBy: { generatedAt: 'desc' },
-            take: 2,
-        });
-
-        const lastMonthBurn = snapshots.length > 0 ? Number(snapshots[0].netBurn) : currentBurn;
-        const twoMonthsAgoBurn = snapshots.length > 1 ? Number(snapshots[1].netBurn) : lastMonthBurn;
-
-        // Formula: weightedBurn = (0.5 * currentMonth) + (0.3 * lastMonth) + (0.2 * twoMonthsAgo)
-        const weightedBurn = (0.5 * currentBurn) + (0.3 * lastMonthBurn) + (0.2 * twoMonthsAgoBurn);
-
-        // Formula: burnSpike = (currentMonth - weightedBurn) / weightedBurn
-        const burnSpike = weightedBurn > 0 ? (currentBurn - weightedBurn) / weightedBurn : 0;
-
-        return { weightedBurn, burnSpike };
-    }
 
     private async determineDashboardMode(
         organizationId: string,
@@ -2500,10 +2622,45 @@ export class CfoStateService {
             dataCoverageDays: number;
             monthlyRevenue: number;
             lastSync: string | null;
+            dataInputMethod?: string;
+            lastFinancialUpdate?: string | null;
         }
     ) {
         const warnings: TrustWarning[] = [];
         let score = accuracyScore;
+
+        // ── Data Input Method Boost ────────────────────────────
+        const inputMethod = context.dataInputMethod || 'SLIDER';
+        if (inputMethod === 'INTEGRATION') {
+            score += 20;
+        } else if (inputMethod === 'MANUAL') {
+            score += 10;
+        }
+        // SLIDER and DEMO get no boost (baseline)
+
+        // ── Data Freshness Penalty ─────────────────────────────
+        if (context.lastFinancialUpdate) {
+            const daysSinceUpdate = Math.floor((Date.now() - new Date(context.lastFinancialUpdate).getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSinceUpdate > 30) {
+                warnings.push({
+                    problem: `Financial data is ${daysSinceUpdate} days old`,
+                    impact: 'Insights may be inaccurate due to outdated data.',
+                    action: 'Update your financials to get accurate analysis.',
+                    severity: 'high',
+                    actionPayload: { type: 'navigate', navigateTo: '/manual-input' }
+                });
+                score -= 20;
+            } else if (daysSinceUpdate > 14) {
+                warnings.push({
+                    problem: `Financial data is ${daysSinceUpdate} days old`,
+                    impact: 'Your data may be getting outdated.',
+                    action: 'Consider updating your financials.',
+                    severity: 'medium',
+                    actionPayload: { type: 'navigate', navigateTo: '/manual-input' }
+                });
+                score -= 10;
+            }
+        }
 
         if (!context.bankSynced) {
             warnings.push({
@@ -2546,9 +2703,13 @@ export class CfoStateService {
             score -= 20;
         }
 
+        const clampedScore = Math.max(0, Math.min(100, score));
+        const label = clampedScore > 70 ? 'HIGH' : clampedScore > 40 ? 'MEDIUM' : 'LOW';
+
         return {
-            score: Math.max(0, score),
-            meaning: score > 85 ? 'High Precision' : score > 60 ? 'Directional' : 'Incomplete',
+            score: clampedScore,
+            label,
+            meaning: clampedScore > 85 ? 'High Precision' : clampedScore > 60 ? 'Directional' : 'Incomplete',
             warnings,
             breakdown: {
                 bankSynced: context.bankSynced,
@@ -2577,5 +2738,314 @@ export class CfoStateService {
         return this.prisma.transaction.count({
             where: { bankAccount: { organizationId }, deletedAt: null }
         });
+    }
+
+    /**
+     * matchTransactionToDecision
+     * v4.1 DOUBLE-LOCK Fuzzy Matching
+     * Primary: Date (+-3d) & Amount (+-5%)
+     * Secondary: Keyword Overlap
+     */
+    private normalizeString(str: string): string {
+        return (str || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, ' ') // Replace symbols with space
+            .replace(/\s+/g, ' ')        // Collapse multiple spaces
+            .trim();
+    }
+
+    private matchTransactionToDecision(tx: any, decision: any): boolean {
+        const txAmount = Number(tx.amount);
+        const decisionAmount = Number(decision.impactBurnMonthly || 0);
+        const finalizedAt = new Date(decision.finalizedAt).getTime();
+        const txDate = new Date(tx.date).getTime();
+
+        // 1. Primary Filter: Amount (+-5%) and Date (+-3 days)
+        const amountDiff = Math.abs(txAmount - decisionAmount) / Math.max(1, decisionAmount);
+        const dateDiffDays = Math.abs(txDate - finalizedAt) / (1000 * 60 * 60 * 24);
+
+        // v4.1 Mastermind Guardrail: Soft Match is enough to prevent Unrecognized alert
+        if (amountDiff <= 0.05 && dateDiffDays <= 3) {
+            return true;
+        }
+
+        // 2. Secondary Filter: Normalized Keyword Match
+        const normTx = this.normalizeString(tx.description);
+        const normDecision = this.normalizeString(decision.decisionType || '');
+        const categoryTokens = normDecision.split(' ');
+        
+        return categoryTokens.some(token => 
+            token.length > 3 && (normTx.includes(token) || token.includes(normTx))
+        );
+    }
+
+    private preprocessTransaction(tx: any): any {
+        const description = (tx.description || '').toUpperCase();
+        
+        const ALIAS_MAP: Record<string, string> = {
+            'AMZN': 'SOFTWARE_SUBSCRIPTION',
+            'AWS': 'SOFTWARE_SUBSCRIPTION',
+            'AMAZON': 'SOFTWARE_SUBSCRIPTION',
+            'GOOGLE': 'MARKETING_ADS',
+            'FACEBK': 'MARKETING_ADS',
+            'META': 'MARKETING_ADS',
+            'ZOMATO': 'MEALS_ENTERTAINMENT',
+            'SWIGGY': 'MEALS_ENTERTAINMENT',
+            'EAT': 'MEALS_ENTERTAINMENT',
+            'FOOD': 'MEALS_ENTERTAINMENT',
+            'RAZORPAY': 'PAYMENT_GATEWAY_FEES',
+            'CASHFREE': 'PAYMENT_GATEWAY_FEES',
+            'STRIPE': 'PAYMENT_GATEWAY_FEES',
+            'PAYTM': 'PAYMENTS',
+            'UBER': 'TRAVEL_CONVEYANCE',
+            'OLA': 'TRAVEL_CONVEYANCE',
+            'LYFT': 'TRAVEL_CONVEYANCE',
+            'V-IDP': 'STATUTORY_LIABILITY',
+            'GST': 'STATUTORY_LIABILITY',
+            'INCOME TAX': 'STATUTORY_LIABILITY',
+        };
+
+        for (const [alias, category] of Object.entries(ALIAS_MAP)) {
+            if (description.includes(alias)) {
+                return { ...tx, category, isPreprocessed: true };
+            }
+        }
+
+        return tx;
+    }
+
+    private async reconcile(organizationId: string): Promise<{ 
+        ghostAlerts: CriticalAlert[], 
+        uncategorizedOutflows: any[],
+        stats: {
+            bankMatched: number,
+            userVerified: number,
+            estimated: number,
+            unrecognized: number,
+            totalCount: number
+        },
+        oldestSuspenseDays: number
+    }> {
+        const profile = await this.prisma.startupProfile.findUnique({ where: { organizationId }});
+        if (!profile) return { ghostAlerts: [], uncategorizedOutflows: [], stats: { bankMatched: 0, userVerified: 0, estimated: 0, unrecognized: 0, totalCount: 0 }, oldestSuspenseDays: 0 };
+
+        const alerts: CriticalAlert[] = [];
+        const uncategorizedOutflows: any[] = [];
+        
+        // Stats buckets (by amount for weighted accuracy, or by count?)
+        // User wants percentages, let's use Count for simplicity or Amount for "Financial Weight". 
+        // User said "87%", usually implies weight. Let's use Amount.
+        let bankMatchedAmt = 0;
+        let userVerifiedAmt = 0;
+        let estimatedAmt = 0;
+        let unrecognizedAmt = 0;
+
+        const resolvedDecisions = await this.prisma.cfoDecision.findMany({
+            where: { 
+                startupProfileId: profile.id, 
+                status: 'RESOLVED',
+                finalizedAt: { lte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }
+            }
+        });
+
+        const rawTxs = await this.prisma.transaction.findMany({
+            where: { 
+                bankAccount: { organizationId }, 
+                date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+                deletedAt: null
+            },
+            orderBy: { date: 'desc' }
+        });
+
+        const recentTxs = rawTxs.map(tx => this.preprocessTransaction(tx));
+        const totalAmt = recentTxs.filter(t => t.type === 'EXPENSE').reduce((sum, t) => sum + Number(t.amount), 0);
+        const matchedTxIds = new Set<string>();
+
+        // 1. Count User Verified (from Zoho or manual edits)
+        recentTxs.filter(tx => tx.type === 'EXPENSE' && tx.source !== 'BANKING_API_SYNC').forEach(tx => {
+            userVerifiedAmt += Number(tx.amount);
+            matchedTxIds.add(tx.id);
+        });
+
+        for (const decision of resolvedDecisions) {
+            const hasOverride = await this.prisma.behavioralAudit.findFirst({
+                where: { startupProfileId: profile.id, decisionId: decision.id, actionType: 'OVERRIDDEN' }
+            });
+            if (hasOverride) continue;
+
+            const leakingTxs = recentTxs.filter(tx => 
+                tx.type === 'EXPENSE' && 
+                !matchedTxIds.has(tx.id) &&
+                tx.date > decision.finalizedAt! &&
+                this.matchTransactionToDecision(tx, decision)
+            );
+
+            if (leakingTxs.length > 0) {
+                leakingTxs.forEach(tx => {
+                    matchedTxIds.add(tx.id);
+                    bankMatchedAmt += Number(tx.amount);
+                });
+                const totalAmount = leakingTxs.reduce((sum, tx) => sum + Number(tx.amount), 0);
+                
+                alerts.push({
+                    id: `unrecognized_${decision.id}`,
+                    severity: 'medium',
+                    title: 'Unrecognized Transaction',
+                    description: `We found ₹${totalAmount.toLocaleString()} in bank activity that isn't reflected in your recent Zoho resolutions. This may reduce the accuracy of your runway insights.`,
+                    impact: 'Data Accuracy Risk',
+                    isBlocking: false,
+                    actionPayload: { type: 'navigate', navigateTo: `/dashboard/reconcile/${decision.id}` }
+                });
+            }
+        }
+
+        const rawSuspenseTxs = recentTxs.filter(tx => 
+            tx.type === 'EXPENSE' && 
+            !matchedTxIds.has(tx.id)
+        );
+
+        let oldestSuspenseDate = new Date();
+
+        for (const tx of rawSuspenseTxs) {
+            // SAFE LEARNING LAYER (v2.0)
+            const historicalMatches = await this.prisma.transaction.findMany({
+                where: {
+                    description: { contains: tx.description },
+                    category: { notIn: ['General'] },
+                    bankAccount: { organizationId: organizationId }
+                },
+                select: { category: true }
+            });
+
+            const matchCount = historicalMatches.length;
+            const mostCommonCategory = historicalMatches.length > 0 ? historicalMatches[0].category : null;
+
+            if (matchCount >= 5) {
+                // High Confidence: Auto-apply
+                await this.prisma.transaction.update({
+                    where: { id: tx.id },
+                    data: { category: mostCommonCategory ?? 'General', metadata: { ...tx.metadata, autoClassified: true, confidence: 'high' } }
+                });
+                estimatedAmt += Number(tx.amount);
+                matchedTxIds.add(tx.id);
+                continue;
+            } else if (matchCount >= 1) {
+                // Low/Medium Confidence: Suggest only
+                uncategorizedOutflows.push({
+                    id: tx.id,
+                    amount: Number(tx.amount),
+                    description: tx.description,
+                    date: tx.date.toISOString(),
+                    suggestedCategory: mostCommonCategory,
+                    confidence: matchCount >= 3 ? 'medium' : 'low',
+                    reason: `Suggested based on ${matchCount} past pattern(s)`
+                });
+            } else {
+                // Zero Confidence: Raw Suspense
+                uncategorizedOutflows.push({
+                    id: tx.id,
+                    amount: Number(tx.amount),
+                    description: tx.description,
+                    date: tx.date.toISOString(),
+                    suggestedCategory: 'Operating Expense',
+                    confidence: 'none'
+                });
+            }
+
+            unrecognizedAmt += Number(tx.amount);
+            if (tx.date < oldestSuspenseDate) oldestSuspenseDate = tx.date;
+        }
+
+        const oldestSuspenseDays = Math.floor((Date.now() - oldestSuspenseDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        return { 
+            ghostAlerts: alerts, 
+            uncategorizedOutflows,
+            stats: {
+                bankMatched: totalAmt > 0 ? (bankMatchedAmt / totalAmt) * 100 : 100,
+                userVerified: totalAmt > 0 ? (userVerifiedAmt / totalAmt) * 100 : 0,
+                estimated: totalAmt > 0 ? (estimatedAmt / totalAmt) * 100 : 0,
+                unrecognized: totalAmt > 0 ? (unrecognizedAmt / totalAmt) * 100 : 0,
+                totalCount: recentTxs.length
+            },
+            oldestSuspenseDays
+        };
+    }
+
+    /**
+     * markGhostAsValid
+     * v4.0 Manual Override for residual payments
+     */
+    async markGhostAsValid(userId: string, decisionId: string, comment: string) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        const profile = await this.prisma.startupProfile.findFirst({ where: { userId } });
+        if (!profile) throw new Error('Profile not found');
+
+        this.logger.log(`Founder Override: Marking ghost ${decisionId} as valid. Reason: ${comment}`);
+
+        await this.prisma.behavioralAudit.create({
+            data: {
+                startupProfileId: profile.id,
+                decisionId,
+                actionType: 'OVERRIDDEN',
+                overrideReason: comment,
+                timestamp: new Date()
+            }
+        });
+
+        // Clear cache to reflect status change
+        this.cache.delete(profile.organizationId);
+
+        return { success: true };
+    }
+
+    /**
+     * bulkResolve
+     * v4.1 Mastermind Shortcut: Resolve all unexplained leaks
+     */
+    async bulkResolve(organizationId: string) {
+        const profile = await this.prisma.startupProfile.findUnique({ where: { organizationId }});
+        if (!profile) return;
+
+        this.logger.log(`Bulk Resolving Suspense Queue for org ${organizationId}`);
+
+        // 1. Identify transactions in suspense
+        const recentTxs = await this.prisma.transaction.findMany({
+            where: { 
+                bankAccount: { organizationId }, 
+                date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+                category: { in: ['General'] },
+                source: 'BANKING_API_SYNC',
+                deletedAt: null
+            }
+        });
+
+        if (recentTxs.length === 0) return { count: 0 };
+
+        // 2. Mark as Operational Burn and Verified
+        await this.prisma.transaction.updateMany({
+            where: { id: { in: recentTxs.map(t => t.id) } },
+            data: { 
+                category: 'OPERATIONAL_BURN'
+            }
+        });
+
+        // 3. Clear GHOST_DETECTED alerts in behavioral audit
+        await this.prisma.behavioralAudit.updateMany({
+            where: { 
+                startupProfileId: profile.id,
+                actionType: 'GHOST_DETECTED',
+                timestamp: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Clear recent ones
+            },
+            data: { 
+                actionType: 'RESOLVED_BY_FOUNDER'
+            }
+        });
+
+        // 4. Recalculate and boost reputation score (+10 bonus for transparency)
+        await this.behaviorService.boostScore(profile.id, 10, 'BULK_RECONCILE');
+        
+        this.cache.delete(organizationId);
+        return { count: recentTxs.length };
     }
 }

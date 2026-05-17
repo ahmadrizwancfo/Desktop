@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useShallow } from 'zustand/shallow';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from './auth-store';
@@ -91,6 +92,20 @@ export interface Decision {
         score: number;
         label: 'Low' | 'Moderate' | 'High';
     };
+    shownAt?: string;
+    lastActionAt?: string;
+    inactionFeeAccrued?: number;
+
+    // v4.0 Execution Engine
+    impactExplanation?: string; // "If done: Runway +0.4m"
+    consequenceExplanation?: string; // "If ignored: Runway -0.8m in 10 days"
+    statusV4?: 'pending' | 'in_progress' | 'done' | 'ignored';
+
+    // v5.0 Strategic Layer
+    consequenceBasis?: string;
+    secondOrderEffects?: string[];
+    oneThingReasoning?: string;
+    investorNarrative?: string;
 }
 
 export interface DecisionAlert {
@@ -107,6 +122,8 @@ export interface DecisionOpportunity {
     message: string;
     impact: string;
     actionPayload?: ActionPayload;
+    // v6.0 Investor Layer
+    investorNarrative?: string; // "Optimization of burn to extend runway"
 }
 
 export interface DecisionOutput {
@@ -121,10 +138,19 @@ export interface DecisionOutput {
         fix: Decision | null;
         support: Decision | null;
         watch: any;
+        oneThing: Decision | null; // v4.0
     };
     currentRunway: number;
     decisionMemory?: any;
     ownershipNote?: string;
+    completionRate?: number; // v4.0 (0-100)
+
+    // v5.0 Relief Layer
+    stabilizationMessage?: string;
+
+    // v6.0 Investor Layer
+    investorTrustScore?: number;
+    weeklyInvestorUpdate?: string;
 }
 
 export interface ActionPayload {
@@ -179,6 +205,12 @@ export interface TrustLayer {
     dataSource: string;
     summary: string;
     confidenceExplanation?: string;
+    confidenceLevel?: 'low' | 'medium' | 'high';
+    confidenceMetadata?: {
+        runway?: 'low' | 'medium' | 'high';
+        burn?: 'low' | 'medium' | 'high';
+        revenue?: 'low' | 'medium' | 'high';
+    };
 }
 
 export interface CategoryImpact {
@@ -274,6 +306,40 @@ export interface NegativeTrend {
     message: string;
 }
 
+export type BehavioralRiskProfile = 'PROACTIVE' | 'REACTIONARY' | 'CHAOTIC' | 'NEW_USER';
+
+export interface BehavioralMetrics {
+    behaviorScore: number;
+    insightAccuracy: number;
+    activePenalty: number;
+    inactionPenaltiesTotal: number;
+    riskProfile: BehavioralRiskProfile;
+    patterns: any[];
+    probationDaysLeft?: number;
+    isProbationary?: boolean;
+    complianceScore?: number;
+    escalationLevel?: number;
+    teamStability?: {
+        headcount: number;
+        turnoverRate: number;
+        velocityScore: number;
+    };
+    featureVelocity?: number;
+    velocityPeriod?: number;
+    runwayDelta?: number;
+    isWartime?: boolean;
+}
+
+export interface UncategorizedOutflow {
+    id: string;
+    amount: number;
+    description: string;
+    date: string;
+    suggestedCategory?: string;
+    confidence?: string;
+    reason?: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // THE CFO STATE v2
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -296,6 +362,7 @@ export interface TrustWarning {
 export interface CFOState {
     companyStatus: CompanyStatus;
     dashboardMode: 'STABLE' | 'WARNING' | 'CRITICAL';
+    isFirstTimeUser?: boolean;
     modeExplanation?: {
         title: string;
         primaryDriver: string;
@@ -343,11 +410,24 @@ export interface CFOState {
     // Autonomous CFO
     autonomousRecommendations?: any;
     activeMandates?: any[];
-    behavioralAudit?: any;
+    behavioralAudit?: BehavioralMetrics;
     inertiaMetrics?: any;
+    suspenseAlert?: {
+        amount: number;
+        count: number;
+        isCritical: boolean;
+        message: string;
+    };
     
     trustIntelligence?: {
         cfoAccuracyScore: number;
+        accuracyBreakdown: {
+            bankMatched: number;
+            userVerified: number;
+            estimated: number;
+        };
+        confidenceLevel: 'high' | 'medium' | 'low';
+        confidenceMetadata: Record<string, 'high' | 'medium' | 'low'>;
         totalEvaluatedActions: number;
         isRecalibrating: boolean;
         cautionMultiplier: number;
@@ -370,6 +450,7 @@ export interface CFOState {
 
     dynamicConfidence: {
         score: number;
+        label: string;
         meaning: string;
         warnings: TrustWarning[];
         breakdown: {
@@ -399,6 +480,7 @@ export interface CFOState {
         revenueTrend: 'growing' | 'declining' | 'stable' | 'unknown';
         prevMonthlyRevenue: number;
         prevNetBurn: number;
+        avgBurn30d?: number;
     };
     insights: CfoBrainInsight[];
     tone: 'urgent' | 'cautious' | 'strategic';
@@ -406,34 +488,93 @@ export interface CFOState {
     noData: boolean;
     isDemo: boolean;
     isInfiniteRunway: boolean;
+    uncategorizedOutflows: UncategorizedOutflow[];
+
+    // v3.0 Retention Engine
+    predictiveSignals?: {
+        runwayBreachDate?: string;
+        runwayBreachDays?: number;
+        alertMessage: string;
+        confidence: 'high' | 'medium' | 'low';
+    };
+    dailyBrief?: {
+        headline: string;
+        narrative: string;
+        signal: string;
+        attention: string;
+        action: string;
+        momentum: string;
+    };
+    weeklyBrief?: {
+        weekStart: string;
+        metricsJson: {
+            improved: string;
+            worsened: string;
+            risk: string;
+            priority: string;
+            cashChange: number;
+        };
+    };
+
+    // v4.0 Execution Engine
+    founderPersona?: 'disciplined' | 'reactive' | 'chaotic' | 'scaling';
 }
 
 // ── Zustand Store ─────────────────────────────────────────────────────────────
 
-interface CfoStateStore {
+export interface CfoStateStore {
     state: CFOState | null;
+    resolutionPath: 'mna' | 'service' | 'shutdown' | 'bridge' | null;
+    isTaxBufferUnlocked: boolean;
+    isInvestorMode: boolean;
+    isSimpleMode: boolean;
+    victoryEvent: { amount: number; points: number; title: string; type: 'MILESTONE' | 'MICRO' } | null;
     setStateData: (data: CFOState) => void;
+    setResolutionPath: (path: 'mna' | 'service' | 'shutdown' | 'bridge' | null) => void;
+    toggleTaxBuffer: () => void;
+    setInvestorMode: (val: boolean) => void;
+    setSimpleMode: (val: boolean) => void;
+    triggerVictory: (amount: number, points: number, title: string, type?: 'MILESTONE' | 'MICRO') => void;
+    clearVictory: () => void;
     clear: () => void;
 }
 
 export const useCfoStateStore = create<CfoStateStore>((set) => ({
     state: null,
+    resolutionPath: null,
+    isTaxBufferUnlocked: false,
+    isInvestorMode: false,
+    isSimpleMode: false,
+    victoryEvent: null,
     setStateData: (data) => set({ state: data }),
-    clear: () => set({ state: null }),
+    setInvestorMode: (val) => set({ isInvestorMode: val }),
+    setSimpleMode: (val) => set({ isSimpleMode: val }),
+    setResolutionPath: (path) => set({ resolutionPath: path }),
+    toggleTaxBuffer: () => set((s) => ({ isTaxBufferUnlocked: !s.isTaxBufferUnlocked })),
+    triggerVictory: (amount, points, title, type = 'MICRO') => {
+        set({ victoryEvent: { amount, points, title, type } });
+        setTimeout(() => set({ victoryEvent: null }), type === 'MILESTONE' ? 8000 : 4000);
+    },
+    clearVictory: () => set({ victoryEvent: null }),
+    clear: () => set({ state: null, resolutionPath: null, isTaxBufferUnlocked: false, isSimpleMode: false, victoryEvent: null }),
 }));
 
 // ── React Query Hook ──────────────────────────────────────────────────────────
 
 export function useCFOState() {
     const user = useAuthStore((s) => s.user);
-    const setStateData = useCfoStateStore((s) => s.setStateData);
+    const setStateData = useCfoStateStore(s => s.setStateData);
+    const triggerVictory = useCfoStateStore(s => s.triggerVictory);
 
     return useQuery<CFOState>({
         queryKey: ['cfo-state', user?.organizationId],
         queryFn: async () => {
             const res = await apiClient.get('/cfo-engine/state');
             const data = res.data as CFOState;
+            
+            // Sync with zustand store
             setStateData(data);
+            
             return data;
         },
         enabled: !!user?.organizationId,
@@ -450,6 +591,10 @@ export async function trackDecisionClick(decisionId: string, optionChosen: strin
 
 export async function trackDecisionActed(decisionId: string, currentRunway: number): Promise<void> {
     await apiClient.post('/cfo-engine/state/decision-acted', { decisionId, currentRunway });
+}
+
+export async function updateDecisionStatus(decisionId: string, status: 'pending' | 'in_progress' | 'done' | 'ignored'): Promise<void> {
+    await apiClient.post(`/cfo-engine/state/decision-update-status/${decisionId}`, { status });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -473,6 +618,22 @@ export function formatCurrency(val: number): string {
     return `₹${Math.round(val)}`;
 }
 
+export function formatRunway(months: number): string {
+    if (months > 36 || months <= 0) return 'Sustainable';
+    if (months < 3) return `${Math.round(months * 30.4)} DAYS`;
+    return `${months.toFixed(1)} months`;
+}
+
+export function isCrisisMode(state: CFOState): boolean {
+    return state.summary.runwayMonths < 3 && state.summary.runwayMonths > 0;
+}
+
+export function isTerminalState(state: CFOState): boolean {
+    const isBurning = state.summary.netBurn > 0;
+    const runwayDays = state.summary.runwayMonths * 30.4;
+    return isBurning && runwayDays < 45;
+}
+
 export function getTimeSince(dateStr: string | null): string {
     if (!dateStr) return 'never';
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -482,3 +643,62 @@ export function getTimeSince(dateStr: string | null): string {
     if (hours < 24) return `${hours} hours ago`;
     return `${Math.floor(hours / 24)} days ago`;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ATOMIC SELECTORS — Subscribe to individual slices to prevent re-render hell
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Cash in bank (number) */
+export const useCashInBank = () => useCfoStateStore(s => s.state?.summary?.cashInBank ?? 0);
+
+/** Runway in months (number) */
+export const useRunway = () => useCfoStateStore(s => s.state?.summary?.runwayMonths ?? 0);
+
+/** Is runway infinite (boolean) */
+export const useIsInfiniteRunway = () => useCfoStateStore(s => s.state?.isInfiniteRunway ?? false);
+
+/** Net burn rate (number) */
+export const useBurnRate = () => useCfoStateStore(s => s.state?.summary?.netBurn ?? 0);
+
+/** Monthly expenses (number) */
+export const useMonthlyExpenses = () => useCfoStateStore(s => s.state?.summary?.monthlyExpenses ?? 0);
+
+/** Monthly revenue (number) */
+export const useMonthlyRevenue = () => useCfoStateStore(s => s.state?.summary?.monthlyRevenue ?? 0);
+
+/** Company status: stable | at_risk | critical */
+export const useCompanyStatus = () => useCfoStateStore(s => s.state?.companyStatus ?? 'stable');
+
+/** Dashboard mode: STABLE | WARNING | CRITICAL */
+export const useDashboardMode = () => useCfoStateStore(s => s.state?.dashboardMode ?? 'STABLE');
+
+/** Dynamic confidence score (0-100) */
+export const useConfidenceScore = () => useCfoStateStore(s => s.state?.dynamicConfidence?.score ?? 0);
+
+/** Data quality indicator */
+export const useDataQuality = () => useCfoStateStore(useShallow(s => ({
+    quality: s.state?.trust?.dataQuality ?? 'low',
+    indicator: s.state?.trust?.dataQualityIndicator ?? 'red',
+    lastSynced: s.state?.trust?.lastSyncedAt ?? null,
+    transactionCount: s.state?.trust?.transactionCount ?? 0,
+    dataSource: s.state?.trust?.dataSource ?? 'none',
+    confidenceScore: s.state?.dynamicConfidence?.score ?? 0,
+})));
+
+/** Primary decision (oneThing) */
+export const usePrimaryDecision = () => useCfoStateStore(s => s.state?.decisionEngine?.dailyFocus?.oneThing ?? null);
+
+/** Category breakdown */
+export const useCategoryBreakdown = () => useCfoStateStore(s => s.state?.categoryBreakdown ?? []);
+
+/** Death clock */
+export const useDeathClock = () => useCfoStateStore(s => s.state?.deathClock ?? null);
+
+/** Behavioral audit */
+export const useBehavioralAudit = () => useCfoStateStore(s => s.state?.behavioralAudit ?? null);
+
+/** Critical alerts */
+export const useCriticalAlerts = () => useCfoStateStore(s => s.state?.criticalAlerts ?? []);
+
+/** Is demo mode */
+export const useIsDemo = () => useCfoStateStore(s => s.state?.isDemo ?? false);

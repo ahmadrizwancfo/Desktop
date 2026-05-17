@@ -425,7 +425,7 @@ export default function OnboardingPage() {
 
             // Trigger CFO engine in background
             apiClient.post('/cfo-engine/run').catch(() => {});
-            router.push('/integrations');
+            router.push('/get-started');
         } catch (err: any) {
             setError(err?.response?.data?.message || 'Something went wrong. Please try again.');
             setIsSubmitting(false);

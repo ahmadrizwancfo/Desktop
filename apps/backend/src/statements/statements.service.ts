@@ -31,7 +31,7 @@ export class StatementsService {
 
         try {
             // Step 1: Parse document
-            const parsedDoc = await this.universalParser.parse(file.buffer, file.originalname);
+            const parsedDoc = await this.universalParser.parse(file.buffer, file.originalname, organizationId);
             this.logger.log(`Successfully parsed ${extension} file`);
 
             // Step 2: AI Analysis to extract financial metrics

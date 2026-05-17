@@ -67,7 +67,28 @@ export default function IntegrationsPage() {
 
     const handleMockConnect = async (provider: string) => {
         if (provider === 'Zoho Books') {
-            window.location.href = 'http://localhost:3001/api/integrations/zoho/auth';
+            try {
+                const res = await apiClient.get('/integrations/zoho/auth');
+                if (res.data?.url) {
+                    window.location.href = res.data.url;
+                }
+            } catch (err) {
+                console.error('Failed to get Zoho auth URL', err);
+                alert('Connection failed. Please try again.');
+            }
+            return;
+        }
+
+        if (provider === 'QuickBooks') {
+            try {
+                const res = await apiClient.get('/integrations/quickbooks/auth');
+                if (res.data?.url) {
+                    window.location.href = res.data.url;
+                }
+            } catch (err) {
+                console.error('Failed to get QuickBooks auth URL', err);
+                alert('Connection failed. Please try again.');
+            }
             return;
         }
 
@@ -218,11 +239,11 @@ export default function IntegrationsPage() {
                             <div className="space-y-6">
                                 <h2 className="text-lg font-black text-white text-center">Connect your financial sources</h2>
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {/* Bank */}
                                     <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all group flex flex-col h-full">
-                                        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 shrink-0">
-                                            <Building2 className="w-6 h-6 text-primary" />
+                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-5 shrink-0">
+                                            <Building2 className="w-6 h-6 text-indigo-400" />
                                         </div>
                                         <h3 className="text-lg font-black text-white mb-2">Bank Account</h3>
                                         <p className="text-sm font-medium text-slate-400 mb-6 flex-1">Track real cash flow and runway</p>
@@ -236,8 +257,8 @@ export default function IntegrationsPage() {
 
                                     {/* Razorpay */}
                                     <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all group flex flex-col h-full">
-                                        <div className="w-12 h-12 rounded-xl bg-[#3395FF]/10 flex items-center justify-center mb-5 shrink-0">
-                                            <BarChart3 className="w-6 h-6 text-[#3395FF]" />
+                                        <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center mb-5 shrink-0 overflow-hidden">
+                                            <img src="https://www.vectorlogo.zone/logos/razorpay/razorpay-icon.svg" alt="Razorpay" className="w-8 h-8 object-contain" />
                                         </div>
                                         <h3 className="text-lg font-black text-white mb-2">Razorpay</h3>
                                         <p className="text-sm font-medium text-slate-400 mb-6 flex-1">Automatically track revenue</p>
@@ -251,8 +272,8 @@ export default function IntegrationsPage() {
 
                                     {/* Zoho Books */}
                                     <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all group flex flex-col h-full">
-                                        <div className="w-12 h-12 rounded-xl bg-[#F44336]/10 flex items-center justify-center mb-5 shrink-0">
-                                            <Calculator className="w-6 h-6 text-[#F44336]" />
+                                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center mb-5 shrink-0 overflow-hidden p-1.5">
+                                            <img src="https://www.vectorlogo.zone/logos/zoho/zoho-icon.svg" alt="Zoho" className="w-full h-full object-contain" />
                                         </div>
                                         <h3 className="text-lg font-black text-white mb-2">Zoho Books</h3>
                                         <p className="text-sm font-medium text-slate-400 mb-6 flex-1">Import your financial history</p>
@@ -261,6 +282,42 @@ export default function IntegrationsPage() {
                                             className="w-full py-3.5 rounded-xl bg-white/10 text-white font-black text-[11px] uppercase tracking-widest hover:bg-white/15 transition-all"
                                         >
                                             Connect Zoho
+                                        </button>
+                                    </div>
+
+                                    {/* QuickBooks - Coming Soon */}
+                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 transition-all group flex flex-col h-full opacity-60">
+                                        <div className="w-12 h-12 rounded-xl bg-transparent flex items-center justify-center mb-5 shrink-0 overflow-hidden">
+                                            <img src="https://www.vectorlogo.zone/logos/intuit_quickbooks/intuit_quickbooks-icon.svg" alt="QuickBooks" className="w-9 h-9 object-contain grayscale" />
+                                        </div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-lg font-black text-white">QuickBooks</h3>
+                                            <span className="px-2 py-0.5 rounded-md bg-white/5 text-[9px] font-black text-slate-500 uppercase">Soon</span>
+                                        </div>
+                                        <p className="text-sm font-medium text-slate-500 mb-6 flex-1">Enterprise grade accounting sync</p>
+                                        <button 
+                                            disabled
+                                            className="w-full py-3.5 rounded-xl bg-white/5 text-slate-600 font-black text-[11px] uppercase tracking-widest cursor-not-allowed"
+                                        >
+                                            Locked
+                                        </button>
+                                    </div>
+
+                                    {/* Stripe - Coming Soon */}
+                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 transition-all group flex flex-col h-full opacity-60">
+                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-5 shrink-0 overflow-hidden">
+                                            <img src="https://api.iconify.design/logos:stripe-icon.svg" alt="Stripe" className="w-7 h-7 object-contain grayscale" />
+                                        </div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="text-lg font-black text-white">Stripe</h3>
+                                            <span className="px-2 py-0.5 rounded-md bg-white/5 text-[9px] font-black text-slate-500 uppercase">Soon</span>
+                                        </div>
+                                        <p className="text-sm font-medium text-slate-500 mb-6 flex-1">Global revenue & subscriptions</p>
+                                        <button 
+                                            disabled
+                                            className="w-full py-3.5 rounded-xl bg-white/5 text-slate-600 font-black text-[11px] uppercase tracking-widest cursor-not-allowed"
+                                        >
+                                            Locked
                                         </button>
                                     </div>
                                 </div>

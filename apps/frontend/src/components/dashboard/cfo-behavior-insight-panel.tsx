@@ -18,6 +18,8 @@ interface BehavioralAudit {
     insights: string[];
     warnings: string[];
     recommendations: string[];
+    activePenalty?: number;
+    inactionPenaltiesTotal?: number;
 }
 
 interface CfoBehaviorInsightPanelProps {

@@ -62,16 +62,25 @@ export function FileUpload({ onSuccess, className }: FileUploadProps) {
             setProgress(0);
         }
     };
-
     const getFileIcon = (filename: string) => {
         const ext = filename.split('.').pop()?.toLowerCase();
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff', 'tif', 'bmp'].includes(ext || '')) {
-            return <Image className="w-5 h-5 text-violet-400" />;
-        }
         if (['xlsx', 'xls', 'csv'].includes(ext || '')) {
             return <FileSpreadsheet className="w-5 h-5 text-emerald-400" />;
         }
-        return <FileText className="w-5 h-5 text-primary" />;
+        return <FileSpreadsheet className="w-5 h-5 text-slate-400" />;
+    };
+
+    const downloadTemplate = () => {
+        const headers = 'Date,Description,Amount,Type\n2026-04-01,Cloud Hosting,45000,EXPENSE\n2026-04-02,Client Payment,120000,INCOME';
+        const blob = new Blob([headers], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', 'founder_cfo_template.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     };
 
     return (
@@ -86,22 +95,26 @@ export function FileUpload({ onSuccess, className }: FileUploadProps) {
                         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                             <Upload className="w-8 h-8 text-primary" />
                         </div>
-                        <h4 className="text-lg font-bold text-white">Upload Financial Data</h4>
+                        <h4 className="text-lg font-bold text-white">Upload Bank Data</h4>
                         <p className="text-sm text-slate-400 mt-2 max-w-[280px]">
-                            Balance Sheet, P&L, Bank Statement, or any financial document
+                            Map your bank export to our 4-column format (Date, Description, Amount, Type)
                         </p>
                         <div className="flex flex-wrap gap-2 mt-4 justify-center">
-                            <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white/5 rounded-full">PDF</span>
-                            <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white/5 rounded-full">Excel</span>
-                            <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white/5 rounded-full">CSV</span>
-                            <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white/5 rounded-full">Scanned Images</span>
+                            <span className="px-2 py-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 rounded-full">CSV REQUIRED</span>
+                            <span className="px-2 py-1 text-[10px] font-bold text-slate-500 bg-white/5 rounded-full">Excel (.xlsx)</span>
                         </div>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); downloadTemplate(); }}
+                            className="mt-6 px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all border border-white/10"
+                        >
+                            Download Template
+                        </button>
                         <input
                             type="file"
                             ref={fileInputRef}
                             onChange={handleFileChange}
                             className="hidden"
-                            accept=".csv,.xlsx,.xls,.pdf,.xml,.jpg,.jpeg,.png,.gif,.webp,.tiff,.tif,.bmp"
+                            accept=".csv,.xlsx,.xls"
                         />
                     </div>
                 </div>

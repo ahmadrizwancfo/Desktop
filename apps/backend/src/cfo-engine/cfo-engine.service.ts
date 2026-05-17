@@ -97,11 +97,24 @@ export class CfoEngineService {
             results.map((r) => this.upsertDecision(profileId, r)),
         );
 
+        // AUTO-RESOLVE: mark any OPEN/ACKNOWLEDGED decisions NOT in current results as RESOLVED
+        const currentTypes = results.map(r => r.decisionType);
+        await this.prisma.cfoDecision.updateMany({
+            where: {
+                startupProfileId: profileId,
+                status: { in: ['OPEN', 'ACKNOWLEDGED'] },
+                decisionType: { notIn: currentTypes }
+            },
+            data: { 
+                status: 'RESOLVED',
+            }
+        });
+
         this.logger.log(
-            `CFO engine: ${saved.length} decisions upserted for profile ${profileId}`,
+            `CFO engine: ${saved.length} decisions upserted, and outdated mandates auto-resolved for profile ${profileId}`,
         );
 
-        // Fire HIGH/CRITICAL alerts (non-blocking, 24h dedup + escalation)
+        // Fire HIGH/CRITICAL alerts (non-blocking)
         if (userId) {
             this.alertService.checkAndAlert(saved, userId).catch((err) =>
                 this.logger.error(`Alert dispatch failed: ${err.message}`),

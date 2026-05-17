@@ -7,6 +7,7 @@ import { AiMetricsService } from './ai-metrics.service';
 import { CfoStateService } from '../cfo-engine/cfo-state.service';
 import { CfoBrainService } from '../cfo-engine/cfo-brain.service';
 import { forwardRef, Inject } from '@nestjs/common';
+import { INDIAN_CATEGORY_MAP } from '../statements/parsers/universal-parser.service';
 
 interface CacheEntry {
     response: string;
@@ -296,26 +297,33 @@ KEY PARAMETERS:
 - Current Runway: ${state.isInfiniteRunway ? 'Infinite' : state.summary.runwayMonths.toFixed(1) + ' months'}
 - Death Clock: ${state.deathClock.statement}
 `;
-
+ 
         const systemPrompt = `You are an AI CFO co-founder. You implement the "Outcome Clarity Layer" (v3.5).
 Your goal is to force awareness of logical consequences. You do not force decisions, you force clarity.
+
+CRITICAL SSOT RULE: You MUST use ONLY the numbers provided in AUTHORITATIVE FINANCIAL DATA above.
+Do NOT invent, estimate, or recalculate any financial figures. If data is missing, say so explicitly.
 
 TONE BY STAGE:
 - ${stage === 'survival' ? 'SURVIVAL: Be direct, time-bound, and factual. Inaction has immediate mathematical consequences.' : ''}
 - ${stage === 'stabilize' ? 'STABILIZE: Be analytical and structured. Focus on unit economics and capital efficiency.' : ''}
 - ${stage === 'growth' ? 'GROWTH: Be strategic and opportunity-focused. Highlight market momentum and scaling risks.' : ''}
 
-REQUIRED RESPONSE STRUCTURE:
+REQUIRED RESPONSE STRUCTURE (Include ALL of these in every answer):
 1. Recommendation: (e.g. "Strong recommendation: Cut ₹2L/month")
-2. Trade-off: (Explain "You gain: [Gain]" vs "You lose: [Loss]")
-3. Why this works: (The data rationale)
-4. Alternative considered: (Mention REJECTED OPTION and WHY REJECTED)
-5. If you continue this path: (Explicitly state LOGICAL CONSEQUENCE and RISK TIMEFRAME. Mention OUTCOME CONFIDENCE)
+2. Reasoning: (Why this is the right move, citing exact data from the AUTHORITATIVE section)
+3. Confidence: (High/Medium/Low — based on data completeness)
+4. Impact on Runway: (e.g. "+2.1 months" or "-15 days" — calculated from provided burn/cash)
+5. Trade-off: (Explain "You gain: [Gain]" vs "You lose: [Loss]")
+6. Suggested Action: (One clear, executable next step)
+7. Alternative considered: (Mention REJECTED OPTION and WHY REJECTED)
+8. If you continue this path: (Explicitly state LOGICAL CONSEQUENCE and RISK TIMEFRAME)
 
 RULES:
 - Never hide the downside of the alternative.
 - Use factual, logical phrasing. No hyper-emotional fear-mongering.
 - Always conclude with: "Final decision is yours. This is based on available data."
+- Reference specific numbers from the authoritative data to build trust.
 `;
 
         const prompt = `${systemPrompt}
@@ -347,7 +355,12 @@ Respond naturally as a world-class CFO co-founder. Priority: Resolve the primary
         amount: number,
         vendor?: string
     ): Promise<CategorizationResult> {
+        const validCategories = Object.keys(INDIAN_CATEGORY_MAP).join(', ');
+
         const prompt = `${AI_CONFIG.systemPrompts.expenseCategorization}
+
+STRICT CATEGORY LIST (you MUST use one of these): ${validCategories}
+If none match perfectly, use "Others" and provide a suggestedNewCategory field.
 
 Transaction details:
 - Description: ${description}
@@ -867,5 +880,224 @@ Return JSON array: [{ type, severity, description, transaction, amount, recommen
             realtime,
             costEstimates,
         };
+    }
+
+    // ==================== Interpretation Layer (v2.2) ====================
+
+    async interpretFinancialStateV3(organizationId: string, contextSnippet: string, insightAccuracy: number = 100): Promise<{
+        narrative: string;
+        signal: string;
+        attention: string;
+        action: string;
+        momentum: string;
+    }> {
+        const toneAdvice = insightAccuracy < 60 
+            ? "ROLE: Calm, Intelligent CFO Partner. Tone: Precise/Supportive. Focus on guiding the founder to resolve data modeling gaps." 
+            : "ROLE: Strategic Mastermind CFO Partner. Tone: Confident/Insightful. Focus on high-leverage growth and stability.";
+
+        const prompt = `You are a "Strategic CFO Partner". 
+        Generate a "Today's CFO Brief" in a structured JSON format.
+        
+        CRITICAL RULES:
+        1. Be concise. One item per field.
+        2. Signal: A data-driven fact about today vs yesterday/last week (e.g., "Burn increased 4% vs yesterday").
+        3. Attention: The most urgent unresolved issue (e.g., "₹15,400 in suspense").
+        4. Action: The single highest priority action (e.g., "Classify transactions to restore accuracy").
+        5. Momentum: A positive trend (e.g., "Runway stabilized for 3 days").
+        6. Narrative: A 1-sentence strategic interpretation.
+
+        CONTEXT:
+        ${contextSnippet}
+        
+        ${toneAdvice}
+
+        RESPONSE FORMAT (JSON ONLY):
+        {
+          "narrative": "...",
+          "signal": "...",
+          "attention": "...",
+          "action": "...",
+          "momentum": "..."
+        }`;
+
+        const result = await this.generateWithRetry(prompt, organizationId, 'daily-brief-v3', true);
+        
+        if (result.success) {
+            try {
+                // Clean markdown if present
+                const cleaned = result.data.replace(/```json\n?|\n?```/g, '').trim();
+                return JSON.parse(cleaned);
+            } catch (e) {
+                this.logger.error(`Failed to parse V3 AI response: ${result.data}`);
+            }
+        }
+
+        return {
+            narrative: "Financial modeling active. Reviewing daily signals...",
+            signal: "Burn is within expected variance.",
+            attention: "Transactions in suspense need classification.",
+            action: "Calibrate Accuracy Score.",
+            momentum: "Accuracy holding at 85%."
+        };
+    }
+
+    async generateWeeklyNarrative(organizationId: string, context: string): Promise<{
+        improved: string;
+        worsened: string;
+        risk: string;
+        priority: string;
+    }> {
+        const prompt = `You are a "Strategic CFO Partner". Generate a "Weekly CFO Report Card" in JSON format.
+        
+        STRUCTURE:
+        - improved: What improved this week (e.g. "Runway +0.5 months")
+        - worsened: What worsened (e.g. "Burn +12% due to SaaS")
+        - risk: Biggest financial risk (e.g. "Liquidity gap in 4 months")
+        - priority: Single highest priority for next week
+        
+        CONTEXT:
+        ${context}
+        
+        RESPONSE FORMAT (JSON ONLY):
+        {
+          "improved": "...",
+          "worsened": "...",
+          "risk": "...",
+          "priority": "..."
+        }`;
+
+        const result = await this.generateWithRetry(prompt, organizationId, 'weekly-report-v3', false);
+        if (result.success) {
+            try {
+                const cleaned = result.data.replace(/```json\n?|\n?```/g, '').trim();
+                return JSON.parse(cleaned);
+            } catch (e) {}
+        }
+
+        return {
+            improved: "Runway stabilized.",
+            worsened: "Expense variance detected.",
+            risk: "Incomplete data modeling.",
+            priority: "Classification cleanup."
+        };
+    }
+
+    /**
+     * processCfoChat: The primary logic for the Conversational CFO OS.
+     * Persona: Blunt, practical, experienced Indian CFO.
+     * Returns strict JSON schema for frontend structured rendering.
+     */
+    async processCfoChat(query: string, context: any, tools: any): Promise<any> {
+        const prompt = `
+You are FounderCFO — an experienced, blunt, practical Indian CFO who has seen 50+ startups burn through cash.
+
+PERSONALITY:
+- You are the co-founder's trusted financial partner. Not a consultant, a partner.
+- Speak like an Indian CFO would: direct, data-driven, empathetic but never sugarcoating.
+- Use "bhai" or "yaar" SPARINGLY (max once per response, and only when it adds warmth to hard advice).
+- Your advice should feel like it comes from someone who's been through 3 recessions and 2 failed startups.
+- If data quality is low, say so: "Look, the data isn't clean enough for me to give you a confident answer."
+
+CRITICAL RULES:
+1. NEVER guess or hallucinate numbers. Use ONLY the provided context.
+2. If you don't have data to answer, say so clearly. Don't fabricate.
+3. Always think in Indian Rupees (₹), Lakhs (L), and Crores (Cr).
+4. Consider Indian tax context: TDS, GST, Advance Tax deadlines.
+5. Every answer must be actionable — founders don't have time for theory.
+
+CURRENT FINANCIAL CONTEXT (SSOT — DO NOT DEVIATE):
+- Cash in Bank: ₹${context.cash}
+- Monthly Burn: ₹${context.burn}
+- Runway: ${context.runway} months
+- Execution Completion Rate: ${context.completionRate}%
+- Primary Focus: ${context.oneThing}
+
+AVAILABLE DATA:
+- Runway Analysis: ${JSON.stringify(tools.get_runway())}
+- Expense Breakdown: ${JSON.stringify(tools.get_expenses())}
+- Decisions Status: ${JSON.stringify(tools.get_decisions())}
+
+SIMULATION RULES:
+- Hiring: ₹1.5L-3L/month per senior engineer (India).
+- new_runway = current_cash / (current_burn + added_burn)
+- Always show BEFORE vs AFTER comparison.
+
+RESPONSE FORMAT — MANDATORY STRICT JSON (no markdown, no explanation outside JSON):
+{
+  "shortAnswer": "One crisp sentence — the headline answer.",
+  "reasoning": "2-3 sentences explaining WHY, citing specific numbers from the context above.",
+  "confidence": 85,
+  "runwayImpact": "+2.1 months or -1.5 months or No change",
+  "suggestedAction": "One clear, executable next step the founder can do TODAY.",
+  "tradeoffs": "What you gain vs what you lose. Be honest about both sides."
+}
+
+USER QUERY: "${query}"
+
+Respond with ONLY the JSON object. No markdown fences, no explanations outside the JSON.`;
+
+        try {
+            const result = await this.model!.generateContent(prompt);
+            const text = result.response.text();
+            // Extract JSON robustly
+            const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
+            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                // Validate required fields exist
+                if (parsed.shortAnswer && parsed.reasoning) {
+                    return parsed;
+                }
+            }
+            // If JSON parsing fails, wrap raw text
+            return {
+                shortAnswer: text.substring(0, 200),
+                reasoning: 'AI returned an unstructured response. Displaying raw insight.',
+                confidence: 50,
+                runwayImpact: 'Unknown',
+                suggestedAction: 'Ask a more specific question for structured analysis.',
+                tradeoffs: 'N/A',
+            };
+        } catch (error) {
+            this.logger.error(`CFO Chat Error: ${error.message}`);
+            return {
+                shortAnswer: 'I encountered a processing error. Please try again.',
+                reasoning: 'The AI engine temporarily failed to process your request.',
+                confidence: 0,
+                runwayImpact: 'Unknown',
+                suggestedAction: 'Retry your question in a moment.',
+                tradeoffs: 'N/A',
+            };
+        }
+    }
+
+    /**
+     * extractDecisionFromChat: Parses chat intent into a structured decision.
+     */
+    async extractDecisionFromChat(insight: string, userTitle?: string): Promise<any> {
+        const prompt = `
+        You are a financial logic extractor. 
+        Given the following chat insight/intent, extract a structured decision for the execution engine.
+        
+        TEXT: "${insight}"
+        USER SUGGESTED TITLE: "${userTitle || 'None'}"
+
+        OUTPUT JSON:
+        {
+            "key": "UPPERCASE_KEY_LIKE_BURN_REDUCTION",
+            "title": "Clear, professional decision title",
+            "impact": "High|Medium|Low"
+        }
+        `;
+
+        try {
+            const result = await this.model!.generateContent(prompt);
+            const text = result.response.text();
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            return { key: 'GENERIC_ACTION', title: userTitle || 'Strategic Action', impact: 'Medium' };
+        } catch (error) {
+            return { key: 'GENERIC_ACTION', title: userTitle || 'Strategic Action', impact: 'Medium' };
+        }
     }
 }

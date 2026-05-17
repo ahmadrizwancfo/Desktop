@@ -8,12 +8,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     TrendingUp, TrendingDown, Users, CreditCard, Megaphone, DollarSign,
     Save, RotateCcw, AlertTriangle, Lightbulb, Loader2, Zap, Shield,
-    Clock, ArrowRight, Check, X, ChevronRight, BarChart3, Layers, BrainCircuit
+    Clock, ArrowRight, Check, X, ChevronRight, BarChart3, Layers, BrainCircuit,
+    Anchor, MessageSquare, CheckCircle2
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/lib/utils';
+import { canAccess, getScenarioLimit } from '@/lib/feature-gates';
+import { UpgradePrompt } from '@/components/ui/upgrade-prompt';
+import { toast } from 'sonner';
 import { decodeActionPayload, type ActionPayload } from '@/store/cfo-state-store';
 
 interface SimulationResult {
@@ -182,6 +186,88 @@ export default function SimulatorPage() {
     );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// NLP SCENARIO PARSER — Keyword mapping (no AI call)
+// Supports: "cut marketing 30%", "hire 2 devs @50k", "raise 2cr", "cut saas 25%"
+// ═══════════════════════════════════════════════════════════════════════════════
+function parseNlpScenario(input: string, current: SimulatorValues): SimulatorValues | null {
+    const text = input.toLowerCase().trim();
+    const result = { ...current };
+    let matched = false;
+
+    // Parse amount: "50k" → 50000, "2l" → 200000, "1cr" → 10000000, "2cr" → 20000000
+    const parseAmount = (str: string): number | null => {
+        const m = str.match(/([\d.]+)\s*(cr|crore|l|lakh|k|thousand)?/i);
+        if (!m) return null;
+        const num = parseFloat(m[1]);
+        const unit = (m[2] || '').toLowerCase();
+        if (unit === 'cr' || unit === 'crore') return num * 10000000;
+        if (unit === 'l' || unit === 'lakh') return num * 100000;
+        if (unit === 'k' || unit === 'thousand') return num * 1000;
+        return num;
+    };
+
+    // "cut marketing 30%"  or "reduce marketing 30%"
+    const cutMatch = text.match(/(?:cut|reduce|slash|lower)\s+(marketing|saas|other|salary|payroll)\s+(?:by\s+)?(\d+)%/);
+    if (cutMatch) {
+        const target = cutMatch[1];
+        const pct = parseInt(cutMatch[2]) / 100;
+        if (target === 'marketing') result.marketingSpend = Math.round(current.marketingSpend * (1 - pct));
+        if (target === 'saas') result.saasSpend = Math.round(current.saasSpend * (1 - pct));
+        if (target === 'other') result.otherExpenses = Math.round(current.otherExpenses * (1 - pct));
+        if (target === 'salary' || target === 'payroll') result.avgSalary = Math.round(current.avgSalary * (1 - pct));
+        matched = true;
+    }
+
+    // "increase marketing 20%" or "boost revenue 15%"
+    const boostMatch = text.match(/(?:increase|boost|raise|grow)\s+(marketing|saas|revenue|other)\s+(?:by\s+)?(\d+)%/);
+    if (boostMatch) {
+        const target = boostMatch[1];
+        const pct = parseInt(boostMatch[2]) / 100;
+        if (target === 'marketing') result.marketingSpend = Math.round(current.marketingSpend * (1 + pct));
+        if (target === 'saas') result.saasSpend = Math.round(current.saasSpend * (1 + pct));
+        if (target === 'revenue') result.monthlyRevenue = Math.round(current.monthlyRevenue * (1 + pct));
+        if (target === 'other') result.otherExpenses = Math.round(current.otherExpenses * (1 + pct));
+        matched = true;
+    }
+
+    // "hire 2 devs @50k" or "hire 3 people" or "add 1 engineer"
+    const hireMatch = text.match(/(?:hire|add)\s+(\d+)\s+(?:dev|engineer|people|person|employee|member)s?\s*(?:@|at\s+)?(.+)?/);
+    if (hireMatch) {
+        const count = parseInt(hireMatch[1]);
+        const salaryStr = hireMatch[2];
+        const salary = salaryStr ? parseAmount(salaryStr) : current.avgSalary;
+        result.headcount = current.headcount + count;
+        if (salary && salary !== current.avgSalary) {
+            // Weighted average salary
+            result.avgSalary = Math.round(
+                (current.avgSalary * current.headcount + salary * count) / (current.headcount + count)
+            );
+        }
+        matched = true;
+    }
+
+    // "fire 2 people" or "let go 1 person"
+    const fireMatch = text.match(/(?:fire|remove|let go|layoff|lay off)\s+(\d+)\s+(?:dev|engineer|people|person|employee|member)s?/);
+    if (fireMatch) {
+        const count = parseInt(fireMatch[1]);
+        result.headcount = Math.max(0, current.headcount - count);
+        matched = true;
+    }
+
+    // "raise 2cr" or "fundraise 1cr" or "inject 50l"
+    const raiseMatch = text.match(/(?:raise|fundraise|inject|add cash|infuse)\s+(.+)/);
+    if (raiseMatch && !cutMatch && !boostMatch && !hireMatch) {
+        const amount = parseAmount(raiseMatch[1]);
+        if (amount) {
+            result.currentCash = current.currentCash + amount;
+            matched = true;
+        }
+    }
+
+    return matched ? result : null;
+}
+
 function SimulatorContent() {
     const user = useAuthStore((state) => state.user);
     const searchParams = useSearchParams();
@@ -224,6 +310,8 @@ function SimulatorContent() {
     const [showSaveDialog, setShowSaveDialog] = useState(false);
     const [activeScenarios, setActiveScenarios] = useState<Set<string>>(new Set());
     const [showComparison, setShowComparison] = useState(false);
+    const [nlpInput, setNlpInput] = useState('');
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     // Fetch baseline
     const { data: baselineData } = useQuery({
@@ -322,6 +410,9 @@ function SimulatorContent() {
             setScenarioName('');
             refetchScenarios();
             setActiveScenarioTab('saved');
+            setSaveSuccess(true);
+            toast.success('Scenario saved successfully!');
+            setTimeout(() => setSaveSuccess(false), 2000);
         }
     });
 
@@ -512,11 +603,29 @@ function SimulatorContent() {
                                     Reset
                                 </button>
                                 <button
-                                    onClick={() => setShowSaveDialog(true)}
+                                    onClick={() => {
+                                        setBaseline({ ...values });
+                                        calculateBaselineMutation.mutate(values);
+                                        toast.success('New baseline applied for this session.');
+                                    }}
+                                    className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white font-bold flex items-center gap-2 hover:bg-white/10 transition-all"
+                                >
+                                    <Anchor className="w-4 h-4" />
+                                    Set Baseline
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const limit = getScenarioLimit();
+                                        if (savedScenarios && savedScenarios.length >= limit) {
+                                            toast.error(`Starter plan limited to ${limit} scenarios. Upgrade for unlimited.`);
+                                            return;
+                                        }
+                                        setShowSaveDialog(true);
+                                    }}
                                     className="px-4 py-2.5 bg-primary rounded-xl text-white font-bold flex items-center gap-2 hover:bg-indigo-600 transition-all"
                                 >
-                                    <Save className="w-4 h-4" />
-                                    Save
+                                    {saveSuccess ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                                    {saveSuccess ? 'Saved!' : 'Save'}
                                 </button>
                             </>
                         )}
@@ -641,6 +750,62 @@ function SimulatorContent() {
                                     )}
                                 </div>
                             )}
+
+                            {/* Natural Language What-If Input */}
+                            <div className="mt-6 relative">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <MessageSquare className="w-3 h-3 text-primary" />
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Quick What-If</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={nlpInput}
+                                        onChange={(e) => setNlpInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && nlpInput.trim()) {
+                                                const parsed = parseNlpScenario(nlpInput, values);
+                                                if (parsed) {
+                                                    setValues(parsed);
+                                                    toast.success(`Applied: ${nlpInput}`);
+                                                    setNlpInput('');
+                                                } else {
+                                                    toast.error('Could not parse. Try: "cut marketing 30%", "hire 2 devs", "raise 1cr"');
+                                                }
+                                            }
+                                        }}
+                                        placeholder='Try: "cut marketing 30%", "hire 2 devs @50k", "raise 2cr"'
+                                        className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (!nlpInput.trim()) return;
+                                            const parsed = parseNlpScenario(nlpInput, values);
+                                            if (parsed) {
+                                                setValues(parsed);
+                                                toast.success(`Applied: ${nlpInput}`);
+                                                setNlpInput('');
+                                            } else {
+                                                toast.error('Could not parse. Try: "cut marketing 30%", "hire 2 devs", "raise 1cr"');
+                                            }
+                                        }}
+                                        className="px-5 py-3 bg-primary/20 border border-primary/30 rounded-xl text-primary text-xs font-bold hover:bg-primary/30 transition-all"
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {['cut marketing 30%', 'hire 2 devs @50k', 'raise 1cr', 'cut saas 25%'].map(ex => (
+                                        <button
+                                            key={ex}
+                                            onClick={() => setNlpInput(ex)}
+                                            className="px-2 py-1 rounded-md bg-white/5 text-[9px] text-slate-500 hover:text-white hover:bg-white/10 transition-all"
+                                        >
+                                            {ex}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
                         {/* Main Content */}
@@ -1093,6 +1258,15 @@ function SimulatorContent() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* Professional Disclaimer */}
+            <div className="mt-8 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                <p className="text-[9px] text-slate-600 leading-relaxed text-center">
+                    <AlertTriangle className="w-2.5 h-2.5 inline mr-1" />
+                    Simulations are projections based on current data and assumptions. They do not constitute financial advice.
+                    Always consult a qualified Chartered Accountant before making major financial decisions. FounderCFO is not a licensed financial advisor.
+                </p>
+            </div>
         </DashboardLayout>
     );
 }

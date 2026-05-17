@@ -39,6 +39,7 @@ model Organization {
   fiscalYearStartMonth   Int                     @default(4)
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
+  isFirstTimeUser        Boolean                 @default(true)
   actionItems            ActionItem[]
   AiUsage                AiUsage[]
   bankAccounts           BankAccount[]
@@ -48,6 +49,7 @@ model Organization {
   chatThreads            ChatThread[]
   complianceItems        ComplianceItem[]
   customers              Customer[]
+  decisionFeedbacks      DecisionFeedback[]
   financialMetrics       FinancialMetrics[]
   financialSnapshots     FinancialSnapshot[]
   fundingRounds          FundingRound[]
@@ -59,9 +61,9 @@ model Organization {
   scenarios              Scenario[]
   simulationLogs         SimulationLog[]
   startupProfiles        StartupProfile?
+  statutoryLiabilities   StatutoryLiability[]
   users                  User[]
   vendors                Vendor[]
-  decisionFeedbacks      DecisionFeedback[]
 }
 
 model AuditLog {
@@ -376,7 +378,7 @@ model ExecutionLog {
   contextSnapshot Json?
   profileId       String?
   metadata        Json?
-  explanation     Json?                  // v2.2 Structured reasoning
+  explanation     Json?
   action          ActionItem             @relation(fields: [actionId], references: [id])
   profile         StartupProfile?        @relation(fields: [profileId], references: [id])
 
@@ -432,89 +434,111 @@ model StartupProfileVersion {
 }
 
 model StartupProfile {
-  id                      String                   @id @default(uuid())
-  userId                  String                   @unique
-  organizationId          String                   @unique
-  companyName             String
-  stage                   StartupStage
-  monthlyRevenue          Decimal                  @db.Decimal(20, 2)
-  monthlyExpenses         Decimal                  @db.Decimal(20, 2)
-  cashInBank              Decimal                  @db.Decimal(20, 2)
-  teamSize                Int
-  country                 String                   @default("IN")
-  industry                String
-  primaryGoal             PrimaryGoal
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  lastCriticalEmailSentAt DateTime?
-  lastAlertGeneratedAt    DateTime?
-  ignoredAlertsCount      Int                      @default(0)
-  daysSinceLastAction     Int                      @default(0)
-  autoPilotDelayMinutes   Int                      @default(30)
-  autoPilotEnabledAt      DateTime?
-  autoPilotFailureStreak  Int                      @default(0)
-  autoPilotMode           AutoPilotMode            @default(OFF)
-  cautionMultiplier       Float                    @default(1.0)
-  cfoAccuracyScore        Float                    @default(85)
-  complianceScore         Int                      @default(100)
-  envUncertaintyScore     Float                    @default(0)
-  growthMode              Boolean                  @default(false)
-  hiringFreeze            Boolean                  @default(false)
-  isTrustZoneDowngraded   Boolean                  @default(false)
-  lastAccuracyUpdate      DateTime                 @default(now())
-  lastAutoPilotFailureAt  DateTime?
-  lastAutoPilotScanAt     DateTime?
-  lastScoreUpdate         DateTime                 @default(now())
-  marketingMultiplier     Float                    @default(1.0)
-  maxAutoBurnImpact       Float                    @default(5.0)
-  rollbackRate            Float                    @default(0)
-  rolledBackAutoActions   Int                      @default(0)
-  salesMultiplier         Float                    @default(1.0)
-  shadowModeEnabled       Boolean                  @default(true)
-  targetBurn              Float?
-  totalAutoActions        Int                      @default(0)
-  totalEvaluatedActions   Int                      @default(0)
-  
-  // v2.1 Hybrid Decision Engine Upgrades
-  lastDashboardMode       String?                  @default("STABLE")
-  modeStagingCount        Int                      @default(0)
-  lastSnapshotAt          DateTime?
-  highestCashBuffer       Float?                   @default(0)
-  rollbackRecoveryCount   Int                      @default(0)
-  
-  decisionSensitivity     SensitivityLevel         @default(BALANCED)
-  notificationPreference  AlertTier                @default(IMPORTANT)
-  
-  autoPilotLogs           AutoPilotLog[]
-  cfoDecisions            CfoDecision[]
-  logs                    ExecutionLog[]
-  organization            Organization             @relation(fields: [organizationId], references: [id])
-  user                    User                     @relation(fields: [userId], references: [id])
-  snapshots               StartupProfileSnapshot[]
-  versions                StartupProfileVersion[]
+  id                         String                   @id @default(uuid())
+  userId                     String                   @unique
+  organizationId             String                   @unique
+  companyName                String
+  stage                      StartupStage
+  monthlyRevenue             Decimal                  @db.Decimal(20, 2)
+  monthlyExpenses            Decimal                  @db.Decimal(20, 2)
+  cashInBank                 Decimal                  @db.Decimal(20, 2)
+  teamSize                   Int
+  country                    String                   @default("IN")
+  industry                   String
+  primaryGoal                PrimaryGoal
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  lastCriticalEmailSentAt    DateTime?
+  lastAlertGeneratedAt       DateTime?
+  ignoredAlertsCount         Int                      @default(0)
+  daysSinceLastAction        Int                      @default(0)
+  autoPilotDelayMinutes      Int                      @default(30)
+  autoPilotEnabledAt         DateTime?
+  autoPilotFailureStreak     Int                      @default(0)
+  autoPilotMode              AutoPilotMode            @default(OFF)
+  cautionMultiplier          Float                    @default(1.0)
+  cfoAccuracyScore           Float                    @default(85)
+  complianceScore            Int                      @default(100)
+  envUncertaintyScore        Float                    @default(0)
+  growthMode                 Boolean                  @default(false)
+  hiringFreeze               Boolean                  @default(false)
+  isTrustZoneDowngraded      Boolean                  @default(false)
+  lastAccuracyUpdate         DateTime                 @default(now())
+  lastAutoPilotFailureAt     DateTime?
+  lastAutoPilotScanAt        DateTime?
+  lastScoreUpdate            DateTime                 @default(now())
+  marketingMultiplier        Float                    @default(1.0)
+  maxAutoBurnImpact          Float                    @default(5.0)
+  rollbackRate               Float                    @default(0)
+  rolledBackAutoActions      Int                      @default(0)
+  salesMultiplier            Float                    @default(1.0)
+  shadowModeEnabled          Boolean                  @default(true)
+  targetBurn                 Float?
+  totalAutoActions           Int                      @default(0)
+  totalEvaluatedActions      Int                      @default(0)
+  highestCashBuffer          Float?                   @default(0)
+  lastDashboardMode          String?                  @default("STABLE")
+  lastSnapshotAt             DateTime?
+  modeStagingCount           Int                      @default(0)
+  rollbackRecoveryCount      Int                      @default(0)
+  decisionSensitivity        SensitivityLevel         @default(BALANCED)
+  notificationPreference     AlertTier                @default(IMPORTANT)
+  dataInputMethod            DataInputMethod          @default(SLIDER)
+  lastFinancialUpdate        DateTime                 @default(now())
+  isTaxBufferUnlocked        Boolean                  @default(false)
+  behavioralScore            Int                      @default(100)
+  runwayDelta                Float?                   @default(0)
+  totalInactionPenalties     Decimal                  @default(0) @db.Decimal(20, 2)
+  behavioralPenaltiesAccrued Decimal                  @default(0) @db.Decimal(20, 2)
+  oxygenClockDays            Int                      @default(0)
+  autoPilotLogs              AutoPilotLog[]
+  behavioralAudits           BehavioralAudit[]
+  cfoDecisions               CfoDecision[]
+  cfoInsights                CfoInsight[]
+  logs                       ExecutionLog[]
+  organization               Organization             @relation(fields: [organizationId], references: [id])
+  user                       User                     @relation(fields: [userId], references: [id])
+  snapshots                  StartupProfileSnapshot[]
+  versions                   StartupProfileVersion[]
 
   @@index([organizationId])
 }
 
-model StartupProfileSnapshot {
+model CfoInsight {
   id               String         @id @default(uuid())
   startupProfileId String
+  type             String         @default("DAILY_BRIEF")
+  headline         String
+  narrative        String
+  netBurnAtInsight Decimal        @db.Decimal(20, 2)
+  isCrisisMode     Boolean        @default(false)
+  generatedAt      DateTime       @default(now())
+  expiresAt        DateTime?
+  startupProfile   StartupProfile @relation(fields: [startupProfileId], references: [id])
+
+  @@index([startupProfileId, generatedAt])
+}
+
+model StartupProfileSnapshot {
+  id               String          @id @default(uuid())
+  startupProfileId String
   stage            StartupStage
-  monthlyRevenue   Decimal        @db.Decimal(20, 2)
-  monthlyExpenses  Decimal        @db.Decimal(20, 2)
-  cashInBank       Decimal        @db.Decimal(20, 2)
+  monthlyRevenue   Decimal         @db.Decimal(20, 2)
+  monthlyExpenses  Decimal         @db.Decimal(20, 2)
+  cashInBank       Decimal         @db.Decimal(20, 2)
   teamSize         Int
   primaryGoal      PrimaryGoal
-  snapshotAt       DateTime       @default(now())
-  projectedRunway  Float          @default(0)
-  startupProfile   StartupProfile @relation(fields: [startupProfileId], references: [id])
+  snapshotAt       DateTime        @default(now())
+  projectedRunway  Float           @default(0)
+  dataInputMethod  DataInputMethod @default(SLIDER)
+  startupProfile   StartupProfile  @relation(fields: [startupProfileId], references: [id])
 
   @@index([startupProfileId])
   @@index([snapshotAt])
 }
 
 model CfoDecision {
-  id                 String         @id @default(uuid())
+  id                 String            @id @default(uuid())
   startupProfileId   String
   decisionDomain     DecisionDomain
   decisionType       String
@@ -522,11 +546,16 @@ model CfoDecision {
   confidence         Float
   facts              Json
   recommendedActions Json
-  status             DecisionStatus @default(OPEN)
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  status             DecisionStatus    @default(OPEN)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  finalizedAt        DateTime?
+  inactionFeeAccrued Decimal           @default(0) @db.Decimal(20, 2)
+  lastActionAt       DateTime?         @default(now())
+  shownAt            DateTime?         @default(now())
   aiExplanation      AiExplanation?
-  startupProfile     StartupProfile @relation(fields: [startupProfileId], references: [id])
+  behavioralAudits   BehavioralAudit[]
+  startupProfile     StartupProfile    @relation(fields: [startupProfileId], references: [id])
 
   @@index([startupProfileId, status])
   @@index([createdAt])
@@ -545,19 +574,54 @@ model AiExplanation {
 }
 
 model FinancialSnapshot {
-  id             String       @id @default(uuid())
-  userId         String
-  organizationId String
-  snapshotDate   DateTime     @default(now())
-  revenue        Decimal      @db.Decimal(20, 2)
-  expenses       Decimal      @db.Decimal(20, 2)
-  cashBalance    Decimal      @db.Decimal(20, 2)
-  burn           Decimal      @db.Decimal(20, 2)
-  createdAt      DateTime     @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  id              String       @id @default(uuid())
+  userId          String
+  organizationId  String
+  snapshotDate    DateTime     @default(now())
+  revenue         Decimal      @db.Decimal(20, 2)
+  expenses        Decimal      @db.Decimal(20, 2)
+  cashBalance     Decimal      @db.Decimal(20, 2)
+  burn            Decimal      @db.Decimal(20, 2)
+  createdAt       DateTime     @default(now())
+  monthlyExpenses Decimal?     @db.Decimal(20, 2)
+  monthlyRevenue  Decimal?     @db.Decimal(20, 2)
+  netBurn         Decimal?     @db.Decimal(20, 2)
+  organization    Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId, snapshotDate])
   @@index([userId])
+}
+
+model BehavioralAudit {
+  id               String         @id @default(uuid())
+  startupProfileId String
+  decisionId       String
+  actionType       String
+  timestamp        DateTime       @default(now())
+  inactionFee      Decimal?       @db.Decimal(20, 2)
+  metadata         Json?
+  overrideReason   String?
+  decision         CfoDecision    @relation(fields: [decisionId], references: [id])
+  startupProfile   StartupProfile @relation(fields: [startupProfileId], references: [id])
+
+  @@index([startupProfileId, timestamp])
+  @@index([decisionId])
+}
+
+model StatutoryLiability {
+  id             String           @id @default(uuid())
+  organizationId String
+  type           ComplianceType
+  title          String
+  amount         Decimal          @db.Decimal(20, 2)
+  status         ComplianceStatus @default(PENDING)
+  source         String           @default("MANUAL")
+  dueDate        DateTime
+  recordedAt     DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, status])
+  @@index([dueDate])
 }
 
 model WeeklyBrief {
@@ -787,7 +851,6 @@ model CfoStateSnapshot {
   revenueTrend      String
   tone              String
   transactionCount  Int          @default(0)
-  riskScore         Float?       @default(0)
   dataQuality       String
   totalReceivables  Float        @default(0)
   runwayChangeDays  Int?
@@ -796,8 +859,9 @@ model CfoStateSnapshot {
   riskChanged       Boolean      @default(false)
   statusChanged     Boolean      @default(false)
   fullState         Json
-  explanation       Json?        // Structured reasoning for mode/state
   generatedAt       DateTime     @default(now())
+  riskScore         Float?       @default(0)
+  explanation       Json?
   organization      Organization @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId, generatedAt])
@@ -829,6 +893,18 @@ model CfoDecisionEvent {
   @@unique([organizationId, decisionId])
   @@index([organizationId, resolved])
   @@index([organizationId, createdAt])
+}
+
+model DecisionFeedback {
+  id             String       @id @default(cuid())
+  organizationId String
+  decisionId     String
+  decisionType   String
+  accepted       Boolean
+  rolledBack     Boolean
+  outcomeScore   Float?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
 }
 
 enum ComplianceType {
@@ -959,7 +1035,6 @@ enum DecisionDomain {
 }
 
 enum DecisionStatus {
-  NEW
   OPEN
   ACKNOWLEDGED
   RESOLVED
@@ -967,6 +1042,7 @@ enum DecisionStatus {
   IMPLEMENTING
   FIXED
   IGNORED
+  NEW
 }
 
 enum AlertChannel {
@@ -1044,18 +1120,6 @@ enum SyncStatus {
   SYNCING
   FAILED
 }
-model DecisionFeedback {
-  id                String   @id @default(cuid())
-  organizationId    String
-  decisionId        String
-  decisionType      String
-  accepted          Boolean
-  rolledBack        Boolean
-  outcomeScore      Float?
-  createdAt         DateTime @default(now())
-
-  organization      Organization @relation(fields: [organizationId], references: [id])
-}
 
 enum SensitivityLevel {
   CONSERVATIVE
@@ -1067,4 +1131,11 @@ enum AlertTier {
   ALL
   IMPORTANT
   CRITICAL_ONLY
+}
+
+enum DataInputMethod {
+  SLIDER
+  MANUAL
+  INTEGRATION
+  DEMO
 }

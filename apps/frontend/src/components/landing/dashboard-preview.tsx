@@ -141,7 +141,7 @@ export function DashboardPreview() {
                           <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full ring-1 ring-emerald-500/20">On Track</div>
                         </div>
                         <div className="text-xs text-slate-400 leading-relaxed pt-1">
-                          Based on current pipeline, you are projected to hit $1.5M ARR by Q3 2026.
+                          Based on current pipeline, you are projected to hit ₹12Cr ARR by Q3 2026.
                         </div>
                       </div>
                     </div>

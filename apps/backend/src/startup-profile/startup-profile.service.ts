@@ -28,6 +28,8 @@ export class StartupProfileService {
             organizationId = user?.organizationId ?? userId; // fallback to userId as org key
         }
 
+        const inputMethod = (dto.dataInputMethod as any) || 'SLIDER';
+        
         const profile = await this.prisma.startupProfile.upsert({
             where: { userId },
             create: {
@@ -42,6 +44,8 @@ export class StartupProfileService {
                 country: dto.country ?? 'IN',
                 industry: dto.industry,
                 primaryGoal: dto.primaryGoal,
+                dataInputMethod: inputMethod,
+                lastFinancialUpdate: new Date(),
                 decisionSensitivity: SensitivityLevel.BALANCED,
                 notificationPreference: AlertTier.IMPORTANT
             },
@@ -55,6 +59,8 @@ export class StartupProfileService {
                 country: dto.country ?? 'IN',
                 industry: dto.industry,
                 primaryGoal: dto.primaryGoal,
+                dataInputMethod: inputMethod,
+                lastFinancialUpdate: new Date(),
                 decisionSensitivity: (dto.decisionSensitivity as SensitivityLevel) ?? SensitivityLevel.BALANCED,
                 notificationPreference: (dto.notificationPreference as AlertTier) ?? AlertTier.IMPORTANT
             },
@@ -67,7 +73,7 @@ export class StartupProfileService {
         );
 
         // ── AUTO-TRIGGER: Financial Snapshot ──────────────────────────────────
-        this.createSnapshot(userId, organizationId, dto).catch((err) =>
+        this.createSnapshot(userId, organizationId, profile.id, dto).catch((err) =>
             this.logger.error(`Snapshot creation failed: ${err.message}`),
         );
 
@@ -98,23 +104,39 @@ export class StartupProfileService {
     private async createSnapshot(
         userId: string,
         organizationId: string,
+        startupProfileId: string,
         dto: CreateStartupProfileDto,
     ): Promise<void> {
         const revenue = Number(dto.monthlyRevenue) || 0;
         const expenses = Number(dto.monthlyExpenses) || 0;
         const burn = Math.max(expenses - revenue, 0);
 
-        await this.prisma.financialSnapshot.create({
-            data: {
-                userId,
-                organizationId,
-                revenue: dto.monthlyRevenue,
-                expenses: dto.monthlyExpenses,
-                cashBalance: dto.cashInBank,
-                burn,
-            },
-        });
-        this.logger.log(`Financial snapshot saved for user ${userId}`);
+        await this.prisma.$transaction([
+            this.prisma.financialSnapshot.create({
+                data: {
+                    userId,
+                    organizationId,
+                    revenue: dto.monthlyRevenue,
+                    expenses: dto.monthlyExpenses,
+                    cashBalance: dto.cashInBank,
+                    burn,
+                },
+            }),
+            this.prisma.startupProfileSnapshot.create({
+                data: {
+                    startupProfileId,
+                    stage: dto.stage,
+                    monthlyRevenue: dto.monthlyRevenue,
+                    monthlyExpenses: dto.monthlyExpenses,
+                    cashInBank: dto.cashInBank,
+                    teamSize: dto.teamSize,
+                    primaryGoal: dto.primaryGoal,
+                    dataInputMethod: (dto.dataInputMethod as any) || 'SLIDER',
+                }
+            })
+        ]);
+        
+        this.logger.log(`Financial & profile snapshot saved for user ${userId}`);
     }
 
     async findByUser(userId: string) {
