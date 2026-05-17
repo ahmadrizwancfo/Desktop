@@ -70,6 +70,27 @@ export class ExpensesService {
     }
 
     async update(id: string, dto: UpdateExpenseDto) {
+        const existing = await this.prisma.transaction.findUnique({
+            where: { id }
+        });
+        if (!existing) {
+            throw new Error('Expense not found');
+        }
+
+        const existingMetadata = (existing.metadata as Record<string, any>) || {};
+        const incomingMetadata = dto.metadata || {};
+
+        const updatedMetadata = {
+            ...existingMetadata,
+            ...incomingMetadata,
+            ...(dto.vendor !== undefined && { vendor: dto.vendor }),
+            ...(dto.status !== undefined && { status: dto.status }),
+            ...(dto.tdsApplicable !== undefined && { tdsApplicable: dto.tdsApplicable }),
+            ...(dto.tdsAmount !== undefined && { tdsAmount: dto.tdsAmount }),
+            ...(dto.gstAmount !== undefined && { gstAmount: dto.gstAmount }),
+            ...(dto.receiptUrl !== undefined && { receiptUrl: dto.receiptUrl }),
+        };
+
         return this.prisma.transaction.update({
             where: { id },
             data: {
@@ -77,14 +98,7 @@ export class ExpensesService {
                 category: dto.category,
                 description: dto.description,
                 date: dto.date ? new Date(dto.date) : undefined,
-                metadata: {
-                    vendor: dto.vendor,
-                    status: dto.status,
-                    tdsApplicable: dto.tdsApplicable,
-                    tdsAmount: dto.tdsAmount,
-                    gstAmount: dto.gstAmount,
-                    receiptUrl: dto.receiptUrl
-                }
+                metadata: updatedMetadata
             }
         });
     }

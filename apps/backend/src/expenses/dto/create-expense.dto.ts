@@ -37,4 +37,7 @@ export class CreateExpenseDto {
     @IsString()
     @IsOptional()
     receiptUrl?: string;
+
+    @IsOptional()
+    metadata?: any;
 }

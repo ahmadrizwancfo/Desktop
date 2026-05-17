@@ -99,6 +99,8 @@ export class UniversalParserService {
     private async parsePdfWithFallback(buffer: Buffer, organizationId?: string): Promise<ParsedDocument> {
         // Step 1: Try pdf-parse
         const pdfResult = await this.tryPdfParse(buffer);
+        const totalPages = pdfResult?.metadata?.pages || 1;
+
         if (pdfResult && !pdfResult.metadata?.isScanned) {
             this.logger.log('PDF parsed successfully via pdf-parse');
             return pdfResult;
@@ -117,7 +119,7 @@ export class UniversalParserService {
             const canUseVision = this.checkVisionLimit(organizationId);
             if (canUseVision) {
                 this.logger.log('OCR insufficient, falling back to Gemini Vision...');
-                const visionResult = await this.tryGeminiVision(buffer, organizationId);
+                const visionResult = await this.tryGeminiVision(buffer, organizationId, totalPages);
                 if (visionResult) {
                     this.logger.log('PDF parsed via Gemini Vision fallback');
                     return visionResult;
@@ -221,42 +223,68 @@ export class UniversalParserService {
         }
     }
 
-    private async tryGeminiVision(buffer: Buffer, organizationId: string): Promise<ParsedDocument | null> {
+    private async tryGeminiVision(buffer: Buffer, organizationId: string, totalPages: number): Promise<ParsedDocument | null> {
         if (!this.genAI) return null;
+
+        const maxPages = Math.min(totalPages, 8);
+        this.logger.log(`[Vision Segmenter] Splitting PDF into ${maxPages} pages for Vision processing.`);
 
         try {
             const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-            const base64 = buffer.toString('base64');
+            
+            // Build concurrent array of page render & Gemini vision calls
+            const pagePromises = Array.from({ length: maxPages }).map(async (_, idx) => {
+                try {
+                    const pageBuffer = await sharp(buffer, { page: idx })
+                        .greyscale()
+                        .normalize()
+                        .sharpen()
+                        .png()
+                        .toBuffer();
 
-            const result = await model.generateContent([
-                {
-                    inlineData: { mimeType: 'application/pdf', data: base64 },
-                },
-                {
-                    text: `Extract ALL financial transactions from this bank statement document.
+                    const base64 = pageBuffer.toString('base64');
+                    const result = await model.generateContent([
+                        {
+                            inlineData: { mimeType: 'image/png', data: base64 },
+                        },
+                        {
+                            text: `Extract ALL financial transactions from this bank statement page.
 For each transaction, extract: Date, Description, Debit Amount, Credit Amount, Running Balance.
-Return the raw text content of the document, preserving table structure.
+Return the raw text content of the page, keeping the original horizontal layout and table structure.
 If this is a bank statement, format transactions as rows separated by newlines.
 Important: Extract exact numbers. Do not summarize or skip any transactions.`,
-                },
-            ]);
+                        },
+                    ]);
 
-            const text = result.response.text();
+                    const pageText = result.response.text();
+                    return { pageIndex: idx, text: pageText };
+                } catch (pageErr: any) {
+                    this.logger.error(`[Vision Segmenter] Page ${idx + 1} processing failed: ${pageErr.message}`);
+                    return { pageIndex: idx, text: `[Error parsing Page ${idx + 1}]` };
+                }
+            });
+
+            const results = await Promise.all(pagePromises);
+            // Sort by index to maintain correct chronological order
+            results.sort((a, b) => a.pageIndex - b.pageIndex);
+
+            const mergedText = results.map(r => r.text).join('\n\n');
             this.trackVisionUsage(organizationId);
 
-            this.logger.log(`Gemini Vision extracted ${text.length} chars for org ${organizationId}`);
+            this.logger.log(`Gemini Vision multi-page sync complete. Extracted ${mergedText.length} chars total across ${maxPages} pages.`);
 
             return {
                 type: 'pdf',
-                rawText: text,
+                rawText: mergedText,
                 metadata: {
                     isScanned: true,
                     parserUsed: 'gemini-vision',
                     visionUsed: true,
+                    pages: maxPages,
                 },
             };
         } catch (error: any) {
-            this.logger.error(`Gemini Vision failed: ${error.message}`);
+            this.logger.error(`[Vision Segmenter] Fatal error during segmenting: ${error.message}`);
             return null;
         }
     }
@@ -481,32 +509,136 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
         const transactions: ParsedTransaction[] = [];
         const lines = text.split('\n').filter(l => l.trim().length > 5);
 
-        // Look for lines matching typical bank statement patterns
-        // Pattern: date  description  debit  credit  balance
-        const datePattern = /(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/;
+        let debitColIndex = -1;
+        let creditColIndex = -1;
+        let balanceColIndex = -1;
+        let columnsDetected = false;
+
+        // Scan for header line
+        for (const line of lines) {
+            const lowerLine = line.toLowerCase();
+            if ((lowerLine.includes('date') || lowerLine.includes('txn') || lowerLine.includes('value')) &&
+                (lowerLine.includes('particular') || lowerLine.includes('desc') || lowerLine.includes('narration') || lowerLine.includes('remark')) &&
+                (lowerLine.includes('debit') || lowerLine.includes('withdrawal') || lowerLine.includes('dr ') || lowerLine.includes('out') || lowerLine.includes('payment')) &&
+                (lowerLine.includes('credit') || lowerLine.includes('deposit') || lowerLine.includes('cr ') || lowerLine.includes('in ') || lowerLine.includes('receipt'))) {
+                
+                const debitKeywords = ['withdrawal', 'debit', 'dr ', 'amount(dr)', 'out', 'payment'];
+                const creditKeywords = ['deposit', 'credit', 'cr ', 'amount(cr)', 'in ', 'receipt'];
+                const balanceKeywords = ['balance', 'bal', 'closing', 'running'];
+
+                for (const kw of debitKeywords) {
+                    const idx = lowerLine.indexOf(kw);
+                    if (idx !== -1) {
+                        debitColIndex = idx;
+                        break;
+                    }
+                }
+
+                for (const kw of creditKeywords) {
+                    const idx = lowerLine.indexOf(kw);
+                    if (idx !== -1) {
+                        creditColIndex = idx;
+                        break;
+                    }
+                }
+
+                for (const kw of balanceKeywords) {
+                    const idx = lowerLine.indexOf(kw);
+                    if (idx !== -1) {
+                        balanceColIndex = idx;
+                        break;
+                    }
+                }
+
+                if (debitColIndex !== -1 && creditColIndex !== -1) {
+                    columnsDetected = true;
+                    this.logger.log(`[Parser Column Classifier] Header detected. Column bounds: Debit=${debitColIndex}, Credit=${creditColIndex}, Balance=${balanceColIndex}`);
+                    break;
+                }
+            }
+        }
+
+        // Support abbreviated date formats like DD-MMM-YYYY, DD/MM/YYYY, DD MM YYYY, etc.
+        const datePattern = /(\d{1,2}[\/\s-](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\/\s-]\d{2,4}|\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i;
 
         for (const line of lines) {
             const dateMatch = line.match(datePattern);
             if (!dateMatch) continue;
 
-            // Extract amounts from the line (numbers that look like money)
-            const amounts = line.match(/[\d,]+\.\d{2}/g)?.map(a => parseFloat(a.replace(/,/g, ''))) || [];
-            const desc = line.replace(datePattern, '').replace(/[\d,]+\.\d{2}/g, '').trim().replace(/\s+/g, ' ');
+            // Extract decimal amounts with character index tracking
+            const rawAmounts: { value: number; index: number }[] = [];
+            const amountRegex = /([\d,]+\.\d{2})/g;
+            let match;
+            while ((match = amountRegex.exec(line)) !== null) {
+                const val = parseFloat(match[1].replace(/,/g, ''));
+                if (!isNaN(val)) {
+                    rawAmounts.push({ value: val, index: match.index });
+                }
+            }
 
+            const desc = line.replace(datePattern, '').replace(/[\d,]+\.\d{2}/g, '').trim().replace(/\s+/g, ' ');
             if (desc.length < 2) continue;
+
+            let debit: number | null = null;
+            let credit: number | null = null;
+            let balance: number | null = null;
+
+            if (columnsDetected && rawAmounts.length > 0) {
+                for (const amt of rawAmounts) {
+                    const distToDebit = Math.abs(amt.index - debitColIndex);
+                    const distToCredit = Math.abs(amt.index - creditColIndex);
+                    const distToBalance = balanceColIndex !== -1 ? Math.abs(amt.index - balanceColIndex) : Infinity;
+
+                    const minDist = Math.min(distToDebit, distToCredit, distToBalance);
+                    if (minDist === distToDebit) {
+                        debit = amt.value;
+                    } else if (minDist === distToCredit) {
+                        credit = amt.value;
+                    } else {
+                        balance = amt.value;
+                    }
+                }
+            } else {
+                // Heuristic sequential fallback
+                const amounts = rawAmounts.map(a => a.value);
+                if (amounts.length === 1) {
+                    const lowerDesc = desc.toLowerCase();
+                    const isDebitWord = lowerDesc.includes('charge') || lowerDesc.includes('bill') || 
+                                        lowerDesc.includes('payment') || lowerDesc.includes('fee') || 
+                                        lowerDesc.includes('tax') || lowerDesc.includes('debit') || 
+                                        lowerDesc.includes('withdrawal') || lowerDesc.includes('transfer to');
+                    
+                    if (isDebitWord) {
+                        debit = amounts[0];
+                    } else {
+                        credit = amounts[0];
+                    }
+                } else if (amounts.length === 2) {
+                    debit = amounts[0];
+                    credit = amounts[1];
+                } else if (amounts.length >= 3) {
+                    debit = amounts[0];
+                    credit = amounts[1];
+                    balance = amounts[2];
+                }
+            }
 
             transactions.push({
                 date: this.normalizeDate(dateMatch[1]),
                 description: desc,
-                debit: amounts.length >= 2 ? amounts[0] || null : null,
-                credit: amounts.length >= 2 ? amounts[1] || null : (amounts[0] || null),
-                balance: amounts.length >= 3 ? amounts[2] : null,
+                debit,
+                credit,
+                balance,
                 rawDateString: dateMatch[1],
             });
         }
 
         if (transactions.length === 0 && text.length > 100) {
-            issues.push({ type: 'missing_field', severity: 'warning', message: 'Could not extract structured transactions from raw text. AI analysis will use raw text.' });
+            issues.push({
+                type: 'missing_field',
+                severity: 'warning',
+                message: 'No transaction rows matched standard bank ledger formatting. Manual categorization is recommended.',
+            });
         }
 
         return transactions;
@@ -532,7 +664,7 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
                     issues.push({
                         type: 'balance_mismatch',
                         severity: 'warning',
-                        message: `Balance mismatch at row ${i + 1}: expected ₹${expectedBalance.toFixed(2)}, got ₹${curr.balance?.toFixed(2)}`,
+                        message: `Running balance mismatch at transaction row ${i + 1} ("${curr.description.substring(0, 20)}..."): expected ₹${expectedBalance.toFixed(2)}, got ₹${curr.balance?.toFixed(2)}. Suggest checking if a Debit amount was misclassified as Credit, or if a transaction row was skipped during extraction.`,
                         rowIndex: i,
                     });
                 }
@@ -559,7 +691,7 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
                 issues.push({
                     type: 'balance_mismatch',
                     severity: 'warning',
-                    message: `Debit/credit totals don't reconcile with balance change. Diff: ₹${Math.abs(expectedDiff - actualDiff).toFixed(2)}`,
+                    message: `Ledger summary totals do not reconcile with the bank statement's balance changes. Deviation: ₹${Math.abs(expectedDiff - actualDiff).toFixed(2)} (Expected change: ₹${expectedDiff.toFixed(2)}, Actual change: ₹${actualDiff.toFixed(2)}). This is highly likely a column alignment issue (e.g. withdrawal column parsed as deposit) or a broken numeric OCR reading.`,
                 });
             }
             return match;
@@ -610,11 +742,16 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
         if (txns.length === 0) score -= 25;
         else if (txns.length < 5) score -= 10;
 
-        // Balance verification (0-15 points)
-        if (txns.length > 2 && !balanceVerified) score -= 15;
+        // Balance verification (0-30 points)
+        if (txns.length > 2 && !balanceVerified) score -= 30;
 
-        // Debit/credit reconciliation (0-10 points)
-        if (txns.length > 0 && !debitCreditMatch) score -= 10;
+        // Debit/credit reconciliation (0-30 points)
+        if (txns.length > 0 && !debitCreditMatch) score -= 30;
+
+        // Running balance validation bonus (+10 points)
+        if (txns.length > 2 && balanceVerified && debitCreditMatch) {
+            score += 10;
+        }
 
         // OCR confidence penalty
         const ocrConf = doc.metadata?.ocrConfidence;
@@ -649,6 +786,22 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
     private normalizeDate(dateStr: string): string {
         if (!dateStr) return '';
         const cleaned = dateStr.trim();
+
+        const MONTH_MAP: Record<string, string> = {
+            jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+            jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+        };
+
+        // DD[-/ ]MMM[-/ ]YYYY or DD[-/ ]MMM[-/ ]YY (e.g. 12-Apr-2026, 23 Aug 2025, 15/Dec/25)
+        const alphaDmy = cleaned.match(/^(\d{1,2})[\/\s-]((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*)[\/\s-](\d{2,4})$/i);
+        if (alphaDmy) {
+            const day = alphaDmy[1].padStart(2, '0');
+            const monthStr = alphaDmy[2].toLowerCase().substring(0, 3);
+            const month = MONTH_MAP[monthStr] || '01';
+            let year = alphaDmy[3];
+            if (year.length === 2) year = (parseInt(year) > 50 ? '19' : '20') + year;
+            return `${year}-${month}-${day}`;
+        }
 
         // DD/MM/YYYY or DD-MM-YYYY
         const dmy = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
