@@ -1,11 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
+import { CfoStateService } from '../cfo-engine/cfo-state.service';
+import { CfoEngineService } from '../cfo-engine/cfo-engine.service';
 
 @Injectable()
 export class ExpensesService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        @Inject(forwardRef(() => CfoStateService))
+        private readonly cfoState: CfoStateService,
+        @Inject(forwardRef(() => CfoEngineService))
+        private readonly cfoEngine: CfoEngineService,
+    ) { }
 
     async create(organizationId: string, dto: CreateExpenseDto) {
         // First, get or create a default bank account for the organization
@@ -69,9 +77,10 @@ export class ExpensesService {
         });
     }
 
-    async update(id: string, dto: UpdateExpenseDto) {
+    async update(id: string, dto: UpdateExpenseDto, userId?: string) {
         const existing = await this.prisma.transaction.findUnique({
-            where: { id }
+            where: { id },
+            include: { bankAccount: true }
         });
         if (!existing) {
             throw new Error('Expense not found');
@@ -80,27 +89,54 @@ export class ExpensesService {
         const existingMetadata = (existing.metadata as Record<string, any>) || {};
         const incomingMetadata = dto.metadata || {};
 
+        // Merge notes
+        const notesValue = dto.notes !== undefined ? dto.notes : incomingMetadata.notes;
+
         const updatedMetadata = {
             ...existingMetadata,
             ...incomingMetadata,
             ...(dto.vendor !== undefined && { vendor: dto.vendor }),
             ...(dto.status !== undefined && { status: dto.status }),
+            ...(notesValue !== undefined && { notes: notesValue }),
             ...(dto.tdsApplicable !== undefined && { tdsApplicable: dto.tdsApplicable }),
             ...(dto.tdsAmount !== undefined && { tdsAmount: dto.tdsAmount }),
             ...(dto.gstAmount !== undefined && { gstAmount: dto.gstAmount }),
             ...(dto.receiptUrl !== undefined && { receiptUrl: dto.receiptUrl }),
         };
 
-        return this.prisma.transaction.update({
+        const updated = await this.prisma.transaction.update({
             where: { id },
             data: {
                 amount: dto.amount,
                 category: dto.category,
-                description: dto.description,
+                description: dto.description !== undefined ? dto.description : (notesValue !== undefined ? notesValue : undefined),
                 date: dto.date ? new Date(dto.date) : undefined,
                 metadata: updatedMetadata
             }
         });
+
+        // Trigger cache invalidation and engine recalculations
+        const organizationId = existing.bankAccount.organizationId;
+        this.cfoState.invalidateCache(organizationId);
+
+        if (userId) {
+            const profile = await this.prisma.startupProfile.findFirst({
+                where: { organizationId }
+            });
+            if (profile) {
+                // Run diagnostic engine asynchronously so update isn't blocked
+                this.cfoEngine.runEngine(profile.id, userId)
+                    .then(() => {
+                        this.cfoState.invalidateCache(organizationId);
+                    })
+                    .catch(err => {
+                        // Log but don't crash
+                        console.error('Failed to run diagnostic engine after expense update:', err);
+                    });
+            }
+        }
+
+        return updated;
     }
 
     async remove(id: string) {

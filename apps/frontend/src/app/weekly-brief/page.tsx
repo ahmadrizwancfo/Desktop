@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { canAccess } from '@/lib/feature-gates';
 import { UpgradePrompt } from '@/components/ui/upgrade-prompt';
 import { toast } from 'sonner';
+import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
 
 const CHANNELS = [
     { id: 'EMAIL', label: 'Email', icon: Mail, enabled: true, description: 'Sent to your registered email' },
@@ -453,6 +454,9 @@ export default function WeeklyBriefPage() {
                         <ArrowRight className="w-5 h-5 text-primary" />
                     </div>
                 </motion.div>
+
+                {/* Professional CA Disclaimer */}
+                <FinancialDisclaimer />
             </div>
         </DashboardLayout>
     );

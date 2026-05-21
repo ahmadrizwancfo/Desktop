@@ -43,6 +43,7 @@ const navItems = [
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Compliance', href: '/compliance', icon: ShieldCheck },
     { name: 'Integrations', href: '/integrations', icon: Database },
+    { name: 'Invite Founders', href: '/invite', icon: Users, promo: true },
 ];
 
 import { useAuthStore } from '@/store/auth-store';
@@ -52,7 +53,7 @@ import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
-export function Sidebar() {
+export function Sidebar({ className, onItemClick }: { className?: string; onItemClick?: () => void }) {
     const pathname = usePathname();
     const router = useRouter();
     const logout = useAuthStore((state) => state.logout);
@@ -78,9 +79,9 @@ export function Sidebar() {
     };
 
     return (
-        <div className="w-64 h-full glass-premium border-r border-white/5 flex flex-col pt-6 px-6 pb-10 z-50 flex-shrink-0">
+        <div className={cn("w-64 h-full glass-premium border-r border-white/5 flex flex-col pt-6 px-6 pb-10 z-50 flex-shrink-0", className)}>
             {/* Logo Section */}
-            <Link href="/dashboard" className="flex items-center gap-4 mb-12 group">
+            <Link href="/dashboard" onClick={onItemClick} className="flex items-center gap-4 mb-12 group">
                 <div>
                     <Logo size="md" />
                     <p className="text-[9px] text-primary/80 font-black uppercase tracking-[0.3em] mt-1.5 flex items-center gap-1.5">
@@ -98,6 +99,7 @@ export function Sidebar() {
                         <Link
                             key={item.name}
                             href={item.href}
+                            onClick={onItemClick}
                             className={cn(
                                 "group flex items-center justify-between px-4 py-3 rounded-[1.25rem] transition-all duration-300 relative overflow-hidden",
                                 isActive
@@ -130,6 +132,12 @@ export function Sidebar() {
                                     isActive ? "bg-primary/20 text-primary border-primary/20" : "bg-white/5 text-slate-600 border-white/5"
                                 )}>
                                     AI
+                                </span>
+                            )}
+
+                            {item.promo && (
+                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/25 border border-emerald-500/20 text-emerald-400 tracking-tighter">
+                                    FREE
                                 </span>
                             )}
                         </Link>

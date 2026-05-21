@@ -19,6 +19,7 @@ import { canAccess, getScenarioLimit } from '@/lib/feature-gates';
 import { UpgradePrompt } from '@/components/ui/upgrade-prompt';
 import { toast } from 'sonner';
 import { decodeActionPayload, type ActionPayload } from '@/store/cfo-state-store';
+import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
 
 interface SimulationResult {
     currentCash: number;
@@ -550,7 +551,7 @@ function SimulatorContent() {
                     </motion.div>
                 )}
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center">
@@ -1260,13 +1261,7 @@ function SimulatorContent() {
             </AnimatePresence>
 
             {/* Professional Disclaimer */}
-            <div className="mt-8 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                <p className="text-[9px] text-slate-600 leading-relaxed text-center">
-                    <AlertTriangle className="w-2.5 h-2.5 inline mr-1" />
-                    Simulations are projections based on current data and assumptions. They do not constitute financial advice.
-                    Always consult a qualified Chartered Accountant before making major financial decisions. FounderCFO is not a licensed financial advisor.
-                </p>
-            </div>
+            <FinancialDisclaimer />
         </DashboardLayout>
     );
 }

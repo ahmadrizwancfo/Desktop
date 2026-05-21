@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/lib/api-client';
+import { toast } from 'sonner';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REAL CFO UPGRADE EXPERIENCE
@@ -36,6 +37,46 @@ export default function IntegrationsPage() {
     const [progressStep, setProgressStep] = useState(0);
 
     const [file, setFile] = useState<File | null>(null);
+
+    const { data: connectionsData, refetch: refetchConnections } = useQuery({
+        queryKey: ['connections'],
+        queryFn: async () => {
+            const res = await apiClient.get('/integrations/connections');
+            return res.data;
+        }
+    });
+
+    const razorpayConn = connectionsData?.integrations?.find((conn: any) => conn.type === 'razorpay');
+
+    const syncMutation = useMutation({
+        mutationFn: async (provider: string) => {
+            const res = await apiClient.post(`/integrations/${provider.toLowerCase()}/sync-now`);
+            return res.data;
+        },
+        onSuccess: () => {
+            toast.success('Sync triggered successfully! Refreshing connections...');
+            refetchConnections();
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
+        },
+        onError: () => {
+            toast.error('Sync failed. Please verify credentials or try again later.');
+        }
+    });
+
+    const disconnectMutation = useMutation({
+        mutationFn: async (provider: string) => {
+            const res = await apiClient.post(`/integrations/${provider.toLowerCase()}/disconnect`);
+            return res.data;
+        },
+        onSuccess: () => {
+            toast.success('Disconnected successfully!');
+            refetchConnections();
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
+        },
+        onError: () => {
+            toast.error('Failed to disconnect.');
+        }
+    });
 
     // Mock progress steps for the "alive" feeling
     const progressMessages = [
@@ -100,6 +141,7 @@ export default function IntegrationsPage() {
                 setConnectionMessage(`Connecting to ${provider}...`);
                 try {
                     await apiClient.post('/integrations/razorpay/sync', { keyId, keySecret });
+                    await refetchConnections();
                     await queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
                 } catch (err) {
                     console.error('Failed to sync Razorpay', err);
@@ -256,18 +298,80 @@ export default function IntegrationsPage() {
                                     </div>
 
                                     {/* Razorpay */}
-                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all group flex flex-col h-full">
-                                        <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center mb-5 shrink-0 overflow-hidden">
-                                            <img src="https://www.vectorlogo.zone/logos/razorpay/razorpay-icon.svg" alt="Razorpay" className="w-8 h-8 object-contain" />
+                                    <div className={cn(
+                                        "p-6 rounded-2xl bg-white/[0.02] border transition-all group flex flex-col h-full",
+                                        razorpayConn?.status === 'connected' 
+                                            ? "border-emerald-500/20 bg-emerald-500/[0.01]" 
+                                            : "border-white/5 hover:bg-white/[0.04] hover:border-white/10"
+                                    )}>
+                                        <div className="flex justify-between items-start mb-5">
+                                            <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                                <img src="https://www.vectorlogo.zone/logos/razorpay/razorpay-icon.svg" alt="Razorpay" className="w-8 h-8 object-contain" />
+                                            </div>
+                                            {razorpayConn?.status === 'connected' ? (
+                                                <span className="flex items-center gap-1 text-[10px] font-black text-emerald-400 uppercase bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                                    Connected
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-black text-slate-500 uppercase bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                                                    Disconnected
+                                                </span>
+                                            )}
                                         </div>
-                                        <h3 className="text-lg font-black text-white mb-2">Razorpay</h3>
-                                        <p className="text-sm font-medium text-slate-400 mb-6 flex-1">Automatically track revenue</p>
-                                        <button 
-                                            onClick={() => handleMockConnect('Razorpay')}
-                                            className="w-full py-3.5 rounded-xl bg-white/10 text-white font-black text-[11px] uppercase tracking-widest hover:bg-white/15 transition-all"
-                                        >
-                                            Connect Razorpay
-                                        </button>
+
+                                        <h3 className="text-lg font-black text-white mb-1">Razorpay</h3>
+                                        <p className="text-xs font-medium text-slate-400 flex-1">Automatically track revenue and transaction history</p>
+
+                                        {razorpayConn?.status === 'connected' && (
+                                            <div className="my-4 py-3 px-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5 text-left">
+                                                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                                                    <span>Transactions imported</span>
+                                                    <span className="text-white">{razorpayConn.transactionCount || 0}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                                                    <span>Sync Status</span>
+                                                    <span className="text-sky-400 font-black uppercase tracking-wider">{razorpayConn.syncStatus || 'idle'}</span>
+                                                </div>
+                                                <div className="text-[9px] text-slate-500 mt-1">
+                                                    Last Synced: {razorpayConn.lastSyncedAt ? new Date(razorpayConn.lastSyncedAt).toLocaleString('en-IN') : 'Never'}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex gap-2 mt-auto">
+                                            {razorpayConn?.status === 'connected' ? (
+                                                <>
+                                                    <button 
+                                                        onClick={() => syncMutation.mutate('Razorpay')}
+                                                        disabled={syncMutation.isPending || razorpayConn.syncStatus === 'syncing'}
+                                                        className="flex-1 py-3.5 rounded-xl bg-white text-[#0a0f1e] font-black text-[11px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                                    >
+                                                        <RefreshCw className={cn("w-3.5 h-3.5", (syncMutation.isPending || razorpayConn.syncStatus === 'syncing') && "animate-spin")} />
+                                                        {razorpayConn.syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            if (confirm('Are you sure you want to disconnect Razorpay?')) {
+                                                                disconnectMutation.mutate('Razorpay');
+                                                            }
+                                                        }}
+                                                        disabled={disconnectMutation.isPending}
+                                                        className="px-3.5 py-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-black text-[11px] uppercase tracking-widest border border-rose-500/20 transition-all"
+                                                        title="Disconnect"
+                                                    >
+                                                        Disconnect
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => handleMockConnect('Razorpay')}
+                                                    className="w-full py-3.5 rounded-xl bg-white/10 text-white font-black text-[11px] uppercase tracking-widest hover:bg-white/15 transition-all"
+                                                >
+                                                    Connect Razorpay
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Zoho Books */}

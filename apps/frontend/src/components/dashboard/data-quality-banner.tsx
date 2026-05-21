@@ -19,13 +19,13 @@ export function DataQualityBanner() {
     const dq = useDataQuality();
 
     const score = dq.confidenceScore;
-    const isLow = score < 65;
-    const isMedium = score >= 65 && score < 85;
+    const isPoor = score < 50;
+    const isFair = score >= 50 && score < 70;
 
     const qualityLabel = score >= 85 ? 'Excellent' : score >= 70 ? 'Good' : score >= 50 ? 'Fair' : 'Poor';
     const qualityColor = score >= 85 ? 'emerald' : score >= 70 ? 'sky' : score >= 50 ? 'amber' : 'rose';
 
-    const IconComponent = isLow ? ShieldAlert : isMedium ? Shield : ShieldCheck;
+    const IconComponent = isPoor ? ShieldAlert : isFair ? Shield : ShieldCheck;
 
     return (
         <motion.div
@@ -33,9 +33,9 @@ export function DataQualityBanner() {
             animate={{ opacity: 1, y: 0 }}
             className={cn(
                 "w-full rounded-2xl border px-6 py-4 flex items-center justify-between gap-4 mb-8",
-                isLow && "bg-rose-500/5 border-rose-500/20",
-                isMedium && "bg-amber-500/5 border-amber-500/20",
-                !isLow && !isMedium && "bg-emerald-500/5 border-emerald-500/20",
+                isPoor && "bg-rose-500/5 border-rose-500/20",
+                isFair && "bg-amber-500/5 border-amber-500/20",
+                !isPoor && !isFair && "bg-emerald-500/5 border-emerald-500/20",
             )}
         >
             {/* Left: Icon + Quality Label */}
@@ -54,9 +54,9 @@ export function DataQualityBanner() {
                         </span>
                         <span className={cn(
                             "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md",
-                            isLow && "bg-rose-500/10 text-rose-400",
-                            isMedium && "bg-amber-500/10 text-amber-400",
-                            !isLow && !isMedium && "bg-emerald-500/10 text-emerald-400",
+                            isPoor && "bg-rose-500/10 text-rose-400",
+                            isFair && "bg-amber-500/10 text-amber-400",
+                            !isPoor && !isFair && "bg-emerald-500/10 text-emerald-400",
                         )}>
                             {qualityLabel} ({Math.round(score)}%)
                         </span>
@@ -74,11 +74,14 @@ export function DataQualityBanner() {
                 </div>
             </div>
 
-            {/* Right: Fix Button (only when quality is low) */}
-            {isLow && (
+            {/* Right: Fix Button (only when quality is fair or poor) */}
+            {score < 70 && (
                 <button
-                    onClick={() => router.push('/integrations')}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-rose-400 text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+                    onClick={() => router.push('/expenses?filter=needs-review')}
+                    className={cn(
+                        "flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 whitespace-nowrap",
+                        isPoor ? "bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400" : "bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400"
+                    )}
                 >
                     <AlertTriangle className="w-3.5 h-3.5" />
                     Fix Data Issues

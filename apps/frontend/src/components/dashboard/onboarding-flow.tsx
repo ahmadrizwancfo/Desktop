@@ -91,52 +91,46 @@ export function OnboardingFlow() {
                 </div>
             ),
         },
-        // Step 2: Biggest Leak
+        // Step 2: Top Mandate
         {
-            icon: <TrendingDown className="w-8 h-8 text-rose-400" />,
-            title: 'Biggest Expense Area',
-            subtitle: biggestLeak
-                ? `"${biggestLeak.category}" is your top spend at ${formatCurrency(biggestLeak.amount || 0)}/mo.`
-                : `Your net burn rate is ${formatCurrency(burn)}/month.`,
+            icon: <TrendingDown className="w-8 h-8 text-amber-400" />,
+            title: 'Top Strategic Mandate',
+            subtitle: 'FounderCFO prioritizes your most critical financial mandate.',
             content: (
-                <div className="mt-8 space-y-4">
-                    {categories.slice(0, 4).map((cat, i) => {
-                        const pct = burn > 0 ? ((cat.amount || 0) / burn) * 100 : 0;
-                        return (
-                            <div key={i} className="flex items-center gap-4">
-                                <span className="text-xs text-slate-400 w-28 truncate font-bold">{cat.category}</span>
-                                <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${Math.min(100, pct)}%` }}
-                                        transition={{ delay: i * 0.15, duration: 0.8 }}
-                                        className={cn("h-full rounded-full", i === 0 ? "bg-rose-500" : "bg-white/20")}
-                                    />
-                                </div>
-                                <span className="text-xs text-slate-500 font-bold w-12 text-right">{pct.toFixed(0)}%</span>
-                            </div>
-                        );
-                    })}
-                    {categories.length === 0 && (
-                        <p className="text-sm text-slate-500">Category data will appear after more transactions are processed.</p>
-                    )}
+                <div className="mt-8 p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                            <Zap className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div>
+                            <h4 className="text-white font-black text-xs uppercase tracking-wider text-amber-400">DAILY FOCUS</h4>
+                            <p className="text-white font-bold text-base mt-1">
+                                {state.decisionEngine?.dailyFocus?.oneThing?.title || "Preserve cash & optimize saas subscription stack by 20%."}
+                            </p>
+                            <p className="text-slate-400 text-xs mt-2 leading-relaxed">
+                                Act on this mandate directly from the Decision Center on the dashboard to build trust score.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             ),
         },
-        // Step 3: Quick Win
+        // Step 3: Scenario Simulator
         {
             icon: <Zap className="w-8 h-8 text-primary" />,
-            title: 'Your Quick Win',
-            subtitle: 'One action to improve your financial clarity right now.',
+            title: 'Model Your Future',
+            subtitle: 'Use the What-If Simulator to forecast changes in headcount, revenue, and subscriptions.',
             content: (
                 <div className="mt-8 p-6 bg-primary/5 border border-primary/20 rounded-2xl">
                     <div className="flex items-start gap-4">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <Tag className="w-5 h-5 text-primary" />
+                            <Sparkles className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                            <h4 className="text-white font-black text-lg">{quickWin.title}</h4>
-                            <p className="text-slate-400 text-sm mt-1 leading-relaxed">{quickWin.desc}</p>
+                            <h4 className="text-white font-black text-base">Natural Language Simulator</h4>
+                            <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+                                Simply type things like <span className="text-primary font-bold">"hire 2 devs"</span> or <span className="text-primary font-bold">"cut marketing by 30%"</span> to immediately witness real-time runway impacts.
+                            </p>
                         </div>
                     </div>
                 </div>

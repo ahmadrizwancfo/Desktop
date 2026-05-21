@@ -38,6 +38,10 @@ export class CreateExpenseDto {
     @IsOptional()
     receiptUrl?: string;
 
+    @IsString()
+    @IsOptional()
+    notes?: string;
+
     @IsOptional()
     metadata?: any;
 }

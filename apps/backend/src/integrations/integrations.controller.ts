@@ -38,16 +38,29 @@ export class IntegrationsController {
             where: { organizationId: user.organizationId }
         });
 
-        return {
-            integrations: connections.map(conn => ({
+        const integrations: any[] = [];
+        for (const conn of connections) {
+            let transactionCount = 0;
+            if (conn.provider === 'RAZORPAY') {
+                transactionCount = await this.prisma.transaction.count({
+                    where: {
+                        bankAccount: { organizationId: user.organizationId },
+                        source: 'RAZORPAY'
+                    }
+                });
+            }
+            integrations.push({
                 id: conn.id,
                 type: conn.provider.toLowerCase(),
                 status: conn.status === 'CONNECTED' || conn.status === 'ACTIVE' ? 'connected' : 'disconnected',
                 syncStatus: conn.syncStatus?.toLowerCase() || 'idle',
                 lastSyncedAt: conn.lastSyncedAt,
-                error: conn.lastError
-            }))
-        };
+                error: conn.lastError,
+                transactionCount
+            });
+        }
+
+        return { integrations };
     }
 
     @Post(':provider/disconnect')

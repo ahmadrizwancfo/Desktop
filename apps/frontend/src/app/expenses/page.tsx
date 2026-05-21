@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { CreateExpenseModal } from '@/components/modals/create-expense-modal';
 import { ExpenseBreakdown } from '@/components/dashboard/expense-breakdown';
@@ -13,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DecisionBadge } from '@/components/ui/decision-badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
 
 const INDIAN_CATEGORIES = [
     'Salary & Payroll', 'TDS Deducted', 'GST Paid', 'Marketing & Ads',
@@ -22,8 +24,11 @@ const INDIAN_CATEGORIES = [
 
 type FilterTab = 'all' | 'needs_review' | 'uncategorized' | 'high_value';
 
-export default function ExpensesPage() {
+function ExpensesContent() {
     const user = useAuthStore((state) => state.user);
+    const searchParams = useSearchParams();
+    const initialFilter = searchParams.get('filter');
+
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showBreakdown, setShowBreakdown] = useState(true);
@@ -31,7 +36,17 @@ export default function ExpensesPage() {
     const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
     const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
     const [editNotesValue, setEditNotesValue] = useState('');
+    const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
+    const [sessionFixes, setSessionFixes] = useState(0);
+
     const queryClient = useQueryClient();
+
+    // Trigger filterTab change when params change
+    useEffect(() => {
+        if (initialFilter === 'needs-review') {
+            setFilterTab('needs_review');
+        }
+    }, [initialFilter]);
 
     // THE ONE SOURCE: CFOState
     const { data: cfoState } = useCFOState();
@@ -56,19 +71,58 @@ export default function ExpensesPage() {
         enabled: !!user?.organizationId,
     });
 
-    // Mutation: inline category/notes edit
-    const updateExpenseMutation = useMutation({
-        mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
-            const res = await apiClient.patch(`/expenses/${id}`, data);
+    // Mutation: force sync
+    const forceSyncMutation = useMutation({
+        mutationFn: async () => {
+            const res = await apiClient.post('/cfo-engine/sync/force');
             return res.data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['expenses'] });
             queryClient.invalidateQueries({ queryKey: ['expenses-stats'] });
             queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
+            toast.success('CFO state successfully recalculated!');
+            setSessionFixes(0); // Reset
+        },
+        onError: () => {
+            toast.error('Sync failed. Try again.');
+        }
+    });
+
+    // Mutation: inline category/notes edit
+    const updateExpenseMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: string; data: Record<string, any> }) => {
+            const res = await apiClient.patch(`/expenses/${id}`, data);
+            return res.data;
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['expenses'] });
+            queryClient.invalidateQueries({ queryKey: ['expenses-stats'] });
+            queryClient.invalidateQueries({ queryKey: ['cfo-state'] });
             toast.success('Transaction updated. Refreshing analysis...');
             setEditingCategoryId(null);
             setEditingNotesId(null);
+            
+            // Set temporary highlight
+            setHighlightedRowId(variables.id);
+            setTimeout(() => setHighlightedRowId(null), 2500);
+
+            // Increment session fixes if verifying or categorizing
+            if (variables.data?.metadata?.status === 'VERIFIED' || variables.data?.status === 'VERIFIED') {
+                setSessionFixes(prev => {
+                    const newVal = prev + 1;
+                    if (newVal >= 3) {
+                        toast.success('Outstanding! You have verified 3+ items. Let\'s sync your new CFO State!', {
+                            action: {
+                                label: 'Re-calculate CFO',
+                                onClick: () => forceSyncMutation.mutate()
+                            },
+                            duration: 8000
+                        });
+                    }
+                    return newVal;
+                });
+            }
         },
         onError: () => {
             toast.error('Failed to update. Try again.');
@@ -209,7 +263,7 @@ export default function ExpensesPage() {
                         </div>
 
                         {/* Expenses Table */}
-                        <div className="glass-card rounded-3xl overflow-hidden">
+                        <div className="glass-card rounded-3xl overflow-x-auto custom-scrollbar">
                             {isLoading ? (
                                 <div className="flex items-center justify-center py-20">
                                     <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -220,6 +274,7 @@ export default function ExpensesPage() {
                                         <tr className="border-b border-white/10">
                                             <th className="text-left p-4 text-xs text-slate-500 uppercase tracking-widest font-bold">Vendor</th>
                                             <th className="text-left p-4 text-xs text-slate-500 uppercase tracking-widest font-bold">Category</th>
+                                            <th className="text-left p-4 text-xs text-slate-500 uppercase tracking-widest font-bold">Notes</th>
                                             <th className="text-left p-4 text-xs text-slate-500 uppercase tracking-widest font-bold">Amount</th>
                                             <th className="text-left p-4 text-xs text-slate-500 uppercase tracking-widest font-bold">Date</th>
                                             <th className="text-left p-4 text-xs text-slate-500 uppercase tracking-widest font-bold">Status</th>
@@ -237,7 +292,10 @@ export default function ExpensesPage() {
                                                     initial={{ opacity: 0 }}
                                                     animate={{ opacity: 1 }}
                                                     transition={{ delay: i * 0.05 }}
-                                                    className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                                                    className={cn(
+                                                        "border-b border-white/5 hover:bg-white/5 transition-colors",
+                                                        highlightedRowId === expense.id && "bg-emerald-500/10 border-emerald-500/30 animate-pulse"
+                                                    )}
                                                 >
                                                     <td className="p-4">
                                                         <div className="flex items-center gap-3">
@@ -269,6 +327,41 @@ export default function ExpensesPage() {
                                                             >
                                                                 {expense.category || 'Uncategorized'}
                                                                 <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4">
+                                                        {editingNotesId === expense.id ? (
+                                                            <div className="flex items-center gap-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={editNotesValue}
+                                                                    onChange={(e) => setEditNotesValue(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            updateExpenseMutation.mutate({ id: expense.id, data: { notes: editNotesValue } });
+                                                                        }
+                                                                    }}
+                                                                    autoFocus
+                                                                    className="bg-slate-800 border border-primary/30 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-primary min-w-[120px]"
+                                                                />
+                                                                <button
+                                                                    onClick={() => updateExpenseMutation.mutate({ id: expense.id, data: { notes: editNotesValue } })}
+                                                                    className="p-1 rounded bg-primary/20 text-primary hover:bg-primary/30"
+                                                                >
+                                                                    <Check className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingNotesId(expense.id);
+                                                                    setEditNotesValue(metadata.notes || expense.description || '');
+                                                                }}
+                                                                className="text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors group text-left max-w-[150px] truncate"
+                                                            >
+                                                                <span className="truncate">{metadata.notes || expense.description || <span className="text-slate-600 italic">Add note...</span>}</span>
+                                                                <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                                                             </button>
                                                         )}
                                                     </td>
@@ -405,8 +498,24 @@ export default function ExpensesPage() {
                         </div>
                     </div>
                 </div>
+                {/* Professional CA Disclaimer */}
+                <FinancialDisclaimer />
             </div>
         </DashboardLayout>
+    );
+}
+
+export default function ExpensesPage() {
+    return (
+        <Suspense fallback={
+            <DashboardLayout>
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary animate-pulse" />
+                </div>
+            </DashboardLayout>
+        }>
+            <ExpensesContent />
+        </Suspense>
     );
 }
 

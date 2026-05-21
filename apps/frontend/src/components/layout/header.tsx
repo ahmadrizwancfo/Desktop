@@ -36,7 +36,7 @@ export function Header() {
         <header className="h-20 border-b border-white/5 bg-background/30 backdrop-blur-xl sticky top-0 z-40 px-8 flex items-center justify-between group/header transition-all duration-500 hover:bg-background/40">
             {/* Subtle Header Bottom Glow */}
             <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover/header:opacity-100 transition-opacity duration-700" />
-            <div className="flex items-center gap-6 w-[450px]">
+            <div className="hidden md:flex items-center gap-6 w-[450px]">
                 <div className="relative w-full group/search">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within/search:text-primary transition-colors duration-300" />
                     <input
@@ -51,17 +51,20 @@ export function Header() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 md:gap-6 ml-auto">
                 {/* Data Freshness Indicator */}
                 {lastUpdatedAt && (
                     <div className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-wider transition-all",
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all",
                         stale 
                             ? "bg-rose-500/10 border-rose-500/30 text-rose-400 group relative cursor-help" 
                             : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                     )}>
-                        {stale ? <AlertTriangle className="w-3 h-3 animate-pulse" /> : <Clock className="w-3 h-3" />}
-                        <span className="font-black">Command Sync: {timeAgo(lastUpdatedAt)}</span>
+                        {stale ? <AlertTriangle className="w-3 h-3 animate-pulse" /> : <Clock className="w-3 h-3 text-primary" />}
+                        <span className="font-black">
+                            <span className="hidden sm:inline">Command Sync: </span>
+                            {timeAgo(lastUpdatedAt)}
+                        </span>
                         
                         {stale && (
                             <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 p-2 bg-slate-900 border border-white/10 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 normal-case font-medium text-slate-300">
