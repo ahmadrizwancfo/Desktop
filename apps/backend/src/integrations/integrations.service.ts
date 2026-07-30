@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StartupProfileService } from '../startup-profile/startup-profile.service';
 import * as Papa from 'papaparse';
 import * as crypto from 'crypto';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class IntegrationsService {
@@ -14,28 +15,72 @@ export class IntegrationsService {
     ) { }
 
     async processCsvUpload(file: Express.Multer.File, importType: string, organizationId: string, userId: string) {
-        this.logger.log(`Processing CSV upload (${importType}) for organization ${organizationId}`);
+        this.logger.log(`Processing file upload (${importType}) for organization ${organizationId}`);
 
-        // 1. Parse CSV
-        const csvText = file.buffer.toString('utf-8');
-        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+        // 1. Parse file — CSV or Excel
+        const extension = file.originalname.split('.').pop()?.toLowerCase();
+        let rows: Record<string, any>[];
 
-        if (parsed.errors.length > 0) {
-            this.logger.warn(`CSV Parse warnings: ${JSON.stringify(parsed.errors)}`);
+        if (extension === 'xlsx' || extension === 'xls') {
+            // Parse Excel with the xlsx library
+            const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true });
+            const sheetName = workbook.SheetNames[0];
+            if (!sheetName) {
+                throw new BadRequestException('Excel file has no sheets');
+            }
+            const sheet = workbook.Sheets[sheetName];
+            rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+        } else {
+            // Parse CSV with PapaParse
+            const csvText = file.buffer.toString('utf-8');
+            const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+            if (parsed.errors.length > 0) {
+                this.logger.warn(`CSV Parse warnings: ${JSON.stringify(parsed.errors)}`);
+            }
+            rows = parsed.data as Record<string, any>[];
         }
-        
-        const rows = parsed.data as Record<string, any>[];
         if (rows.length === 0) {
-            throw new BadRequestException('CSV file is empty or invalid format');
+            throw new BadRequestException('File is empty or has no data rows');
         }
 
-        // Validate Headers - look for at least date and amount equivalent columns
-        const headers = Object.keys(rows[0]).map(h => h.toLowerCase());
-        const hasDate = headers.some(h => h.includes('date'));
-        const hasAmount = headers.some(h => h.includes('amount') || h.includes('value'));
+        // ── Schema Detection ────────────────────────────────────────────────────
+        // Auto-detect what kind of financial data this file contains and route
+        // to the correct processing pipeline.
+        const headers = Object.keys(rows[0]).map(h => h.toLowerCase().trim());
+        this.logger.log(`Detected columns: [${headers.join(', ')}]`);
 
-        if (!hasDate || !hasAmount) {
-            throw new BadRequestException('CSV is missing required columns. Must have at least "Date" and "Amount" (or "Value").');
+        const hasCol = (...synonyms: string[]) =>
+            headers.some(h => synonyms.some(s => h === s || h.includes(s)));
+
+        // Balance-sheet / financial-metrics fingerprint
+        const isBalanceSheet = hasCol('total_assets', 'total assets', 'totalassets')
+            || hasCol('equity', 'total_equity', 'shareholders equity')
+            || hasCol('total_liabilities', 'total liabilities', 'totalliabilities')
+            || (hasCol('cash', 'accounts_receivable', 'fixed_assets') && !hasCol('date', 'txn date'));
+
+        // Transaction / bank-statement fingerprint
+        const DATE_SYNONYMS   = ['date', 'txn date', 'transaction date', 'value date', 'trans date', 'posting date', 'entry date'];
+        const AMOUNT_SYNONYMS = ['amount', 'value', 'net amount', 'transaction amount', 'txn amount'];
+        const DEBIT_SYNONYMS  = ['debit', 'dr', 'withdrawal', 'withdrawal amt', 'debit amount'];
+        const CREDIT_SYNONYMS = ['credit', 'cr', 'deposit', 'deposit amt', 'credit amount'];
+
+        const hasDate   = hasCol(...DATE_SYNONYMS);
+        const hasAmount = hasCol(...AMOUNT_SYNONYMS)
+                       || (hasCol(...DEBIT_SYNONYMS) && hasCol(...CREDIT_SYNONYMS));
+        const isTransactionFile = hasDate && hasAmount;
+
+        // ── Route to correct pipeline ────────────────────────────────────────────
+        if (isBalanceSheet) {
+            this.logger.log('Detected Balance Sheet / Financial Metrics file — routing to balance-sheet pipeline');
+            return this.processBalanceSheetRows(rows, organizationId, userId, file.originalname);
+        }
+
+        if (!isTransactionFile) {
+            throw new BadRequestException(
+                `Unrecognised file format. Detected columns: [${headers.join(', ')}]. ` +
+                `Supported formats: (1) Bank statements with Date + Amount/Debit/Credit columns, ` +
+                `(2) Balance sheets with Assets/Liabilities/Equity columns.`
+            );
         }
 
         // 2. Log Raw Import (Sync History)
@@ -45,7 +90,7 @@ export class IntegrationsService {
                 organizationId,
                 provider: 'CSV_MANUAL',
                 sourceType: importType,
-                rawPayload: parsed.data as any,
+                rawPayload: rows as any,
                 status: 'PROCESSING',
             }
         });
@@ -75,31 +120,64 @@ export class IntegrationsService {
         let totalExpenseImported = 0;
 
         for (const row of rows) {
-            // Find likely columns regardless of exact casing
-            const getDateCol = () => row['Date'] || row['date'] || row['Transaction Date'] || row['transaction_date'];
-            const getAmountCol = () => row['Amount'] || row['amount'] || row['Value'] || row['value'];
-            const getDescCol = () => row['Description'] || row['description'] || row['Memo'] || row['memo'] || row['Notes'] || row['notes'] || 'CSV Import';
-            const getTypeCol = () => row['Type'] || row['type'] || row['Transaction Type'];
+            // Resolve column value by trying multiple name aliases (case-insensitive)
+            const resolveCol = (...aliases: string[]): any => {
+                const rowKeys = Object.keys(row);
+                for (const alias of aliases) {
+                    const key = rowKeys.find(k => k.toLowerCase().trim() === alias.toLowerCase().trim()
+                                               || k.toLowerCase().trim().includes(alias.toLowerCase().trim()));
+                    if (key !== undefined && row[key] !== '' && row[key] !== null && row[key] !== undefined) {
+                        return row[key];
+                    }
+                }
+                return undefined;
+            };
 
-            const rawDate = getDateCol();
+            const getDateCol   = () => resolveCol('date', 'txn date', 'transaction date', 'value date', 'trans date', 'posting date', 'entry date');
+            const getDescCol   = () => resolveCol('description', 'narration', 'particulars', 'memo', 'remarks', 'notes', 'details', 'chq/ref no', 'ref no', 'reference') ?? 'Import';
+            const getTypeCol   = () => resolveCol('type', 'transaction type', 'txn type', 'dr/cr', 'cr/dr');
+
+            // Amount resolution: prefer unified Amount column; fall back to separate Debit/Credit columns
+            const getAmountCol = (): number | undefined => {
+                const unified = resolveCol('amount', 'net amount', 'transaction amount', 'txn amount', 'value', 'net');
+                if (unified !== undefined && unified !== '') return Number(String(unified).replace(/[^0-9.-]+/g, '')) || undefined;
+
+                const debit  = Number(String(resolveCol('debit', 'withdrawal', 'withdrawal amt', 'dr', 'debit amount', 'dr amount') ?? '').replace(/[^0-9.]+/g, '')) || 0;
+                const credit = Number(String(resolveCol('credit', 'deposit', 'deposit amt', 'cr', 'credit amount', 'cr amount') ?? '').replace(/[^0-9.]+/g, '')) || 0;
+                if (debit === 0 && credit === 0) return undefined;
+                // Return signed: credit = positive (INCOME), debit = negative (EXPENSE)
+                return credit > 0 ? credit : -debit;
+            };
+
+            const rawDate   = getDateCol();
             const rawAmount = getAmountCol();
-            const rawDesc = getDescCol();
+            const rawDesc   = getDescCol();
             
-            if (!rawDate || !rawAmount) {
+            if (!rawDate || rawAmount === undefined) {
                 failedCount++;
                 continue;
             }
 
-            // Parse Date
-            const parsedDate = new Date(rawDate);
+            // Parse Date — also handles Excel serial date numbers
+            let parsedDate: Date;
+            if (typeof rawDate === 'number') {
+                // Excel serial date: days since 1899-12-30 (Excel epoch)
+                const excelEpoch = new Date(1899, 11, 30);
+                parsedDate = new Date(excelEpoch.getTime() + rawDate * 86400000);
+            } else if (rawDate instanceof Date) {
+                // xlsx with cellDates:true returns a real JS Date
+                parsedDate = rawDate;
+            } else {
+                parsedDate = new Date(rawDate);
+            }
             if (isNaN(parsedDate.getTime())) {
                 failedCount++;
                 continue;
             }
 
-            // Parse Amount
-            const stringAmount = String(rawAmount).replace(/[^0-9.-]+/g, '');
-            const amountVal = parseFloat(stringAmount);
+            // Amount is already a number from getAmountCol()
+            const amountVal = typeof rawAmount === 'number' ? rawAmount
+                            : parseFloat(String(rawAmount).replace(/[^0-9.-]+/g, ''));
             if (isNaN(amountVal) || amountVal === 0) {
                 failedCount++;
                 continue;
@@ -198,6 +276,117 @@ export class IntegrationsService {
         
         return 'misc';
     }
+
+    // ── Balance Sheet / Financial Metrics Pipeline ───────────────────────────────
+    // Maps rows with columns like Cash, Total_Assets, Equity, etc. into the
+    // FinancialMetrics table. Each row = one snapshot/period.
+    private async processBalanceSheetRows(
+        rows: Record<string, any>[],
+        organizationId: string,
+        userId: string,
+        sourceFile: string,
+    ) {
+        // Flexible column resolver (case/underscore insensitive)
+        const resolve = (row: Record<string, any>, ...aliases: string[]): number | null => {
+            const keys = Object.keys(row);
+            for (const alias of aliases) {
+                const key = keys.find(k =>
+                    k.toLowerCase().replace(/_/g, ' ').trim() === alias.toLowerCase().replace(/_/g, ' ').trim()
+                    || k.toLowerCase().trim() === alias.toLowerCase().trim()
+                );
+                if (key !== undefined && row[key] !== '' && row[key] !== null && row[key] !== undefined) {
+                    const num = Number(String(row[key]).replace(/[^0-9.-]/g, ''));
+                    return isNaN(num) ? null : num;
+                }
+            }
+            return null;
+        };
+
+        let importedCount = 0;
+        let failedCount   = 0;
+
+        for (const row of rows) {
+            try {
+                // Map all common balance-sheet column names
+                const cash                = resolve(row, 'cash', 'cash and equivalents', 'cash & equivalents');
+                const accountsReceivable  = resolve(row, 'accounts_receivable', 'accounts receivable', 'receivables', 'trade receivables');
+                const inventory           = resolve(row, 'inventory', 'inventories', 'stock');
+                const fixedAssets         = resolve(row, 'fixed_assets', 'fixed assets', 'property plant equipment', 'ppe', 'non current assets');
+                const totalAssets         = resolve(row, 'total_assets', 'total assets', 'assets total');
+                const accountsPayable     = resolve(row, 'accounts_payable', 'accounts payable', 'trade payables', 'payables');
+                const shortTermDebt       = resolve(row, 'short_term_debt', 'short term debt', 'current liabilities', 'current portion of debt');
+                const longTermDebt        = resolve(row, 'long_term_debt', 'long term debt', 'long-term liabilities', 'non current liabilities');
+                const totalLiabilities    = resolve(row, 'total_liabilities', 'total liabilities', 'liabilities total');
+                const equity              = resolve(row, 'equity', 'total_equity', 'shareholders equity', "stockholders' equity", 'net worth');
+                const revenue             = resolve(row, 'revenue', 'total_revenue', 'sales', 'net revenue', 'turnover');
+                const netProfit           = resolve(row, 'net_profit', 'net profit', 'net income', 'profit after tax', 'pat');
+                const grossProfit         = resolve(row, 'gross_profit', 'gross profit', 'gross margin');
+                const totalExpenses       = resolve(row, 'total_expenses', 'total expenses', 'operating expenses', 'opex');
+                const operatingCashFlow   = resolve(row, 'operating_cash_flow', 'operating cash flow', 'cash from operations', 'cfo');
+                const period              = resolve(row, 'period', 'year', 'month', 'quarter', 'record_id') ?? importedCount + 1;
+
+                // Compute derived ratios where possible
+                const currentAssets       = cash !== null && accountsReceivable !== null && inventory !== null
+                                          ? (cash + accountsReceivable + inventory) : null;
+                const currentLiabilities  = shortTermDebt ?? accountsPayable;
+                const currentRatio        = currentAssets && currentLiabilities && currentLiabilities > 0
+                                          ? currentAssets / currentLiabilities : null;
+                const debtToEquity        = totalLiabilities && equity && equity > 0
+                                          ? totalLiabilities / equity : null;
+
+                await this.prisma.financialMetrics.create({
+                    data: {
+                        organizationId,
+                        documentType:       'BALANCE_SHEET',
+                        period:             String(period),
+                        sourceFile,
+                        confidence:         'HIGH',
+                        // Assets
+                        currentAssets:      currentAssets       ?? undefined,
+                        totalAssets:        totalAssets         ?? undefined,
+                        // Liabilities
+                        currentLiabilities: currentLiabilities  ?? undefined,
+                        totalLiabilities:   totalLiabilities    ?? undefined,
+                        // Equity
+                        totalEquity:        equity              ?? undefined,
+                        // P&L
+                        revenue:            revenue             ?? undefined,
+                        netProfit:          netProfit           ?? undefined,
+                        grossProfit:        grossProfit         ?? undefined,
+                        totalExpenses:      totalExpenses       ?? undefined,
+                        // Cash flow
+                        operatingCashFlow:  operatingCashFlow   ?? undefined,
+                        // Liquidity
+                        closingBalance:     cash                ?? undefined,
+                        // Computed ratios
+                        currentRatio:       currentRatio        ?? undefined,
+                        debtToEquity:       debtToEquity        ?? undefined,
+                        // Keep full raw row for auditability
+                        extractedFields:    Object.keys(row),
+                    }
+                });
+
+                importedCount++;
+            } catch (err) {
+                this.logger.warn(`Failed to import balance-sheet row: ${JSON.stringify(err)}`);
+                failedCount++;
+            }
+        }
+
+        await this.upsertConnectionStatus(userId, organizationId);
+
+        return {
+            status:         'success',
+            dataType:       'BALANCE_SHEET',
+            message:        `Imported ${importedCount} financial metric snapshot(s) from ${rows.length} rows.`,
+            importedCount,
+            failedCount,
+            duplicateCount: 0,
+            skippedCount:   0,
+        };
+    }
+
+
 
     public async recalculateProfileAggregations(userId: string, organizationId: string) {
         // Find existing profile

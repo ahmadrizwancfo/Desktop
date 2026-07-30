@@ -82,62 +82,69 @@ export function CashFlowForecast({ forecasts, currentCash }: CashFlowForecastPro
             </div>
 
             {/* Forecast Chart */}
-            <div className="relative mb-4" style={{ height: '192px' }}>
-                {/* Zero line if applicable */}
-                {minCash < 0 && (
-                    <div
-                        className="absolute left-0 right-0 border-t border-dashed border-rose-500/50"
-                        style={{ bottom: `${getBarHeight(0)}%` }}
-                    >
-                        <span className="absolute -left-1 -top-2.5 text-[10px] text-rose-400">₹0</span>
-                    </div>
-                )}
-
-                <div className="flex items-end justify-between gap-2 px-4" style={{ height: '160px' }}>
-                    {/* Current month indicator */}
-                    <div
-                        className="flex flex-col items-center flex-1"
-                        onMouseEnter={() => setHoveredMonth(-1)}
-                        onMouseLeave={() => setHoveredMonth(null)}
-                    >
-                        <motion.div
-                            className={`w-full max-w-[40px] rounded-t-lg ${zoneColors[getCashZoneAtMonth(-1)]} cursor-pointer hover:opacity-80 transition-opacity`}
-                            initial={{ height: 0 }}
-                            animate={{ height: Math.round(getBarHeight(currentCash) * 1.4) }}
-                            transition={{ duration: 0.5 }}
-                        />
-                        <span className="text-[10px] text-slate-500 mt-2">Now</span>
-                    </div>
-
-                    {forecasts.map((forecast, i) => {
-                        const zone = getCashZoneAtMonth(i);
-                        const barHeight = Math.round(getBarHeight(forecast.projectedCash) * 1.4);
-                        return (
-                            <div
-                                key={i}
-                                className="flex flex-col items-center flex-1"
-                                onMouseEnter={() => setHoveredMonth(i)}
-                                onMouseLeave={() => setHoveredMonth(null)}
-                            >
-                                <motion.div
-                                    className={`w-full max-w-[40px] rounded-t-lg ${zoneColors[zone]} cursor-pointer hover:opacity-80 transition-opacity relative`}
-                                    initial={{ height: 0 }}
-                                    animate={{ height: Math.max(barHeight, 8) }}
-                                    transition={{ duration: 0.5, delay: i * 0.1 }}
-                                >
-                                    {/* Event indicators */}
-                                    {forecast.events && forecast.events.length > 0 && (
-                                        <div className="absolute -top-5 left-1/2 -translate-x-1/2">
-                                            <Zap className="w-3 h-3 text-amber-400" />
-                                        </div>
-                                    )}
-                                </motion.div>
-                                <span className="text-[10px] text-slate-500 mt-2">{forecast.month}</span>
-                            </div>
-                        );
-                    })}
+            {forecasts.length === 0 ? (
+                <div className="py-12 text-center text-slate-500">
+                    <p className="text-sm font-medium">No cash flow forecast projection available.</p>
+                    <p className="text-xs text-slate-600 mt-1">Connect financial data sources to enable automated forecasts.</p>
                 </div>
-            </div>
+            ) : (
+                <div className="relative mb-4" style={{ height: '192px' }}>
+                    {/* Zero line if applicable */}
+                    {minCash < 0 && (
+                        <div
+                            className="absolute left-0 right-0 border-t border-dashed border-rose-500/50"
+                            style={{ bottom: `${getBarHeight(0)}%` }}
+                        >
+                            <span className="absolute -left-1 -top-2.5 text-[10px] text-rose-400">₹0</span>
+                        </div>
+                    )}
+
+                    <div className="flex items-end justify-between gap-2 px-4" style={{ height: '160px' }}>
+                        {/* Current month indicator */}
+                        <div
+                            className="flex flex-col items-center flex-1"
+                            onMouseEnter={() => setHoveredMonth(-1)}
+                            onMouseLeave={() => setHoveredMonth(null)}
+                        >
+                            <motion.div
+                                className={`w-full max-w-[40px] rounded-t-lg ${zoneColors[getCashZoneAtMonth(-1)]} cursor-pointer hover:opacity-80 transition-opacity`}
+                                initial={{ height: 0 }}
+                                animate={{ height: Math.round(getBarHeight(currentCash) * 1.4) }}
+                                transition={{ duration: 0.5 }}
+                            />
+                            <span className="text-[10px] text-slate-500 mt-2">Now</span>
+                        </div>
+
+                        {forecasts.map((forecast, i) => {
+                            const zone = getCashZoneAtMonth(i);
+                            const barHeight = Math.round(getBarHeight(forecast.projectedCash) * 1.4);
+                            return (
+                                <div
+                                    key={i}
+                                    className="flex flex-col items-center flex-1"
+                                    onMouseEnter={() => setHoveredMonth(i)}
+                                    onMouseLeave={() => setHoveredMonth(null)}
+                                >
+                                    <motion.div
+                                        className={`w-full max-w-[40px] rounded-t-lg ${zoneColors[zone]} cursor-pointer hover:opacity-80 transition-opacity relative`}
+                                        initial={{ height: 0 }}
+                                        animate={{ height: Math.max(barHeight, 8) }}
+                                        transition={{ duration: 0.5, delay: i * 0.1 }}
+                                    >
+                                        {/* Event indicators */}
+                                        {forecast.events && forecast.events.length > 0 && (
+                                            <div className="absolute -top-5 left-1/2 -translate-x-1/2">
+                                                <Zap className="w-3 h-3 text-amber-400" />
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                    <span className="text-[10px] text-slate-500 mt-2">{forecast.month}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Hover Detail */}
             <motion.div
@@ -214,16 +221,4 @@ export function CashFlowForecast({ forecasts, currentCash }: CashFlowForecastPro
     );
 }
 
-// Default forecast with mock data
-export function DefaultCashFlowForecast() {
-    const forecasts: ForecastMonth[] = [
-        { month: 'Feb', projectedCash: 1720000, revenue: 320000, expenses: 400000, netFlow: -80000 },
-        { month: 'Mar', projectedCash: 1440000, revenue: 340000, expenses: 420000, netFlow: -80000, events: [{ type: 'expense', label: 'GST Payment', amount: 100000 }] },
-        { month: 'Apr', projectedCash: 1160000, revenue: 360000, expenses: 440000, netFlow: -80000 },
-        { month: 'May', projectedCash: 880000, revenue: 380000, expenses: 460000, netFlow: -80000, events: [{ type: 'expense', label: 'Annual AWS', amount: 150000 }] },
-        { month: 'Jun', projectedCash: 600000, revenue: 400000, expenses: 480000, netFlow: -80000 },
-        { month: 'Jul', projectedCash: 320000, revenue: 420000, expenses: 500000, netFlow: -80000 },
-    ];
 
-    return <CashFlowForecast forecasts={forecasts} currentCash={2000000} />;
-}

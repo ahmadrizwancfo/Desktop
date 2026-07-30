@@ -9,6 +9,7 @@ import { useCfoStateStore } from '@/store/cfo-state-store';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Info, Menu, X, MessageSquare, Send, Sparkles } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
+import { CommandPalette } from './command-palette';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -68,7 +69,7 @@ export function DashboardLayout({ children, banner }: { children: React.ReactNod
             </AnimatePresence>
 
             {/* Mobile Top Navbar */}
-            <div className="flex lg:hidden items-center justify-between px-6 py-4 bg-[#0a0f1e]/80 border-b border-white/5 shrink-0 z-40">
+            <div className="flex md:hidden items-center justify-between px-6 py-4 bg-[#0a0f1e]/80 border-b border-white/5 shrink-0 z-40">
                 <Logo size="sm" />
                 <button
                     onClick={() => setIsMobileMenuOpen(true)}
@@ -81,7 +82,7 @@ export function DashboardLayout({ children, banner }: { children: React.ReactNod
             {/* Mobile Sidebar Overlay Drawer */}
             <AnimatePresence>
                 {isMobileMenuOpen && (
-                    <div className="fixed inset-0 z-[100] flex lg:hidden">
+                    <div className="fixed inset-0 z-[100] flex md:hidden">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 0.6 }}
@@ -114,7 +115,7 @@ export function DashboardLayout({ children, banner }: { children: React.ReactNod
 
             <div className="flex-1 bg-[#020617] text-foreground flex overflow-hidden">
                 {/* Sidebar - Desktop */}
-                <Sidebar className="hidden lg:flex" />
+                <Sidebar className="hidden md:flex" />
 
                 {/* Main Content */}
                 <main className="flex-1 flex flex-col overflow-hidden">
@@ -128,74 +129,9 @@ export function DashboardLayout({ children, banner }: { children: React.ReactNod
                 </main>
             </div>
 
-            {/* Keyboard Shortcuts */}
+            {/* Keyboard Shortcuts & Global Command Palette */}
             <KeyboardShortcuts />
-
-            {/* Floating Feedback Trigger */}
-            <div className="fixed bottom-6 right-6 z-40">
-                <button
-                    onClick={() => setIsFeedbackOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-wider shadow-lg hover:scale-105 active:scale-95 transition-all"
-                >
-                    <MessageSquare className="w-4 h-4 fill-current" />
-                    Feedback
-                </button>
-            </div>
-
-            {/* Feedback Form Modal */}
-            <AnimatePresence>
-                {isFeedbackOpen && (
-                    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="w-full max-w-md bg-[#0a0f1e] border border-white/10 rounded-[2rem] p-8 shadow-2xl relative"
-                        >
-                            <button
-                                onClick={() => setIsFeedbackOpen(false)}
-                                className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-
-                            <h3 className="text-xl font-black text-white mb-2 flex items-center gap-2 tracking-tight">
-                                <Sparkles className="w-5 h-5 text-primary" />
-                                What can we improve?
-                            </h3>
-                            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
-                                Your advice shapes FounderCFO. Suggest dashboard enhancements, new calculations, or report styles.
-                            </p>
-
-                            <form onSubmit={handleFeedbackSubmit} className="space-y-4">
-                                <textarea
-                                    required
-                                    rows={4}
-                                    value={feedbackText}
-                                    onChange={(e) => setFeedbackText(e.target.value)}
-                                    placeholder="I'd love to see direct Stripe invoice imports, or more granular burn charts..."
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 text-sm resize-none"
-                                />
-
-                                <button
-                                    type="submit"
-                                    disabled={submittingFeedback || !feedbackText.trim()}
-                                    className="w-full py-4 rounded-xl bg-white text-[#020617] font-black text-xs uppercase tracking-widest hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                                >
-                                    {submittingFeedback ? (
-                                        <>Submitting...</>
-                                    ) : (
-                                        <>
-                                            <Send className="w-3.5 h-3.5 fill-current" />
-                                            Submit Feedback
-                                        </>
-                                    )}
-                                </button>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            <CommandPalette />
 
             {/* Dynamic Background Effects */}
             <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-hidden">

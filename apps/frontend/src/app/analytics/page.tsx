@@ -4,8 +4,8 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { FileUpload } from '@/components/dashboard/file-upload';
-import { DefaultMonthlyComparison } from '@/components/dashboard/monthly-comparison';
-import { DefaultCashFlowForecast } from '@/components/dashboard/cash-flow-forecast';
+import { MonthlyComparison } from '@/components/dashboard/monthly-comparison';
+import { CashFlowForecast } from '@/components/dashboard/cash-flow-forecast';
 import { ExpenseBreakdown } from '@/components/dashboard/expense-breakdown';
 import { useCFOState, formatCurrency, getTimeSince } from '@/store/cfo-state-store';
 import {
@@ -162,7 +162,7 @@ export default function AnalyticsPage() {
                             {/* Left Column - Forecasts & Charts */}
                             <div className="lg:col-span-2 space-y-8">
                                 {/* Cash Flow Forecast */}
-                                <DefaultCashFlowForecast />
+                                <CashFlowForecast forecasts={[]} currentCash={cfoState.summary.cashInBank} />
 
                                 {/* Category Breakdown from CFOState */}
                                 {cfoState.categoryBreakdown.length > 0 && (
@@ -233,7 +233,14 @@ export default function AnalyticsPage() {
                             {/* Right Column */}
                             <div className="space-y-6">
                                 {/* Monthly Comparison */}
-                                <DefaultMonthlyComparison />
+                                <MonthlyComparison
+                                    currentMonth="Current"
+                                    previousMonth="Previous"
+                                    metrics={[
+                                        { label: 'Revenue', currentValue: cfoState.summary.monthlyRevenue, previousValue: cfoState.summary.prevMonthlyRevenue || 0, format: 'currency', goodDirection: 'up' },
+                                        { label: 'Net Burn', currentValue: cfoState.summary.netBurn, previousValue: cfoState.summary.prevNetBurn || 0, format: 'currency', goodDirection: 'down' },
+                                    ]}
+                                />
 
                                 {/* Expense Breakdown */}
                                 <ExpenseBreakdown />

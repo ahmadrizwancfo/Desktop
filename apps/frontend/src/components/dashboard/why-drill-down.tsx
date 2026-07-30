@@ -30,77 +30,50 @@ interface WhyDrillDownProps {
     isPositive?: boolean; // true = increase is good (revenue), false = increase is bad (burn)
 }
 
-// Mock data generator - in production this would come from API
-function generateDrillDownData(metric: string): DrillDownData {
-    const mockData: Record<string, DrillDownData> = {
-        burn: {
-            metric: 'burn',
-            value: 240000,
-            change: 36000,
-            changePercent: 18,
-            contributors: [
-                { category: 'SaaS Subscriptions', amount: 45000, change: 45000, type: 'recurring', icon: '💻' },
-                { category: 'AWS Infrastructure', amount: 12000, change: 12000, type: 'one-time', icon: '☁️' },
-                { category: 'Office Supplies', amount: 8000, change: 8000, type: 'one-time', icon: '📦' },
-                { category: 'Payroll', amount: 150000, change: 0, type: 'recurring', icon: '👥' },
-                { category: 'Marketing', amount: 25000, change: -5000, type: 'recurring', icon: '📣' },
-            ],
-            trend: [
-                { month: 'Nov', value: 190000 },
-                { month: 'Dec', value: 210000 },
-                { month: 'Jan', value: 240000 },
-            ],
-            aiInsight: 'SaaS spend increased 28% this month. Consider reviewing unused subscriptions like Figma extra seats and Notion Team plan.',
-        },
-        revenue: {
-            metric: 'revenue',
-            value: 320000,
-            change: 48000,
-            changePercent: 18,
-            contributors: [
-                { category: 'Enterprise Deals', amount: 180000, change: 30000, type: 'recurring', icon: '🏢' },
-                { category: 'SMB Subscriptions', amount: 95000, change: 12000, type: 'recurring', icon: '🏬' },
-                { category: 'Professional Services', amount: 45000, change: 6000, type: 'one-time', icon: '🛠️' },
-            ],
-            trend: [
-                { month: 'Nov', value: 250000 },
-                { month: 'Dec', value: 272000 },
-                { month: 'Jan', value: 320000 },
-            ],
-            aiInsight: 'Enterprise deals driving growth. Consider upselling to existing SMB customers for additional 15% MRR boost.',
-        },
-        expenses: {
-            metric: 'expenses',
-            value: 195000,
-            change: 22000,
-            changePercent: 13,
-            contributors: [
-                { category: 'Professional Fees', amount: 45000, change: 15000, type: 'recurring', icon: '⚖️' },
-                { category: 'Rent', amount: 80000, change: 0, type: 'recurring', icon: '🏠' },
-                { category: 'Utilities', amount: 12000, change: 2000, type: 'recurring', icon: '💡' },
-                { category: 'Travel', amount: 28000, change: 8000, type: 'one-time', icon: '✈️' },
-                { category: 'Insurance', amount: 30000, change: -3000, type: 'recurring', icon: '🛡️' },
-            ],
-            trend: [
-                { month: 'Nov', value: 165000 },
-                { month: 'Dec', value: 173000 },
-                { month: 'Jan', value: 195000 },
-            ],
-            aiInsight: 'Professional fees up due to legal review. Travel expenses were one-time for client onboarding.',
-        },
-    };
+import { apiClient } from '@/lib/api-client';
 
-    return mockData[metric] || mockData.burn;
+async function fetchDrillDownData(metric: string): Promise<DrillDownData> {
+    try {
+        const res = await apiClient.get(`/financial-metrics/breakdown/${metric}`);
+        if (res.data) {
+            return {
+                metric,
+                value: res.data.value || 0,
+                change: res.data.change || 0,
+                changePercent: res.data.changePercent || 0,
+                contributors: (res.data.contributors || []).map((c: any) => ({
+                    category: c.category || 'Other',
+                    amount: c.amount || 0,
+                    change: c.change || 0,
+                    type: c.type || 'recurring',
+                    icon: c.icon || '📊',
+                })),
+                trend: res.data.trend || [],
+                aiInsight: res.data.aiInsight || undefined,
+            };
+        }
+    } catch {
+        // Return clean empty state on API error or unconfigured backend
+    }
+    return {
+        metric,
+        value: 0,
+        change: 0,
+        changePercent: 0,
+        contributors: [],
+        trend: [],
+        aiInsight: undefined,
+    };
 }
 
 export function WhyDrillDown({ metric, label, value, change, changePercent, isPositive = true }: WhyDrillDownProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [data, setData] = useState<DrillDownData | null>(null);
 
-    const handleExpand = () => {
+    const handleExpand = async () => {
         if (!isExpanded && !data) {
-            // In production, fetch from API: apiClient.get(`/financial-metrics/breakdown/${metric}`)
-            setData(generateDrillDownData(metric));
+            const result = await fetchDrillDownData(metric);
+            setData(result);
         }
         setIsExpanded(!isExpanded);
     };

@@ -116,19 +116,36 @@ export class QuickbooksService {
         }
 
         const orgId = connection.organizationId;
-        const realmId = (connection.accessMetadata as any)?.realmId || 'mock_realm_id';
+        const realmId = (connection.accessMetadata as any)?.realmId || '';
 
-        // --- 1. Fetch Mock OR Real Data ---
-        // For demonstration, mock QBO payload
-        const qbInvoices = [
-            { Id: 'qb_101', TxnDate: new Date().toISOString().split('T')[0], TotalAmt: 120000, CustomerRef: { name: 'Globex Corp' }, status: 'Paid' },
-            { Id: 'qb_102', TxnDate: new Date(Date.now() - 86400000*2).toISOString().split('T')[0], TotalAmt: 50000, CustomerRef: { name: 'Initech' }, status: 'Paid' }
-        ];
+        // --- 1. Fetch Live QBO Data or Fallback to Empty Arrays ---
+        let qbInvoices: any[] = [];
+        let qbPurchases: any[] = [];
 
-        const qbPurchases = [
-            { Id: 'qb_exp_201', TxnDate: new Date().toISOString().split('T')[0], TotalAmt: 18000, AccountRef: { name: 'Advertising' }, Line: [{ Description: 'Google Ads' }] },
-            { Id: 'qb_exp_202', TxnDate: new Date(Date.now() - 86400000*4).toISOString().split('T')[0], TotalAmt: 22000, AccountRef: { name: 'Rent' }, Line: [{ Description: 'WeWork Office' }] }
-        ];
+        const accessToken = (connection.accessMetadata as any)?.accessToken;
+
+        if (this.clientId !== 'mock_qb_client' && accessToken && realmId) {
+            try {
+                const baseUrl = this.environment === 'sandbox'
+                    ? `https://sandbox-quickbooks.api.intuit.com/v3/company/${realmId}`
+                    : `https://quickbooks.api.intuit.com/v3/company/${realmId}`;
+
+                const headers = {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json',
+                };
+
+                const [invRes, expRes] = await Promise.all([
+                    axios.get(`${baseUrl}/query?query=select * from Invoice`, { headers }),
+                    axios.get(`${baseUrl}/query?query=select * from Purchase`, { headers }),
+                ]);
+
+                qbInvoices = invRes.data?.QueryResponse?.Invoice || [];
+                qbPurchases = expRes.data?.QueryResponse?.Purchase || [];
+            } catch (err: any) {
+                this.logger.warn(`Failed to fetch live QuickBooks data for user ${userId}: ${err.message}`);
+            }
+        }
 
         // --- 2. Save Raw Import ---
         const rawImport = await this.prisma.rawImport.create({

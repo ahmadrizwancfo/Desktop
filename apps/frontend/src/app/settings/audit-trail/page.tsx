@@ -36,64 +36,6 @@ interface AuditLogEntry {
     };
 }
 
-// Mock data when API is unavailable
-const mockAuditLogs: AuditLogEntry[] = [
-    {
-        id: '1',
-        action: 'CREATE',
-        entity: 'Invoice',
-        entityId: 'INV-2024-001',
-        details: { amount: 125000, customer: 'Acme Technologies' },
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        user: { id: '1', name: 'Nishant Mahapatro', email: 'nishant@foundercfo.in' }
-    },
-    {
-        id: '2',
-        action: 'UPDATE',
-        entity: 'Expense',
-        entityId: 'EXP-2024-045',
-        details: { field: 'status', oldValue: 'PENDING', newValue: 'APPROVED' },
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-        user: { id: '2', name: 'Finance Team', email: 'finance@foundercfo.in' }
-    },
-    {
-        id: '3',
-        action: 'DELETE',
-        entity: 'Transaction',
-        entityId: 'TXN-2024-089',
-        details: { reason: 'Duplicate entry', amount: 5000 },
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-        user: { id: '1', name: 'Nishant Mahapatro', email: 'nishant@foundercfo.in' }
-    },
-    {
-        id: '4',
-        action: 'CREATE',
-        entity: 'Customer',
-        entityId: 'CUST-2024-012',
-        details: { name: 'CloudServe India', gstin: '29ABCDE1234F1Z5' },
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        user: { id: '1', name: 'Nishant Mahapatro', email: 'nishant@foundercfo.in' }
-    },
-    {
-        id: '5',
-        action: 'UPDATE',
-        entity: 'Organization',
-        entityId: 'ORG-001',
-        details: { field: 'bankAccount', change: 'Added HDFC account' },
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-        user: { id: '1', name: 'Nishant Mahapatro', email: 'nishant@foundercfo.in' }
-    },
-    {
-        id: '6',
-        action: 'COMPLIANCE',
-        entity: 'ComplianceItem',
-        entityId: 'COMP-GST-DEC',
-        details: { type: 'GSTR-3B', status: 'Filed', period: 'Dec 2024' },
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-        user: { id: '2', name: 'Finance Team', email: 'finance@foundercfo.in' }
-    }
-];
-
 const actionConfig: Record<string, { icon: any; color: string; bg: string; label: string }> = {
     CREATE: { icon: CheckCircle2, color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Created' },
     UPDATE: { icon: FileEdit, color: 'text-blue-400', bg: 'bg-blue-500/10', label: 'Updated' },
@@ -115,7 +57,7 @@ export default function AuditTrailPage() {
     const [selectedAction, setSelectedAction] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Try to fetch from API, fallback to mock
+    // Fetch from API
     const { data: auditLogs, isLoading } = useQuery({
         queryKey: ['audit-logs'],
         queryFn: async () => {
@@ -123,13 +65,13 @@ export default function AuditTrailPage() {
                 const res = await apiClient.get('/audit-logs');
                 return res.data;
             } catch {
-                return mockAuditLogs;
+                return [];
             }
         },
         staleTime: 30000
     });
 
-    const logs = auditLogs || mockAuditLogs;
+    const logs = auditLogs || [];
 
     // Filter logs
     const filteredLogs = logs.filter((log: AuditLogEntry) => {

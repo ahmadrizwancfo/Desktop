@@ -1,31 +1,63 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Transaction, Prisma, TransactionType } from '@prisma/client';
+import { FinancialMath } from '../common/math/financial-math.util';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+export interface PaginatedResult<T> {
+    items: T[];
+    nextCursor: string | null;
+    totalCount?: number;
+}
 
 @Injectable()
 export class TransactionsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private eventEmitter: EventEmitter2,
+    ) { }
 
-    async create(data: Prisma.TransactionCreateInput): Promise<Transaction> {
+    async create(data: Prisma.TransactionCreateInput, organizationId: string): Promise<Transaction> {
+        const bankAccountId = data.bankAccount.connect?.id;
+        if (!bankAccountId) {
+            throw new ForbiddenException('BankAccount connection required');
+        }
+
+        // Validate BankAccount tenant ownership at service layer
+        const bankAccount = await this.prisma.bankAccount.findFirst({
+            where: { id: bankAccountId, organizationId, deletedAt: null },
+        });
+
+        if (!bankAccount) {
+            throw new ForbiddenException('Target BankAccount does not belong to your organization');
+        }
+
         const transaction = await this.prisma.transaction.create({
             data,
         });
 
-        // Update Bank Account Balance
+        // Update Bank Account Balance using FinancialMath (Decimal precision)
         const balanceChange =
-            data.type === TransactionType.INCOME ? Number(data.amount) :
-                data.type === TransactionType.EXPENSE ? -Number(data.amount) : 0;
+            data.type === TransactionType.INCOME ? FinancialMath.toDecimal(data.amount) :
+                data.type === TransactionType.EXPENSE ? FinancialMath.toDecimal(data.amount).negated() : FinancialMath.toDecimal(0);
 
-        if (balanceChange !== 0) {
+        if (!balanceChange.isZero()) {
             await this.prisma.bankAccount.update({
-                where: { id: data.bankAccount.connect?.id },
+                where: { id: bankAccountId },
                 data: {
                     balance: {
-                        increment: balanceChange,
+                        increment: balanceChange.toNumber(),
                     },
                 },
             });
         }
+
+        // Emit transaction.created event to update Redis OrgLiveState with minimal delta
+        this.eventEmitter.emit('transaction.created', {
+            organizationId,
+            amount: FinancialMath.toString(data.amount),
+            type: data.type,
+        });
 
         return transaction;
     }
@@ -33,53 +65,82 @@ export class TransactionsService {
     async findAll(params: {
         skip?: number;
         take?: number;
+        cursor?: string;
         where?: Prisma.TransactionWhereInput;
         orderBy?: Prisma.TransactionOrderByWithRelationInput;
-    }): Promise<Transaction[]> {
-        return this.prisma.transaction.findMany({
-            ...params,
+    }): Promise<PaginatedResult<Transaction>> {
+        // Enforce limit: default 50, max 100
+        const limit = Math.min(params.take || 50, 100);
+
+        const items = await this.prisma.transaction.findMany({
+            skip: params.skip,
+            take: limit + 1,
+            cursor: params.cursor ? { id: params.cursor } : undefined,
+            where: params.where,
+            orderBy: params.orderBy || { date: 'desc' },
             include: {
                 bankAccount: true,
             },
         });
+
+        let nextCursor: string | null = null;
+        if (items.length > limit) {
+            const nextItem = items.pop();
+            nextCursor = nextItem?.id || null;
+        }
+
+        return { items, nextCursor };
     }
 
-    async findOne(id: string): Promise<Transaction | null> {
-        return this.prisma.transaction.findUnique({
+    async findOne(id: string, organizationId: string): Promise<Prisma.TransactionGetPayload<{ include: { bankAccount: true; invoice: true } }> | null> {
+        const transaction = await this.prisma.transaction.findUnique({
             where: { id },
             include: {
                 bankAccount: true,
                 invoice: true,
             },
         });
-    }
 
-    async remove(id: string): Promise<Transaction> {
-        const transaction = await this.prisma.transaction.findUnique({
-            where: { id },
-        });
-
-        if (transaction) {
-            // Revert Balance
-            const balanceChange =
-                transaction.type === TransactionType.INCOME ? -Number(transaction.amount) :
-                    transaction.type === TransactionType.EXPENSE ? Number(transaction.amount) : 0;
-
-            if (balanceChange !== 0) {
-                await this.prisma.bankAccount.update({
-                    where: { id: transaction.bankAccountId },
-                    data: {
-                        balance: {
-                            increment: balanceChange,
-                        },
-                    },
-                });
-            }
+        if (!transaction || transaction.bankAccount?.organizationId !== organizationId) {
+            throw new NotFoundException('Transaction not found');
         }
 
-        return this.prisma.transaction.delete({
+        return transaction;
+    }
+
+    async remove(id: string, organizationId: string): Promise<Transaction> {
+        const transaction = await this.findOne(id, organizationId);
+        if (!transaction) {
+            throw new NotFoundException('Transaction not found');
+        }
+
+        // Revert Balance with exact decimal arithmetic
+        const balanceChange =
+            transaction.type === TransactionType.INCOME ? FinancialMath.toDecimal(transaction.amount).negated() :
+                transaction.type === TransactionType.EXPENSE ? FinancialMath.toDecimal(transaction.amount) : FinancialMath.toDecimal(0);
+
+        if (!balanceChange.isZero()) {
+            await this.prisma.bankAccount.update({
+                where: { id: transaction.bankAccountId },
+                data: {
+                    balance: {
+                        increment: balanceChange.toNumber(),
+                    },
+                },
+            });
+        }
+
+        const deletedTx = await this.prisma.transaction.delete({
             where: { id },
         });
+
+        // Emit transaction.deleted event to update Redis OrgLiveState with minimal delta
+        this.eventEmitter.emit('transaction.deleted', {
+            organizationId,
+            amount: FinancialMath.toString(transaction.amount),
+            type: transaction.type,
+        });
+
+        return deletedTx;
     }
 }
-

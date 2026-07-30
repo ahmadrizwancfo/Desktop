@@ -8,6 +8,8 @@ import {
     Delete,
     UseGuards,
     Query,
+    ForbiddenException,
+    NotFoundException,
 } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { PaymentReminderService } from './payment-reminder.service';
@@ -29,11 +31,15 @@ export class InvoicesController {
 
     @Post()
     @Roles(Role.ADMIN, Role.FOUNDER, Role.ACCOUNTANT)
-    create(@Body() createInvoiceDto: CreateInvoiceDto) {
+    create(@GetUser() user: any, @Body() createInvoiceDto: CreateInvoiceDto) {
+        if (!user?.organizationId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
+        createInvoiceDto.organizationId = user.organizationId;
         const { organizationId, customerId, vendorId, ...rest } = createInvoiceDto;
         return this.invoicesService.create({
             ...rest,
-            organization: { connect: { id: organizationId } },
+            organization: { connect: { id: user.organizationId } },
             ...(customerId ? { customer: { connect: { id: customerId } } } : {}),
             ...(vendorId ? { vendor: { connect: { id: vendorId } } } : {}),
         });
@@ -64,19 +70,53 @@ export class InvoicesController {
     }
 
     @Get(':id')
-    findOne(@Param('id') id: string) {
-        return this.invoicesService.findOne(id);
+    async findOne(@Param('id') id: string, @GetUser() user: any) {
+        if (!user?.organizationId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
+        const invoice = await this.invoicesService.findOne(id);
+        if (!invoice) {
+            throw new NotFoundException('Invoice not found');
+        }
+        if (invoice.organizationId !== user.organizationId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
+        return invoice;
     }
 
     @Patch(':id')
     @Roles(Role.ADMIN, Role.FOUNDER, Role.ACCOUNTANT)
-    update(@Param('id') id: string, @Body() updateInvoiceDto: UpdateInvoiceDto) {
+    async update(
+        @Param('id') id: string,
+        @GetUser() user: any,
+        @Body() updateInvoiceDto: UpdateInvoiceDto,
+    ) {
+        if (!user?.organizationId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
+        const invoice = await this.invoicesService.findOne(id);
+        if (!invoice) {
+            throw new NotFoundException('Invoice not found');
+        }
+        if (invoice.organizationId !== user.organizationId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
         return this.invoicesService.update(id, updateInvoiceDto);
     }
 
     @Delete(':id')
     @Roles(Role.ADMIN, Role.FOUNDER)
-    remove(@Param('id') id: string) {
+    async remove(@Param('id') id: string, @GetUser() user: any) {
+        if (!user?.organizationId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
+        const invoice = await this.invoicesService.findOne(id);
+        if (!invoice) {
+            throw new NotFoundException('Invoice not found');
+        }
+        if (invoice.organizationId !== user.organizationId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
         return this.invoicesService.remove(id);
     }
 }

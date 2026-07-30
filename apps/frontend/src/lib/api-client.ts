@@ -30,36 +30,45 @@ apiClient.interceptors.request.use(
     }
 );
 
-// Add a response interceptor to handle errors globally
+// Add a response interceptor to handle errors globally with automatic retry for 5xx errors
 apiClient.interceptors.response.use(
     (response) => response,
-    (error: AxiosError) => {
+    async (error: AxiosError) => {
+        const config = error.config as any;
+
         // Handle 401 Unauthorized - redirect to login
         if (error.response?.status === 401) {
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('auth_token');
+                localStorage.removeItem('token');
                 localStorage.removeItem('auth-storage');
 
-                // Only redirect if not already on login page
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login?session=expired';
                 }
             }
+            return Promise.reject(error);
         }
 
-        // Handle 429 Too Many Requests - rate limited
+        // Retry 5xx errors for GET requests up to 2 times
+        if (config && config.method === 'get' && error.response?.status && error.response.status >= 500) {
+            config.__retryCount = config.__retryCount || 0;
+            if (config.__retryCount < 2) {
+                config.__retryCount += 1;
+                const backoffDelay = config.__retryCount * 1000;
+                await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+                return apiClient(config);
+            }
+        }
+
+        // Handle 429 Too Many Requests
         if (error.response?.status === 429) {
-            console.error('⚠️ Rate limit exceeded. Please wait before making more requests.');
+            console.warn('⚠️ Rate limit exceeded. Retrying shortly...');
         }
 
-        // Handle 500 Server Error
-        if (error.response?.status && error.response.status >= 500) {
-            console.error('⚠️ Server error. Please try again later.');
-        }
-
-        // Handle network errors
+        // Handle network connection drops
         if (!error.response) {
-            console.error('⚠️ Network error. Please check your connection.');
+            console.warn('⚠️ Transient network drop detected.');
         }
 
         return Promise.reject(error);

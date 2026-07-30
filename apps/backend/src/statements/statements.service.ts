@@ -6,6 +6,8 @@ import { FinancialAnalyzerService } from './analyzers/financial-analyzer.service
 import * as xml2js from 'xml2js';
 import { TransactionType } from '@prisma/client';
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
 @Injectable()
 export class StatementsService {
     private readonly logger = new Logger(StatementsService.name);
@@ -15,6 +17,7 @@ export class StatementsService {
         private aiService: AiService,
         private universalParser: UniversalParserService,
         private financialAnalyzer: FinancialAnalyzerService,
+        private eventEmitter: EventEmitter2,
     ) { }
 
     async processUpload(file: Express.Multer.File, organizationId: string, userId: string) {
@@ -27,12 +30,18 @@ export class StatementsService {
             return this.processTallyXml(file, organizationId, userId);
         }
 
-        // For PDF, Excel, CSV, and Image files - use AI-powered universal analysis
-
         try {
             // Step 1: Parse document
             const parsedDoc = await this.universalParser.parse(file.buffer, file.originalname, organizationId);
             this.logger.log(`Successfully parsed ${extension} file`);
+
+            // Immediate Fast-Layer Feedback (< 50ms)
+            const count = parsedDoc.transactions?.length || 1;
+            this.eventEmitter.emit('dashboard.quick_update', {
+                organizationId,
+                message: `Processing ${count} transactions from ${file.originalname}...`,
+                deltaTransactions: count,
+            });
 
             // Step 2: AI Analysis to extract financial metrics
             const analysis = await this.financialAnalyzer.analyze(parsedDoc);

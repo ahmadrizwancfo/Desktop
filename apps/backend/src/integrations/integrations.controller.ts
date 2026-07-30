@@ -65,11 +65,7 @@ export class IntegrationsController {
 
     @Post(':provider/disconnect')
     @UseGuards(JwtAuthGuard)
-    async disconnect(@GetUser() user: any, @Req() req: Request) {
-        // use Req path or parameter for provider explicitly
-        const urlSplit = req.url.split('/');
-        const provider = urlSplit[urlSplit.length - 2]; 
-        
+    async disconnect(@GetUser() user: any, @Param('provider') provider: string) {
         await this.prisma.integrationConnection.deleteMany({
             where: { userId: user.id, provider: provider.toUpperCase() }
         });
@@ -124,8 +120,8 @@ export class IntegrationsController {
         }
 
         const extension = file.originalname.split('.').pop()?.toLowerCase();
-        if (extension !== 'csv') {
-            throw new BadRequestException('Only CSV files are supported for raw integrations');
+        if (!['csv', 'xlsx', 'xls'].includes(extension ?? '')) {
+            throw new BadRequestException('Only CSV or Excel (.xlsx, .xls) files are supported');
         }
 
         if (!importType || !['BANK_STATEMENT', 'REVENUE', 'EXPENSE'].includes(importType)) {

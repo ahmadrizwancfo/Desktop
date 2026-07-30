@@ -64,6 +64,16 @@ model Organization {
   statutoryLiabilities   StatutoryLiability[]
   users                  User[]
   vendors                Vendor[]
+  orgFinancialState      OrgFinancialState?
+  activeDecisions        ActiveDecision[]
+  recommendedActions     RecommendedAction[]
+  verifiedImpacts        VerifiedImpact[]
+  financialEmbeddings    FinancialEmbedding[]
+  ocrReviewItems         OcrReviewItem[]
+  liveStateChangeLogs    LiveStateChangeLog[]
+  userEventLogs          UserEventLog[]
+  aiFeedbacks            AiFeedback[]
+  founderActions         FounderAction[]
 }
 
 model AuditLog {
@@ -137,6 +147,8 @@ model Transaction {
   @@index([bankAccountId, date])
   @@index([bankAccountId, type, date])
   @@index([date])
+  @@index([createdAt(sort: Desc)])
+  @@index([invoiceId])
 }
 
 model Invoice {
@@ -160,6 +172,9 @@ model Invoice {
   @@index([organizationId, status])
   @@index([organizationId, dueDate])
   @@index([organizationId, deletedAt])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([customerId])
+  @@index([vendorId])
 }
 
 model Customer {
@@ -256,6 +271,7 @@ model AiUsage {
   @@index([organizationId, timestamp])
   @@index([timestamp])
   @@index([endpoint])
+  @@index([userId])
 }
 
 model ComplianceItem {
@@ -346,6 +362,7 @@ model ActionItem {
   @@index([organizationId, status])
   @@index([organizationId, assignee])
   @@index([dueDate])
+  @@index([userId])
 }
 
 model ActionFeedback {
@@ -557,6 +574,7 @@ model CfoDecision {
   behavioralAudits   BehavioralAudit[]
   startupProfile     StartupProfile    @relation(fields: [startupProfileId], references: [id])
 
+  @@index([startupProfileId, status, createdAt(sort: Desc)])
   @@index([startupProfileId, status])
   @@index([createdAt])
   @@index([decisionDomain])
@@ -793,6 +811,8 @@ model IntegrationConnection {
   syncLogs       SyncLog[]
 
   @@index([organizationId, provider])
+  @@index([userId])
+  @@index([organizationId])
 }
 
 model WebhookEvent {
@@ -835,6 +855,9 @@ model RawImport {
   importedAt     DateTime     @default(now())
   organization   Organization @relation(fields: [organizationId], references: [id])
   user           User         @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([organizationId])
 }
 
 model CfoStateSnapshot {
@@ -1139,3 +1162,232 @@ enum DataInputMethod {
   INTEGRATION
   DEMO
 }
+
+enum RunwayStatus {
+  CRITICAL
+  LOW
+  HEALTHY
+  INFINITE
+}
+
+model OrgFinancialState {
+  id                    String        @id @default(uuid())
+  organizationId        String        @unique
+  cashInBank            Decimal       @default(0) @db.Decimal(20, 2)
+  debitSum30d           Decimal       @default(0) @db.Decimal(20, 2)
+  creditSum30d          Decimal       @default(0) @db.Decimal(20, 2)
+  monthlyBurn           Decimal       @default(0) @db.Decimal(20, 2)
+  monthlyRevenue        Decimal       @default(0) @db.Decimal(20, 2)
+  netBurn               Decimal       @default(0) @db.Decimal(20, 2)
+  runwayMonths          Decimal       @default(0) @db.Decimal(10, 2)
+  runwayDays            Int           @default(0)
+  runwayStatus          RunwayStatus  @default(HEALTHY)
+  deathClockDate        DateTime?
+  lastComputedAt        DateTime?
+  isPartialState        Boolean       @default(true)
+  version               Int           @default(0)
+  dataQualityScore      Int           @default(100)
+  complianceScore       Int           @default(100)
+  lastUpdatedAt         DateTime      @default(now()) @updatedAt
+  organization          Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model ProcessedTransaction {
+  id               String   @id @default(uuid())
+  transactionId    String
+  organizationId   String
+
+  processedAt      DateTime @default(now())
+
+  @@unique([transactionId, organizationId])
+  @@index([organizationId])
+}
+
+model ActiveDecision {
+  id               String    @id @default(uuid())
+  organizationId   String
+
+  type             String
+  severity         String
+  priorityScore    Int       @default(0)
+
+  message          String
+  recommendation   String
+  actionableAmount Decimal?  @db.Decimal(20, 2)
+
+  isActive         Boolean   @default(true)
+
+  firstTriggeredAt DateTime  @default(now())
+  lastUpdatedAt    DateTime  @default(now()) @updatedAt
+  resolvedAt       DateTime?
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@index([organizationId])
+}
+
+model RecommendedAction {
+  id               String    @id @default(uuid())
+  organizationId   String
+  decisionId       String?
+
+  title            String
+  description      String
+
+  impactAmount     Decimal   @db.Decimal(20, 2)
+  impactType       String    // BURN_REDUCTION / REVENUE_INCREASE
+
+  status           String    @default("PENDING") // PENDING / IN_PROGRESS / COMPLETED / DISMISSED
+
+  priorityScore    Float     @default(0)
+  confidenceScore  Float     @default(0.9)
+  timeUrgencyDays  Int       @default(7)
+
+  actualImpact     Decimal?  @db.Decimal(20, 2)
+  accuracyScore    Float?
+  completedAt      DateTime?
+  verifiedAt       DateTime?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([decisionId])
+  @@index([organizationId])
+}
+
+model VerifiedImpact {
+  id             String   @id @default(uuid())
+  organizationId String
+  actionId       String
+
+  expectedImpact Decimal  @db.Decimal(20, 2)
+  actualImpact   Decimal  @db.Decimal(20, 2)
+  variance       Decimal  @db.Decimal(20, 2)
+  accuracyScore  Float    @default(1.0)
+
+  verifiedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([actionId])
+}
+
+model FinancialEmbedding {
+  id             String   @id @default(uuid())
+  organizationId String
+  documentType   String
+  referenceId    String
+  content        String
+  embedding      Float[]
+  metadata       Json
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, documentType])
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+model OcrReviewItem {
+  id              String   @id @default(uuid())
+  organizationId  String
+  userId          String
+  filename        String
+  rawText         String
+  parsedData      Json
+  confidenceScore Float
+  status          String   @default("REVIEW_REQUIRED") // REVIEW_REQUIRED, APPROVED, REJECTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+model LiveStateChangeLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  eventType      String
+  delta          Json
+  previousState  Json
+  newState       Json
+  timestamp      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, timestamp(sort: Desc)])
+}
+
+model UserEventLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String?
+  action         String
+  component      String
+  metadata       Json?
+  timestamp      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, timestamp(sort: Desc)])
+  @@index([action])
+}
+
+model AiFeedback {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String?
+  decisionId     String?
+  rating         String   // THUMBS_UP | THUMBS_DOWN
+  feedbackText   String?
+  promptText     String
+  responseText   String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([rating])
+}
+
+model FounderAction {
+  id              String   @id @default(uuid())
+  organizationId  String
+  sourceModule    String   // DecisionLab | Dashboard | AiCopilot | RiskEngine
+  actionType      String   // INVOICE_REMINDER | VENDOR_NEGOTIATION | PAYROLL_RESERVATION | MARKETING_BUDGET_ADJUSTMENT | HIRING_BUDGET_RESERVATION | GST_PAYMENT_SCHEDULE | BOARD_SUMMARY_GENERATE | FINANCE_TEAM_TASK | WEEKLY_CASH_REVIEW
+  title           String
+  description     String?
+  urgency         String   // CRITICAL | HIGH | MEDIUM | LOW
+  status          String   @default("PREPARED") // PREPARED | APPROVED | REJECTED | SNOOZED | COMPLETED
+  financialImpact String   @default("0.00")
+  payload         Json
+  createdById     String?
+  approvedById    String?
+  scheduledFor    DateTime?
+  auditTrail      Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, urgency])
+  @@index([organizationId, createdAt(sort: Desc)])
+}
+
+
+
+
+
+

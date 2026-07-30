@@ -6,8 +6,14 @@ import { UniversalParserService } from './parsers/universal-parser.service';
 import { FinancialAnalyzerService } from './analyzers/financial-analyzer.service';
 import { BadRequestException } from '@nestjs/common';
 
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
 describe('StatementsService', () => {
   let service: StatementsService;
+
+  const mockEventEmitter = {
+    emit: jest.fn(),
+  };
 
   const mockPrismaService = {
     bankAccount: {
@@ -46,6 +52,7 @@ describe('StatementsService', () => {
         { provide: AiService, useValue: mockAiService },
         { provide: UniversalParserService, useValue: mockUniversalParser },
         { provide: FinancialAnalyzerService, useValue: mockFinancialAnalyzer },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 

@@ -1,0 +1,21 @@
+{
+  "jurisdiction": "India",
+  "compliance_buffer": 1.15,
+  "advance_tax_schedule": [
+    { "deadline_month_day": "06-15", "cumulative_percentage": 15 },
+    { "deadline_month_day": "09-15", "cumulative_percentage": 45 },
+    { "deadline_month_day": "12-15", "cumulative_percentage": 75 },
+    { "deadline_month_day": "03-15", "cumulative_percentage": 100 }
+  ],
+  "gst_rates": {
+    "standard_saas": 0.18,
+    "hardware": 0.18,
+    "services": 0.18
+  },
+  "tds_rates": {
+    "section_194J_professional": 0.10,
+    "section_194C_contractor": 0.02,
+    "section_194I_rent": 0.10
+  },
+  "true_runway_formula": "Net_Realizable_Capital / (Adjusted_Monthly_Gross_Burn * Compliance_Buffer)"
+}

@@ -1,15 +1,6 @@
 import { apiClient } from '@/lib/api-client';
 
-// Mock Data for Demo Purposes
-const MOCK_DASHBOARD_DATA = {
-    hasData: true,
-    totalRevenue: 1240500,
-    monthlyBurn: 240000,
-    cashRunway: "7.2 Months",
-    profitMargin: "-8.5%",
-    period: "Mar 2026",
-    message: null
-};
+
 
 export const financialService = {
     getStats: async (organizationId: string) => {

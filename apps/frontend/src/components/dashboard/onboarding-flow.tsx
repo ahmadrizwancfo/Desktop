@@ -26,11 +26,11 @@ export function OnboardingFlow() {
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
-        if (!state || state.noData || state.isDemo) return;
+        if (!state) return;
         const done = localStorage.getItem(ONBOARDING_KEY);
         if (!done) {
             // Small delay so dashboard renders first
-            const timer = setTimeout(() => setVisible(true), 1500);
+            const timer = setTimeout(() => setVisible(true), 1200);
             return () => clearTimeout(timer);
         }
     }, [state]);

@@ -95,7 +95,7 @@ describe('AiController', () => {
     it('should return chat response', async () => {
       const mockUser = { organizationId: 'org1' };
       const result = await controller.chat(mockUser, { message: 'What is my runway?' });
-      expect(aiService.getChatResponse).toHaveBeenCalledWith('org1', 'What is my runway?');
+      expect(aiService.getChatResponse).toHaveBeenCalledWith('org1', 'What is my runway?', undefined);
       expect(result).toHaveProperty('response');
     });
   });

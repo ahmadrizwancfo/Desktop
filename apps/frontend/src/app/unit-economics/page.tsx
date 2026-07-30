@@ -25,38 +25,6 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
 
-// Mock data for when backend is unavailable
-const mockMetrics = {
-    cac: 27083,
-    ltv: 121500,
-    ltvCacRatio: 4.5,
-    paybackPeriod: 14.8,
-    grossMargin: 65,
-    arpu: 2207,
-    churnRate: 0.46,
-    averageCustomerLifespan: 217.4,
-    mrr: 320000,
-    arr: 3840000,
-    healthScore: 75,
-    healthStatus: 'good' as const,
-};
-
-const mockDecisions = [
-    { scenario: 'reduce churn', cacChange: 0, ltvChange: 37.5, paybackChange: -12.5, recommendation: 'Reducing churn is the highest-leverage activity for improving unit economics.', impact: 'positive' as const },
-    { scenario: 'raise prices', cacChange: 3, ltvChange: 18, paybackChange: -12, recommendation: 'Price increase will improve unit economics if churn stays stable.', impact: 'positive' as const },
-    { scenario: 'cut cogs', cacChange: 0, ltvChange: 7, paybackChange: -4, recommendation: "Reducing COGS improves gross margin and LTV. Ensure quality isn't affected.", impact: 'positive' as const },
-    { scenario: 'increase marketing', cacChange: 16, ltvChange: 6, paybackChange: 12, recommendation: 'Marketing increase may hurt unit economics. Consider targeting higher-value segments.', impact: 'negative' as const },
-    { scenario: 'expand sales', cacChange: 15, ltvChange: 12, paybackChange: 9, recommendation: 'Sales expansion increases CAC but can improve customer quality. Track deal sizes.', impact: 'negative' as const },
-];
-
-const mockCohorts = [
-    { month: 'Sep 2025', customersAcquired: 12, retentionMonth1: 100, retentionMonth3: 92, retentionMonth6: 83, retentionMonth12: 75 },
-    { month: 'Oct 2025', customersAcquired: 15, retentionMonth1: 100, retentionMonth3: 93, retentionMonth6: 87, retentionMonth12: 0 },
-    { month: 'Nov 2025', customersAcquired: 10, retentionMonth1: 100, retentionMonth3: 90, retentionMonth6: 0, retentionMonth12: 0 },
-    { month: 'Dec 2025', customersAcquired: 18, retentionMonth1: 100, retentionMonth3: 0, retentionMonth6: 0, retentionMonth12: 0 },
-    { month: 'Jan 2026', customersAcquired: 14, retentionMonth1: 100, retentionMonth3: 0, retentionMonth6: 0, retentionMonth12: 0 },
-];
-
 export default function UnitEconomicsPage() {
     const [activeTab, setActiveTab] = useState<'overview' | 'decisions' | 'cohorts'>('overview');
     const user = useAuthStore((state) => state.user);
@@ -92,15 +60,27 @@ export default function UnitEconomicsPage() {
         enabled: !!orgId,
     });
 
-    const m = metrics || mockMetrics;
-    const d = decisions || mockDecisions;
-    const c = cohorts || mockCohorts;
+    const m = metrics;
+    const d = decisions || [];
+    const c = cohorts || [];
 
     if (metricsLoading) {
         return (
             <DashboardLayout>
                 <div className="h-screen flex items-center justify-center">
                     <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (!m) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+                    <AlertTriangle className="w-12 h-12 text-amber-400 mb-4" />
+                    <h2 className="text-2xl font-bold text-white mb-2">No Unit Economics Data Available</h2>
+                    <p className="text-slate-400 max-w-md">Connect your accounting integration or upload financial records to calculate your CAC, LTV, and payback metrics.</p>
                 </div>
             </DashboardLayout>
         );

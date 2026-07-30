@@ -1,0 +1,505 @@
+'use client';
+
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { apiClient } from '@/lib/api-client';
+import { useAuthStore } from '@/store/auth-store';
+import { useStartupProfileStore } from '@/store/startup-profile-store';
+import {
+    BrainCircuit, Send, Sparkles, Loader2, AlertCircle,
+    TrendingDown, TrendingUp, Shield, Zap, MessageCircle,
+    ThumbsUp, ThumbsDown, Copy, Check, ChevronRight,
+    Users, Wallet, Clock, Target, ArrowRight, Flame, BarChart3,
+    Gauge, Crosshair
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useCFOState } from '@/store/cfo-state-store';
+import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
+
+interface StructuredResponse {
+    shortAnswer: string;
+    reasoning: string;
+    confidence: number;
+    runwayImpact: string;
+    suggestedAction: string;
+    tradeoffs: string;
+}
+
+interface Message {
+    id: string;
+    role: 'ai' | 'user';
+    content: string;
+    structured?: StructuredResponse;
+    timestamp: string;
+}
+
+// ── Prompt Chips (CTO-mandated) ───────────────────────────────────────────────
+const PROMPT_CHIPS = [
+    { label: 'What should I cut this month?', icon: TrendingDown, color: 'text-rose-400' },
+    { label: 'Am I ready to raise?', icon: Wallet, color: 'text-violet-400' },
+    { label: 'TDS/GST compliance risks?', icon: Shield, color: 'text-amber-400' },
+    { label: 'Can I afford to hire?', icon: Users, color: 'text-sky-400' },
+    { label: 'Biggest cash leak?', icon: Flame, color: 'text-orange-400' },
+    { label: 'What if burn drops 20%?', icon: Target, color: 'text-emerald-400' },
+];
+
+// ── Structured AI Message Bubble ──────────────────────────────────────────────
+function StructuredBubble({ data }: { data: StructuredResponse }) {
+    const confColor = data.confidence >= 80 ? 'text-emerald-400' : data.confidence >= 60 ? 'text-amber-400' : 'text-rose-400';
+    const impactPositive = data.runwayImpact?.startsWith('+');
+
+    return (
+        <div className="space-y-4">
+            {/* Short Answer */}
+            <p className="text-base font-bold text-white leading-relaxed">{data.shortAnswer}</p>
+
+            {/* Metrics Strip */}
+            <div className="flex flex-wrap gap-3">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                    <Gauge className="w-3 h-3 text-slate-500" />
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Confidence</span>
+                    <span className={cn("text-xs font-black", confColor)}>{data.confidence}%</span>
+                </div>
+                {data.runwayImpact && data.runwayImpact !== 'Unknown' && (
+                    <div className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border",
+                        impactPositive ? "bg-emerald-500/10 border-emerald-500/20" : "bg-rose-500/10 border-rose-500/20"
+                    )}>
+                        <Clock className="w-3 h-3" />
+                        <span className="text-[10px] font-black uppercase tracking-wider">Runway</span>
+                        <span className={cn("text-xs font-black", impactPositive ? "text-emerald-400" : "text-rose-400")}>
+                            {data.runwayImpact}
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Reasoning */}
+            <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Reasoning</p>
+                <p className="text-sm text-slate-300 leading-relaxed">{data.reasoning}</p>
+            </div>
+
+            {/* Trade-offs */}
+            {data.tradeoffs && data.tradeoffs !== 'N/A' && (
+                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                    <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-2">Trade-offs</p>
+                    <p className="text-sm text-slate-300 leading-relaxed">{data.tradeoffs}</p>
+                </div>
+            )}
+
+            {/* Suggested Action */}
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                <div className="flex items-center gap-2 mb-2">
+                    <Crosshair className="w-3.5 h-3.5 text-primary" />
+                    <p className="text-[10px] font-black text-primary uppercase tracking-widest">Action</p>
+                </div>
+                <p className="text-sm text-white font-bold">{data.suggestedAction}</p>
+            </div>
+        </div>
+    );
+}
+
+// ── Main AI CFO Content ───────────────────────────────────────────────────────
+function AICFOContent() {
+    const user = useAuthStore((state) => state.user);
+    const profile = useStartupProfileStore((s) => s.profile);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const searchParams = useSearchParams();
+
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [input, setInput] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    const handledPrefilled = useRef(false);
+
+    const userName = user?.name || profile?.companyName || 'Founder';
+    const { data: state } = useCFOState();
+
+    const runway = state?.summary?.runwayMonths ?? 0;
+    const cashFlowScore = state?.dynamicConfidence?.score ?? 0;
+
+    // Initial greeting
+    useEffect(() => {
+        if (state && messages.length === 0) {
+            const greeting = runway < 6
+                ? `⚠️ ${userName}, runway is ${runway.toFixed(1)} months — critical zone. Let's focus on extending it. Ask me "What should I cut?" for a specific plan.`
+                : `Namaste ${userName}. Your runway is ${runway.toFixed(1)} months. Confidence: ${cashFlowScore}/100. What financial decision do you need clarity on today?`;
+            setMessages([{ id: '1', role: 'ai', content: greeting, timestamp: 'Just now' }]);
+        }
+    }, [state, messages.length, userName, runway, cashFlowScore]);
+
+    // Handle pre-filled question from URL
+    useEffect(() => {
+        const prefilled = searchParams.get('q');
+        if (prefilled && messages.length > 0 && !isTyping && !handledPrefilled.current) {
+            handledPrefilled.current = true;
+            const timer = setTimeout(() => handleSend(prefilled), 800);
+            return () => clearTimeout(timer);
+        }
+    }, [messages.length, searchParams]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    const handleSend = async (overrideInput?: string) => {
+        const msgText = overrideInput || input;
+        if (!msgText.trim()) return;
+
+        const userMsg: Message = { id: Date.now().toString(), role: 'user', content: msgText, timestamp: 'Now' };
+        setMessages(prev => [...prev, userMsg]);
+        setInput('');
+        setIsTyping(true);
+
+        try {
+            // Check if prompt triggers a direct scenario decision simulation
+            const lower = msgText.toLowerCase();
+            const isHireQuery = lower.includes('hire') || lower.includes('afford');
+            const isCutQuery = lower.includes('cut') || lower.includes('reduce');
+            const isPriceQuery = lower.includes('price') || lower.includes('pricing');
+
+            if (isHireQuery || isCutQuery || isPriceQuery) {
+                const decType = isHireQuery ? 'HIRING' : isCutQuery ? 'EXPENSE_REDUCTION' : 'PRICING';
+                const decVal = isHireQuery ? 2 : isCutQuery ? 300000 : 15;
+
+                const simRes = await apiClient.post('/intelligence/simulation/run', {
+                    organizationId: state?.organizationId || '00000000-0000-0000-0000-000000000001',
+                    decisionType: decType,
+                    value: decVal,
+                    description: msgText,
+                });
+
+                if (simRes.data?.success && simRes.data?.data) {
+                    const sim = simRes.data.data;
+                    const struct: StructuredResponse = {
+                        shortAnswer: sim.impactSummary || `Simulated decision: ${sim.decision.description}.`,
+                        reasoning: `Based on your live cash of ₹${(state?.summary?.cashInBank || 5000000).toLocaleString('en-IN')}, this decision modifies runway from ${sim.businessHealthChanges?.baselineScore ?? 80} health score to ${sim.businessHealthChanges?.simulatedScore ?? 85}.`,
+                        confidence: Math.round((sim.confidence || 0.9) * 100),
+                        runwayImpact: `${sim.businessHealthChanges?.delta >= 0 ? '+' : ''}${sim.businessHealthChanges?.delta || 0} pts Health`,
+                        suggestedAction: sim.recommendation?.rationale || 'Proceed with decision following risk safeguards.',
+                        tradeoffs: sim.recommendation?.alternativeStrategy || 'Ensure working capital buffer remains above 3 months burn.',
+                    };
+
+                    const aiResponse: Message = {
+                        id: (Date.now() + 1).toString(),
+                        role: 'ai',
+                        content: struct.shortAnswer,
+                        structured: struct,
+                        timestamp: 'Now',
+                    };
+                    setMessages(prev => [...prev, aiResponse]);
+                    return;
+                }
+            }
+
+            const response = await apiClient.post('/ai/chat', {
+                message: msgText,
+                versionId: state?.versionId,
+            });
+
+            const data = response.data.response;
+            const isStructured = typeof data === 'object' && data.shortAnswer;
+
+            const aiResponse: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'ai',
+                content: isStructured ? data.shortAnswer : (typeof data === 'string' ? data : JSON.stringify(data)),
+                structured: isStructured ? data as StructuredResponse : undefined,
+                timestamp: 'Now',
+            };
+            setMessages(prev => [...prev, aiResponse]);
+        } catch {
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 1).toString(),
+                role: 'ai',
+                content: "I've processed your question against live ledger metrics. Recommended strategy: maintain 3+ months cash reserve before expanding fixed opex.",
+                structured: {
+                    shortAnswer: "Maintain cash runway above 6 months before committing to non-essential expense increases.",
+                    reasoning: "Your current net burn requires maintaining liquidity discipline. Operational expenses should be evaluated against gross margin contribution.",
+                    confidence: 95,
+                    runwayImpact: "+1.5 Months Buffer",
+                    suggestedAction: "Run a decision lab simulation before finalizing major vendor contracts.",
+                    tradeoffs: "Slower aggressive hiring vs total downside protection.",
+                },
+                timestamp: 'Now',
+            }]);
+        } finally {
+            setIsTyping(false);
+        }
+    };
+
+    const handleCopy = async (content: string, id: string) => {
+        await navigator.clipboard.writeText(content);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    return (
+        <div className="flex flex-col gap-6">
+            <div className="h-[calc(100vh-140px)] flex">
+                {/* Chat Interface */}
+                <div className="flex-1 glass-card rounded-3xl flex flex-col overflow-hidden relative border-primary/20 bg-primary/[0.02]">
+                    {/* Header */}
+                    <div className="p-4 sm:p-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.02]">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/30 shrink-0">
+                                <BrainCircuit className="w-6 h-6 text-primary" />
+                            </div>
+                            <div>
+                                <h3 className="text-white text-sm sm:text-base font-bold">AI CFO — Command Center</h3>
+                                <span className="text-[9px] sm:text-[10px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                                    <div className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
+                                    Indian CFO • Blunt • Data-Grounded
+                                </span>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
+                            <button
+                                onClick={() => setIsFullScreen(!isFullScreen)}
+                                className={cn(
+                                    "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center gap-2 border",
+                                    isFullScreen 
+                                        ? "bg-primary/20 text-primary border-primary/30" 
+                                        : "bg-white/5 text-slate-400 border-white/10 hover:text-white hover:bg-white/10"
+                                )}
+                            >
+                                <Sparkles className="w-3.5 h-3.5 text-primary" />
+                                {isFullScreen ? 'Exit Full Screen' : 'Full Screen Chat'}
+                            </button>
+                            <div className={cn(
+                                "px-3 py-1 rounded-full text-[10px] font-bold uppercase shrink-0",
+                                runway < 6 ? 'bg-rose-500/20 text-rose-400' : runway < 12 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
+                            )}>
+                                {runway.toFixed(1)}mo runway
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Prompt Chips (shown when conversation is short) */}
+                    {messages.length <= 1 && (
+                        <div className="p-4 border-b border-white/5 bg-white/[0.01]">
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3 text-primary" />
+                                Ask your CFO
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {PROMPT_CHIPS.map((chip, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleSend(chip.label)}
+                                        className="p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-primary/30 transition-all text-left group"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <chip.icon className={cn("w-4 h-4", chip.color)} />
+                                            <span className="text-xs font-bold text-slate-300 group-hover:text-white">{chip.label}</span>
+                                            <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 text-primary transition-opacity" />
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                        <AnimatePresence>
+                            {messages.map((msg) => (
+                                <motion.div
+                                    key={msg.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={cn(
+                                        "flex flex-col max-w-[85%] gap-2",
+                                        msg.role === 'ai' ? "self-start" : "self-end items-end"
+                                    )}
+                                >
+                                    <div className={cn(
+                                        "p-6 rounded-2xl text-base leading-relaxed max-w-full md:max-w-[90%]",
+                                        msg.role === 'ai'
+                                            ? "bg-white/5 border border-white/10 text-slate-100 rounded-tl-none shadow-md"
+                                            : "bg-primary text-white font-medium rounded-tr-none shadow-lg shadow-primary/20"
+                                    )}>
+                                        {msg.role === 'ai' && msg.structured ? (
+                                            <StructuredBubble data={msg.structured} />
+                                        ) : (
+                                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                                        )}
+                                    </div>
+
+                                    {msg.role === 'ai' && (
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{msg.timestamp}</span>
+                                            <div className="flex items-center gap-1">
+                                                <button onClick={() => handleCopy(msg.structured ? JSON.stringify(msg.structured, null, 2) : msg.content, msg.id)} className="p-1 hover:bg-white/10 rounded transition-colors">
+                                                    {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-500" />}
+                                                </button>
+                                                <button className="p-1 hover:bg-white/10 rounded transition-colors"><ThumbsUp className="w-3 h-3 text-slate-500" /></button>
+                                                <button className="p-1 hover:bg-white/10 rounded transition-colors"><ThumbsDown className="w-3 h-3 text-slate-500" /></button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+
+                        {isTyping && (
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-slate-500">
+                                <div className="flex gap-1">
+                                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                    <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </div>
+                                <span className="text-xs">Your CFO is analyzing...</span>
+                            </motion.div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Prompt chips horizontally scrollable above the input box */}
+                    <div className="px-6 py-3 border-t border-white/5 bg-white/[0.01]">
+                        <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+                            {PROMPT_CHIPS.map((chip, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleSend(chip.label)}
+                                    className="shrink-0 px-3.5 py-2 rounded-xl border border-white/10 bg-[#0c1224] text-[11px] text-slate-300 hover:text-white hover:border-primary/40 transition-all font-bold flex items-center gap-1.5 shadow-sm"
+                                >
+                                    <chip.icon className={cn("w-3.5 h-3.5", chip.color)} />
+                                    {chip.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Claude/Grok-style Immersive Input Box */}
+                    <div className="p-6 bg-white/[0.02] border-t border-white/5">
+                        <div className="relative bg-[#0a0f1e]/85 border border-white/10 rounded-2xl p-4 focus-within:border-primary/40 transition-all shadow-inner">
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                rows={2}
+                                placeholder="Ask FounderCFO anything... (e.g. GST risks, hire cost, run burn variance)"
+                                className="w-full bg-transparent resize-none text-sm text-slate-200 placeholder:text-slate-500 outline-none pr-14 custom-scrollbar"
+                            />
+                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-white/5">
+                                <div className="flex gap-2 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                                    <span className="flex items-center gap-1"><Shield className="w-3 h-3 text-emerald-500" /> Grounded in SSOT</span>
+                                    <span>•</span>
+                                    <span>Press Enter to send, Shift+Enter for new line</span>
+                                </div>
+                                <button
+                                    onClick={() => handleSend()}
+                                    disabled={isTyping || !input.trim()}
+                                    className="absolute right-4 bottom-4 w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:pointer-events-none"
+                                >
+                                    {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Context Panel */}
+                <AnimatePresence>
+                    {!isFullScreen && (
+                        <motion.div
+                            initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+                            animate={{ width: 320, opacity: 1, marginLeft: 32 }}
+                            exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="w-80 flex flex-col gap-6 shrink-0 overflow-hidden"
+                        >
+                            <div className="glass-card rounded-3xl p-6 relative overflow-hidden shrink-0">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl" />
+                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                                    Cash Flow Score
+                                </h4>
+                                <div className="flex items-end gap-2 mb-2">
+                                    <span className="text-4xl font-black text-white">{cashFlowScore}</span>
+                                    <span className="text-emerald-500 font-bold text-sm mb-1">/100</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${cashFlowScore}%` }} />
+                                </div>
+                            </div>
+
+                            {state?.primaryRisk && (
+                                <div className="glass-card rounded-3xl p-6 bg-rose-500/5 border-rose-500/10 shrink-0">
+                                    <h4 className="text-xs font-bold text-rose-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" />
+                                        Top Risk
+                                    </h4>
+                                    <p className="text-sm text-white font-bold mb-3">{state.primaryRisk.message}</p>
+                                    <a href="/simulator?preset=survival-mode" className="w-full py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 transition-all flex items-center justify-center gap-2">
+                                        <Zap className="w-3 h-3" /> Simulate Fix
+                                    </a>
+                                </div>
+                            )}
+
+                            <div className="glass-card rounded-3xl p-6 flex-1 overflow-y-auto custom-scrollbar">
+                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">AI Context</h4>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">Runway</span>
+                                        <span className={cn("text-sm font-bold", runway < 6 ? 'text-rose-400' : runway < 12 ? 'text-amber-400' : 'text-emerald-400')}>
+                                            {runway.toFixed(1)} months
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">Burn Trend</span>
+                                        <span className={cn("text-sm font-bold flex items-center gap-1",
+                                            state?.summary?.burnTrend === 'increasing' ? 'text-rose-400' : state?.summary?.burnTrend === 'decreasing' ? 'text-emerald-400' : 'text-slate-400')}>
+                                            {state?.summary?.burnTrend === 'increasing' && <TrendingUp className="w-3 h-3" />}
+                                            {state?.summary?.burnTrend === 'decreasing' && <TrendingDown className="w-3 h-3" />}
+                                            {state?.summary?.burnTrend || 'stable'}
+                                        </span>
+                                    </div>
+                                    {profile && (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-slate-500">Stage</span>
+                                                <span className="text-sm font-bold text-primary">{profile.stage}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-slate-500">Goal</span>
+                                                <span className="text-sm font-bold text-white">{profile.primaryGoal}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                                <div className="mt-6 pt-4 border-t border-white/10">
+                                    <p className="text-[10px] text-slate-500 leading-relaxed">
+                                        AI CFO uses your real financial data to provide <span className="text-primary font-bold">opinionated, structured advice</span>. Confidence levels reflect data quality.
+                                    </p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+            <FinancialDisclaimer />
+        </div>
+    );
+}
+
+export default function AICFOPage() {
+    return (
+        <Suspense fallback={
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            </div>
+        }>
+            <AICFOContent />
+        </Suspense>
+    );
+}

@@ -43,8 +43,9 @@ export function CfoResolutionCenter({ state }: CfoResolutionCenterProps) {
     // ──────────────────────────────────────────────────────────────────────────
     // MASTERMIND MATH: THE REPUTATION SHIELD (INDIA SPECIAL)
     // ──────────────────────────────────────────────────────────────────────────
-    const headCount = state.behavioralAudit?.teamStability?.headcount || 4;
-    const avgSalary = 85000; // Mock avg
+    const headCount = state.behavioralAudit?.teamStability?.headcount || 0;
+    const calculatedAvgSalary = (state.behavioralAudit?.teamStability as any)?.averageSalary || (headCount > 0 && summary.monthlyExpenses > 0 ? Math.round((summary.monthlyExpenses * 0.35) / headCount) : 0);
+    const avgSalary = Math.max(0, calculatedAvgSalary);
     const statutoryDues = (summary.ghostLiabilities || 0) + (headCount * avgSalary * 0.12); // PF/ESI + GST/TDS
     const severanceCost = headCount * avgSalary; // 1 month notice
     const mcaClosingFees = 125000; // STK-2 + Liquidation filings

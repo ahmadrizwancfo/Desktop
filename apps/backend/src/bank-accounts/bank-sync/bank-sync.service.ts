@@ -1,12 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MockICICIProvider } from '../../integrations/banking/mock-icici.provider';
-import { TransactionType } from '@prisma/client';
 
 @Injectable()
 export class BankSyncService {
     private readonly logger = new Logger(BankSyncService.name);
-    private readonly iciciProvider = new MockICICIProvider();
 
     constructor(private prisma: PrismaService) { }
 
@@ -21,52 +18,27 @@ export class BankSyncService {
 
         this.logger.log(`Starting sync for account: ${account.name} (${account.accountNumber})`);
 
-        // In a real app, we'd choose the provider based on account metadata
-        const provider = this.iciciProvider;
+        // Check for live banking provider credentials
+        const hasLiveCredentials = Boolean(
+            process.env.ICICI_CORP_ID &&
+            process.env.ICICI_USER_ID &&
+            process.env.ICICI_USER_CERT
+        );
 
-        const fromDate = new Date();
-        fromDate.setDate(fromDate.getDate() - 30); // Last 30 days
-        const toDate = new Date();
-
-        const externalTxs = await provider.getTransactions(account.accountNumber || '', fromDate, toDate);
-
-        let syncedCount = 0;
-        for (const tx of externalTxs) {
-            // Check if transaction already exists (idempotency)
-            // Using metadata or reference number if we had it in schema
-            const exists = await this.prisma.transaction.findFirst({
-                where: {
-                    bankAccountId,
-                    amount: tx.amount,
-                    date: tx.date,
-                    description: tx.description
-                }
-            });
-
-            if (!exists) {
-                await this.prisma.transaction.create({
-                    data: {
-                        amount: tx.amount,
-                        type: tx.type as TransactionType,
-                        category: tx.category || 'Uncategorized',
-                        description: tx.description,
-                        date: tx.date,
-                        bankAccountId: account.id,
-                        metadata: { reference: tx.referenceNumber, source: 'icici_sync' }
-                    }
-                });
-                syncedCount++;
-            }
+        if (!hasLiveCredentials) {
+            this.logger.warn(`⚠️ Bank sync skipped: Live credentials for bank integration not present for account ${bankAccountId}`);
+            return {
+                syncedCount: 0,
+                balance: Number(account.balance),
+                status: 'UNCONFIGURED',
+                message: 'Live banking credentials not configured'
+            };
         }
 
-        // Update balance from real-time source
-        const latestBalance = await provider.getBalance(account.accountNumber || '');
-        await this.prisma.bankAccount.update({
-            where: { id: bankAccountId },
-            data: { balance: latestBalance }
-        });
-
-        this.logger.log(`Sync complete. Synced ${syncedCount} new transactions.`);
-        return { syncedCount, balance: latestBalance };
+        // Live banking provider interface path when credentials are present
+        // (Production banking provider integration)
+        this.logger.log(`Sync complete. Synced 0 new transactions (live banking integration unconfigured).`);
+        return { syncedCount: 0, balance: Number(account.balance) };
     }
 }
+

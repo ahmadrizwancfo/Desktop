@@ -33,6 +33,12 @@ export class CfoChatService {
         const report = await this.brain.generateReport(organizationId);
         const cfoState = await this.state.getState(organizationId);
         
+        // Fetch User first name for professional direct CFO address
+        const user = await this.prisma.user.findFirst({
+            where: { organizationId }
+        });
+        const userName = user?.name ? user.name.split(' ')[0] : 'Founder';
+
         // v7.0 Memory: Retrieve past context (simplified for now)
         const memory = "No previous history";
 
@@ -71,7 +77,14 @@ export class CfoChatService {
             cash: report.summary.cashInBank,
             completionRate: cfoState.decisionEngine.completionRate,
             oneThing: cfoState.decisionEngine.dailyFocus.oneThing?.title,
-            memory: memory
+            memory: memory,
+            userName: userName,
+            // EXPANDED DATA GROUNDING (CTO MANDATE):
+            complianceScore: cfoState.behavioralAudit?.complianceScore || 100,
+            activeMandates: cfoState.activeMandates || [],
+            categoryBreakdown: report.categoryBreakdown || [],
+            insights: report.insights || [],
+            criticalAlerts: cfoState.criticalAlerts || [],
         };
 
         const response = await this.ai.processCfoChat(query, context, tools);

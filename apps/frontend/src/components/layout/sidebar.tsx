@@ -29,21 +29,24 @@ import {
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/ui/logo';
 
-const navItems = [
+interface NavItem {
+    name: string;
+    href: string;
+    icon: React.ComponentType<any>;
+    premium?: boolean;
+    promo?: boolean;
+}
+
+const navItems: NavItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'AI CFO', href: '/ai-cfo', icon: BrainCircuit, premium: true },
-    { name: 'History', href: '/history', icon: History },
-    { name: 'Weekly Brief', href: '/weekly-brief', icon: Mail, premium: true },
-    { name: 'Scenario Simulator', href: '/simulator', icon: TrendingUp, premium: true },
-    { name: 'Investor Readiness', href: '/investor-readiness', icon: Target, premium: true },
-    { name: 'Unit Economics', href: '/unit-economics', icon: Calculator, premium: true },
-    { name: 'Invoices', href: '/invoices', icon: Receipt },
-    { name: 'Expenses', href: '/expenses', icon: Receipt },
-    { name: 'Customers & Vendors', href: '/customers-vendors', icon: Users },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Compliance', href: '/compliance', icon: ShieldCheck },
-    { name: 'Integrations', href: '/integrations', icon: Database },
-    { name: 'Invite Founders', href: '/invite', icon: Users, promo: true },
+    { name: 'Decision Lab', href: '/decision-lab', icon: TrendingUp, premium: true },
+    { name: 'Daily Brief', href: '/daily-brief', icon: Mail },
+    { name: 'Action Center', href: '/action-center', icon: Target },
+    { name: 'Timeline & Events', href: '/timeline', icon: History },
+    { name: 'Invoices & AR/AP', href: '/invoices', icon: Receipt },
+    { name: 'Compliance & Tax', href: '/compliance', icon: ShieldCheck },
+    { name: 'Integrations & Data', href: '/integrations', icon: Database },
 ];
 
 import { useAuthStore } from '@/store/auth-store';
@@ -101,43 +104,37 @@ export function Sidebar({ className, onItemClick }: { className?: string; onItem
                             href={item.href}
                             onClick={onItemClick}
                             className={cn(
-                                "group flex items-center justify-between px-4 py-3 rounded-[1.25rem] transition-all duration-300 relative overflow-hidden",
+                                "group flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-150 relative overflow-hidden",
                                 isActive
-                                    ? "bg-white/[0.03] text-white shadow-inner border border-white/5"
-                                    : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.02]"
+                                    ? "bg-white/10 text-white font-semibold border border-white/10 shadow-sm"
+                                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
                             )}
                         >
-                            {/* Active Glow Accent */}
+                            {/* Active Glow Indicator */}
                             {isActive && (
                                 <motion.div 
                                     layoutId="active-pill"
-                                    className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-primary rounded-full shadow-[0_0_100px_rgba(99,102,241,0.5)]" 
+                                    className="absolute left-0 top-2 bottom-2 w-0.5 bg-emerald-400 rounded-full" 
                                 />
                             )}
                             
                             <div className="flex items-center gap-3 relative z-10">
                                 <item.icon className={cn(
-                                    "w-5 h-5 transition-transform duration-300 group-hover:scale-110",
-                                    isActive ? "text-primary shadow-primary/20" : "text-slate-600 group-hover:text-slate-400"
+                                    "w-4 h-4 transition-colors duration-150",
+                                    isActive ? "text-emerald-400" : "text-slate-500 group-hover:text-slate-300"
                                 )} />
                                 <span className={cn(
-                                    "text-sm font-semibold tracking-tight",
-                                    isActive ? "font-bold" : "font-medium"
+                                    "text-xs tracking-tight",
+                                    isActive ? "font-bold text-white" : "font-medium"
                                 )}>{item.name}</span>
                             </div>
 
                             {item.premium && (
                                 <span className={cn(
-                                    "text-[8px] font-black px-1.5 py-0.5 rounded-md border tracking-tighter",
-                                    isActive ? "bg-primary/20 text-primary border-primary/20" : "bg-white/5 text-slate-600 border-white/5"
+                                    "text-[9px] font-black px-1.5 py-0.5 rounded border tracking-tighter uppercase font-mono",
+                                    isActive ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-white/5 text-slate-500 border-white/5"
                                 )}>
                                     AI
-                                </span>
-                            )}
-
-                            {item.promo && (
-                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded-md bg-emerald-500/25 border border-emerald-500/20 text-emerald-400 tracking-tighter">
-                                    FREE
                                 </span>
                             )}
                         </Link>

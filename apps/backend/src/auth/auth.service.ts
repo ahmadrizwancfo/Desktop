@@ -1,5 +1,5 @@
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -13,6 +13,14 @@ export class AuthService {
     ) { }
 
     async register(dto: RegisterDto) {
+        // Prevent duplicate registration with clear error
+        const existing = await this.prisma.user.findUnique({
+            where: { email: dto.email }
+        });
+        if (existing) {
+            throw new BadRequestException('Email already registered');
+        }
+
         const hashedPassword = await bcrypt.hash(dto.password, 10);
 
         // Create user first
@@ -58,6 +66,10 @@ export class AuthService {
         });
 
         if (!user) throw new UnauthorizedException('Invalid credentials');
+
+        if (user.password === '') {
+            throw new BadRequestException('This account was created using Google OAuth. Please sign in with Google.');
+        }
 
         const isMatch = await bcrypt.compare(dto.password, user.password);
         if (!isMatch) throw new UnauthorizedException('Invalid credentials');

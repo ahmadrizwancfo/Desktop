@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    ForbiddenException,
     Get,
     NotFoundException,
     Param,
@@ -25,6 +26,10 @@ import { CfoAutoExecutionService } from './cfo-auto-execution.service';
 import { CfoAutoPilotService } from './cfo-auto-pilot.service';
 import { CfoResolutionService } from './cfo-resolution.service';
 
+import { LiveStateEngineService } from './live-state.engine';
+
+import { CashflowTimelineService } from './cashflow-timeline.service';
+
 class UpdateStatusDto {
     @IsEnum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED'])
     status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
@@ -48,7 +53,24 @@ export class CfoEngineController {
         private readonly autoExecService: CfoAutoExecutionService,
         private readonly autoPilot: CfoAutoPilotService,
         private readonly resolutionService: CfoResolutionService,
+        private readonly liveStateEngine: LiveStateEngineService,
+        private readonly cashflowTimelineService: CashflowTimelineService,
     ) { }
+
+    @Get('cashflow-timeline')
+    async getCashflowTimeline(@Request() req: any) {
+        const orgId = req.user.organizationId;
+        if (!orgId) throw new NotFoundException('No organization found.');
+        return await this.cashflowTimelineService.getProjection(orgId);
+    }
+
+    @Get('live-state/:orgId')
+    async getLiveStateSnapshot(@Param('orgId') orgId: string, @Request() req: any) {
+        if (!req.user?.organizationId || req.user.organizationId !== orgId) {
+            throw new ForbiddenException('Cross-tenant access forbidden');
+        }
+        return this.liveStateEngine.getLiveState(orgId);
+    }
 
     @Post('actions/start-shadow')
     async startShadow(@Body() body: { actionId: string }, @Request() req: any) {

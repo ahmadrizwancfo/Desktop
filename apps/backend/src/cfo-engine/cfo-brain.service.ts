@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { CfoBehaviorService } from './cfo-behavior.service';
+import { FinancialMath } from '../common/math/financial-math.util';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,48 +156,34 @@ export class CfoBrainService {
         const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
         const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
-        // Fetch 3 months of transactions for Weighted Burn calculation
-        const allTxs = await this.prisma.transaction.findMany({
-            where: {
-                bankAccountId: { in: accountIds },
-                date: { gte: ninetyDaysAgo },
-                deletedAt: null,
-            },
-            select: { amount: true, type: true, category: true, date: true, description: true },
-        });
-
-        // Split into buckets
-        const m1Txs = allTxs.filter(t => t.date >= thirtyDaysAgo);
-        const m2Txs = allTxs.filter(t => t.date >= sixtyDaysAgo && t.date < thirtyDaysAgo);
-        const m3Txs = allTxs.filter(t => t.date >= ninetyDaysAgo && t.date < sixtyDaysAgo);
-
-        // Historical snapshots for trend analysis
-        const resolvedUserId = userId || await this.getOrgOwner(organizationId);
-        const snapshots = resolvedUserId ? await this.prisma.financialSnapshot.findMany({
-            where: { organizationId },
-            orderBy: { snapshotDate: 'desc' },
-            take: 6,
-            select: { revenue: true, expenses: true, burn: true, cashBalance: true, snapshotDate: true },
-        }) : [];
-
-        // StartupProfile for context
-        const profile = await this.prisma.startupProfile.findFirst({
-            where: { organizationId },
-            select: { stage: true, primaryGoal: true, teamSize: true, id: true, isTaxBufferUnlocked: true },
-        });
-
-        // ── 2. Aggregate metrics (SSOT AUTHORITY LAYER) ──────────────────────
-        // CORE PRINCIPLE: Strictly use 30-day trailing windows for all metrics.
-        
-        const calculateBurn = (txs: any[]) => {
-            const exp = txs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0);
-            const rev = txs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0);
-            return Math.max(0, exp - rev);
+        // ── 2. Aggregate metrics via DATABASE AGGREGATIONS (Zero In-Memory Dataset Bloat) ──
+        const getBucketAggregates = async (startDate: Date, endDate: Date) => {
+            if (accountIds.length === 0) return { expenses: '0.00', revenue: '0.00', netBurn: '0.00' };
+            const aggs = await this.prisma.transaction.groupBy({
+                by: ['type'],
+                where: {
+                    bankAccountId: { in: accountIds },
+                    date: { gte: startDate, lt: endDate },
+                    deletedAt: null,
+                },
+                _sum: { amount: true },
+            });
+            const exp = aggs.find(a => a.type === 'EXPENSE')?._sum?.amount ?? 0;
+            const rev = aggs.find(a => a.type === 'INCOME')?._sum?.amount ?? 0;
+            return {
+                expenses: FinancialMath.toString(exp),
+                revenue: FinancialMath.toString(rev),
+                netBurn: FinancialMath.netBurn(exp, rev),
+            };
         };
 
-        const burnM1 = calculateBurn(m1Txs);
-        const burnM2 = calculateBurn(m2Txs);
-        const burnM3 = calculateBurn(m3Txs);
+        const m1 = await getBucketAggregates(thirtyDaysAgo, now);
+        const m2 = await getBucketAggregates(sixtyDaysAgo, thirtyDaysAgo);
+        const m3 = await getBucketAggregates(ninetyDaysAgo, sixtyDaysAgo);
+
+        const burnM1 = parseFloat(m1.netBurn);
+        const burnM2 = parseFloat(m2.netBurn);
+        const burnM3 = parseFloat(m3.netBurn);
 
         /**
          * v4.0 VOLATILITY-AWARE BURN ENGINE
@@ -211,42 +198,56 @@ export class CfoBrainService {
             ? (0.8 * burnM1) + (0.1 * burnM2) + (0.1 * burnM3)
             : (0.5 * burnM1) + (0.3 * burnM2) + (0.2 * burnM3);
 
-        const currentTxs = m1Txs;
-        const prevTxs = m2Txs;
+        const monthlyRevenue = parseFloat(m1.revenue);
+        const monthlyExpenses = parseFloat(m1.expenses);
 
-        const monthlyRevenue = currentTxs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0);
-        const monthlyExpenses = currentTxs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0);
+        const prevRevenue = parseFloat(m2.revenue);
+        const prevExpenses = parseFloat(m2.expenses);
 
-        const prevRevenue = prevTxs.filter(t => t.type === 'INCOME').reduce((s, t) => s + Number(t.amount), 0);
-        const prevExpenses = prevTxs.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + Number(t.amount), 0);
+        // DB Aggregation for Category Spend Breakdown
+        const categoryGroup = accountIds.length > 0 ? await this.prisma.transaction.groupBy({
+            by: ['category'],
+            where: {
+                bankAccountId: { in: accountIds },
+                date: { gte: thirtyDaysAgo },
+                type: 'EXPENSE',
+                deletedAt: null,
+            },
+            _sum: { amount: true },
+        }) : [];
+
+        const prevCategoryGroup = accountIds.length > 0 ? await this.prisma.transaction.groupBy({
+            by: ['category'],
+            where: {
+                bankAccountId: { in: accountIds },
+                date: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+                type: 'EXPENSE',
+                deletedAt: null,
+            },
+            _sum: { amount: true },
+        }) : [];
 
         const categorySums: Record<string, number> = {};
         const prevCategorySums: Record<string, number> = {};
 
-        for (const tx of currentTxs) {
-            if (tx.type === 'EXPENSE') {
-                const cat = tx.category || 'General';
-                categorySums[cat] = (categorySums[cat] || 0) + Number(tx.amount);
-            }
+        for (const item of categoryGroup) {
+            categorySums[item.category || 'General'] = parseFloat(FinancialMath.toString(item._sum?.amount ?? 0));
         }
 
-        for (const tx of prevTxs) {
-            if (tx.type === 'EXPENSE') {
-                const cat = tx.category || 'General';
-                prevCategorySums[cat] = (prevCategorySums[cat] || 0) + Number(tx.amount);
-            }
+        for (const item of prevCategoryGroup) {
+            prevCategorySums[item.category || 'General'] = parseFloat(FinancialMath.toString(item._sum?.amount ?? 0));
         }
 
         /**
          * FORMULA: Net Burn = max(Expenses - Revenue, 0)
          * We do not assume negative burn (profit) as "negative expenses" for safety.
          */
-        const netBurn = Math.max(0, monthlyExpenses - monthlyRevenue);
+        const netBurn = parseFloat(FinancialMath.netBurn(monthlyExpenses, monthlyRevenue));
 
         /**
          * FORMULA: Cash = Total available balance across all active accounts.
          */
-        const cashInBank = bankAccounts.reduce((s, a) => s + Number(a.balance), 0);
+        const cashInBank = parseFloat(FinancialMath.sum(bankAccounts.map(a => a.balance)));
         
         /**
          * FORMULA: Smart Ghost Liabilities (Conservative Buffer)
@@ -302,6 +303,7 @@ export class CfoBrainService {
         const rawRunway = netBurn > 0 ? (bankBalance / netBurn) : 999;
         const isCrisisMode = rawRunway < 3.0;
 
+        const profile = await this.prisma.startupProfile.findFirst({ where: { organizationId } });
         const effectiveGhostAmount = (profile?.isTaxBufferUnlocked && !isCrisisMode) ? 0 : ghostLiabilities;
 
         if (netBurn <= 0 && avgBurn3m <= 0) {
@@ -344,23 +346,36 @@ export class CfoBrainService {
         const topCategory = categoryBreakdown[0];
 
         // ── 4. Determine overall trends ──────────────────────────────────────
+        const snapshots = profile?.id ? await this.prisma.startupProfileSnapshot.findMany({
+            where: { startupProfileId: profile.id },
+            orderBy: { snapshotAt: 'desc' },
+            take: 6,
+        }) : [];
+
         const snapshotRows: SnapshotRow[] = snapshots.map(s => ({
-            revenue: Number(s.revenue),
-            expenses: Number(s.expenses),
-            burn: Number(s.burn),
-            cashBalance: Number(s.cashBalance),
-            snapshotDate: s.snapshotDate,
+            revenue: Number(s.monthlyRevenue),
+            expenses: Number(s.monthlyExpenses),
+            burn: Number(s.monthlyExpenses) - Number(s.monthlyRevenue),
+            cashBalance: Number(s.cashInBank),
+            snapshotDate: s.snapshotAt,
         }));
 
         const burnTrend = this.computeTrend(
             prevExpenses > 0 ? prevExpenses - prevRevenue : null,
             netBurn,
         );
-        const revenueTrend = this.computeRevenueTrend(prevRevenue, monthlyRevenue);
+        const revenueTrend = this.computeTrend(prevRevenue, monthlyRevenue);
+
+        const currentTxCount = accountIds.length > 0 ? await this.prisma.transaction.count({
+            where: { bankAccountId: { in: accountIds }, date: { gte: thirtyDaysAgo }, deletedAt: null }
+        }) : 0;
+        const prevTxCount = accountIds.length > 0 ? await this.prisma.transaction.count({
+            where: { bankAccountId: { in: accountIds }, date: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }, deletedAt: null }
+        }) : 0;
 
         const dataQuality: CfoBrainReport['dataQuality'] =
-            currentTxs.length >= 10 && prevTxs.length >= 5 ? 'rich'
-            : currentTxs.length >= 3 ? 'partial'
+            currentTxCount >= 10 && prevTxCount >= 5 ? 'rich'
+            : currentTxCount >= 3 ? 'partial'
             : 'minimal';
 
         const integrationsCount = await this.prisma.integrationConnection.count({ where: { organizationId } });
@@ -390,6 +405,11 @@ export class CfoBrainService {
 
         this.logger.log(`CFO Brain: ${insights.length} insights generated (quality: ${dataQuality})`);
 
+        const mappedRevenueTrend: 'growing' | 'declining' | 'stable' | 'unknown' = 
+            revenueTrend === 'increasing' ? 'growing' : 
+            revenueTrend === 'decreasing' ? 'declining' : 
+            (revenueTrend as any);
+
         // ── 6. Decision Engine V1 — the brutal-truth CFO layer ────────────
         const decisionEngine = this.generateDecisionEngineV1({
             monthlyRevenue,
@@ -400,11 +420,11 @@ export class CfoBrainService {
             isSustainable,
             ghostLiabilities,
             burnTrend,
-            revenueTrend,
+            revenueTrend: mappedRevenueTrend,
             categoryBreakdown,
             prevRevenue,
             prevExpenses,
-            totalTransactions: currentTxs.length,
+            totalTransactions: currentTxCount,
             dataQuality,
             profile,
             integrationsCount,
@@ -422,7 +442,7 @@ export class CfoBrainService {
             topExpenseCategory: topCategory?.category || 'N/A',
             topExpenseAmount: topCategory?.amount || 0,
             burnTrend,
-            revenueTrend,
+            revenueTrend: mappedRevenueTrend,
             prevMonthlyRevenue: prevRevenue,
             prevNetBurn: Math.max(0, prevExpenses - prevRevenue),
             avgBurn3m
@@ -539,7 +559,7 @@ export class CfoBrainService {
                 topExpenseCategory: topCategory?.category || 'N/A',
                 topExpenseAmount: topCategory?.amount || 0,
                 burnTrend,
-                revenueTrend,
+                revenueTrend: mappedRevenueTrend,
                 prevMonthlyRevenue: prevRevenue,
                 prevNetBurn: Math.max(0, prevExpenses - prevRevenue),
                 avgBurn3m,

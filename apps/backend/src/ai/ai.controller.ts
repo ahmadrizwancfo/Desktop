@@ -4,12 +4,84 @@ import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { GetUser } from '../common/decorators/get-user.decorator';
 
+import { TenantGuard } from '../common/guards/tenant.guard';
+import { AiOrchestratorService } from './agent/ai-orchestrator.service';
+
+import { AiFeedbackService } from './feedback/ai-feedback.service';
+
 @Controller('ai')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard)
 // AI endpoints use Gemini API which costs money - apply stricter rate limits
 @Throttle({ default: { limit: 30, ttl: 60000 } }) // 30 requests per minute per user
 export class AiController {
-    constructor(private readonly aiService: AiService) { }
+    constructor(
+        private readonly aiService: AiService,
+        private readonly orchestratorService: AiOrchestratorService,
+        private readonly feedbackService: AiFeedbackService,
+    ) { }
+
+    @Post('feedback')
+    async submitFeedback(
+        @GetUser() user: any,
+        @Body() body: { decisionId?: string; rating: 'THUMBS_UP' | 'THUMBS_DOWN'; feedbackText?: string; promptText: string; responseText: string; metadata?: any }
+    ) {
+        const result = await this.feedbackService.logFeedback({
+            organizationId: user.organizationId,
+            userId: user.id,
+            decisionId: body.decisionId,
+            rating: body.rating,
+            feedbackText: body.feedbackText,
+            promptText: body.promptText,
+            responseText: body.responseText,
+            metadata: body.metadata,
+        });
+        return { success: true, feedbackId: result.id };
+    }
+
+    @Post('track-event')
+    async trackUserEvent(
+        @GetUser() user: any,
+        @Body() body: { action: string; component: string; metadata?: any }
+    ) {
+        const result = await this.feedbackService.logUserEvent({
+            organizationId: user.organizationId,
+            userId: user.id,
+            action: body.action,
+            component: body.component,
+            metadata: body.metadata,
+        });
+        return { success: true, eventId: result.id };
+    }
+
+    @Post('orchestrate')
+    @Throttle({ default: { limit: 20, ttl: 60000 } })
+    async orchestrate(
+        @GetUser() user: any,
+        @Body() body: { query: string; headcountDelta?: number; marketingSpendDelta?: number }
+    ) {
+        const decision = await this.orchestratorService.generateDecision({
+            organizationId: user.organizationId,
+            userQuery: body.query,
+            headcountDelta: body.headcountDelta,
+            marketingSpendDelta: body.marketingSpendDelta,
+        });
+        return { success: true, decision };
+    }
+
+    @Post('decision')
+    @Throttle({ default: { limit: 20, ttl: 60000 } })
+    async getStructuredDecision(
+        @GetUser() user: any,
+        @Body() body?: { query?: string; headcountDelta?: number; marketingSpendDelta?: number }
+    ) {
+        const decision = await this.orchestratorService.generateDecision({
+            organizationId: user.organizationId,
+            userQuery: body?.query,
+            headcountDelta: body?.headcountDelta,
+            marketingSpendDelta: body?.marketingSpendDelta,
+        });
+        return { success: true, decision };
+    }
 
     // ==================== Chat & Insights ====================
 

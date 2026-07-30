@@ -1,29 +1,21 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Outfit", Arial, sans-serif;
-  
-  --color-primary: #A78BFA;
-  --color-primary-foreground: #ffffff;
-  
-  --color-background: #020617; /* Deeper navy/black */
-  --color-foreground: #f8fafc;
-  
-  --color-card: rgba(15, 23, 42, 0.4);
-  --color-card-foreground: #f8fafc;
-  
-  --color-border: rgba(148, 163, 184, 0.08);
-  --color-input: rgba(15, 23, 42, 0.6);
-  
-  --shadow-premium: 0 0 50px -12px rgba(99, 102, 241, 0.15);
-  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
-}
-
 :root {
-  --background: #020617;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --color-primary: #10b981;
+  --color-primary-foreground: #ffffff;
+  --color-background: #08090a;
+  --color-foreground: #f8fafc;
+  --color-card: rgba(11, 19, 41, 0.6);
+  --color-card-foreground: #f8fafc;
+  --color-border: rgba(255, 255, 255, 0.05);
+  --color-input: rgba(11, 19, 41, 0.8);
+  --shadow-premium: 0 0 40px -10px rgba(16, 185, 129, 0.1);
+  --shadow-glow: 0 0 15px rgba(16, 185, 129, 0.25);
+  --background: #08090a;
   --foreground: #f8fafc;
-  --primary: #A78BFA;
-  --primary-glow: rgba(167, 139, 250, 0.2);
+  --primary: #10b981;
+  --primary-glow: rgba(16, 185, 129, 0.15);
   --accent-violet: #8b5cf6;
   --accent-teal: #14b8a6;
 }
@@ -32,6 +24,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;

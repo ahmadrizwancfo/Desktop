@@ -80,8 +80,14 @@ function computeReadiness(cfoState: any) {
     const recommendations: string[] = [];
 
     // Runway score (max 30)
-    if (deathClock.daysLeft !== null) {
-        const runwayMonths = deathClock.daysLeft / 30;
+    let runwayMonths: number | null = null;
+    if (deathClock && deathClock.daysLeft !== null && deathClock.daysLeft !== undefined) {
+        runwayMonths = deathClock.daysLeft / 30;
+    } else if (summary && summary.runwayMonths !== undefined && summary.runwayMonths !== null) {
+        runwayMonths = summary.runwayMonths;
+    }
+
+    if (runwayMonths !== null && runwayMonths > 0) {
         if (runwayMonths >= 18) { score += 30; strengths.push(`Strong runway at ${runwayMonths.toFixed(1)} months`); }
         else if (runwayMonths >= 12) { score += 20; strengths.push(`Decent runway at ${runwayMonths.toFixed(1)} months`); }
         else if (runwayMonths >= 6) { score += 10; recommendations.push('Extend runway to 12+ months before fundraising'); }
@@ -94,7 +100,7 @@ function computeReadiness(cfoState: any) {
         if (burnMultiple < 2) { score += 25; strengths.push(`Efficient burn multiple at ${burnMultiple.toFixed(1)}x`); }
         else if (burnMultiple < 3) { score += 15; }
         else { score += 5; recommendations.push('Reduce burn multiple below 2x'); }
-    } else if (summary.netBurn <= 0) {
+    } else if (summary.netBurn <= 0 && summary.monthlyRevenue > 0) {
         score += 25; strengths.push('Cash flow positive');
     }
 
@@ -109,13 +115,32 @@ function computeReadiness(cfoState: any) {
     else if (summary.burnTrend === 'increasing') { score += 5; recommendations.push('Stabilize burn rate'); }
     else { score += 10; }
 
+    // Compute readiness timeline dynamically from financial metrics or return null when unconfigured
+    let timeToReadiness: { expected: number; bestCase: number; worstCase: number } | null = null;
+    const hasFinancials = summary && (summary.monthlyRevenue > 0 || summary.cashInBank > 0 || summary.netBurn > 0);
+    if (hasFinancials) {
+        if (score >= 70) {
+            timeToReadiness = { expected: 0, bestCase: 0, worstCase: 0 };
+        } else {
+            const gap = 70 - score;
+            const burnRatio = summary.monthlyRevenue > 0 ? (summary.netBurn / summary.monthlyRevenue) : 1.5;
+            const trendMultiplier = summary.burnTrend === 'increasing' ? 1.8 : summary.burnTrend === 'decreasing' ? 0.9 : 1.3;
+            const expected = Math.round((gap / 10) * Math.max(0.8, Math.min(2.5, burnRatio * trendMultiplier)) * 10) / 10;
+            timeToReadiness = {
+                expected,
+                bestCase: Math.round(expected * 0.65 * 10) / 10,
+                worstCase: Math.round(expected * 1.7 * 10) / 10,
+            };
+        }
+    }
+
     return {
         score: Math.min(score, 100),
         isReady: score >= 70,
         strengths,
         recommendations,
         stage: 'seed', // Default stage
-        timeToReadiness: { expected: 4.2, bestCase: 2.8, worstCase: 7.5 }, // Dummy values
+        timeToReadiness,
         gaps: [], // Initial empty gaps
     };
 }
@@ -128,7 +153,7 @@ const documentTemplates = [
     { type: 'runway_forecast', title: 'Runway Forecast', description: '12-month cash runway projection' },
 ];
 
-const mockMetrics = {
+const EMPTY_METRICS = {
     netBurnRate: 0,
     monthlyRecurringRevenue: 0,
     currentCash: 0,
@@ -139,13 +164,13 @@ const mockMetrics = {
     grossMargin: 0,
 };
 
-const mockReadiness = {
+const EMPTY_READINESS = {
     score: 0,
     isReady: false,
     strengths: [],
     recommendations: [],
     stage: 'seed',
-    timeToReadiness: { expected: 0, bestCase: 0, worstCase: 0 },
+    timeToReadiness: null,
     gaps: [],
 };
 
@@ -210,6 +235,28 @@ export default function InvestorReadinessPage() {
     const blockerLabel = getBlockerLabel(primaryGoal);
     const readiness = cfoState ? computeReadiness(cfoState) : null;
 
+    // Derive gross margin dynamically from revenue/COGS in cfoState or return 0 when unconfigured
+    const grossMargin = (() => {
+        if (!cfoState) return 0;
+        if ((cfoState as any)?.metrics?.grossMargin !== undefined && (cfoState as any)?.metrics?.grossMargin !== null) {
+            return (cfoState as any).metrics.grossMargin;
+        }
+        if ((cfoState as any)?.summary?.grossMargin !== undefined && (cfoState as any)?.summary?.grossMargin !== null) {
+            return (cfoState as any).summary.grossMargin;
+        }
+        const rev = cfoState.summary?.monthlyRevenue ?? 0;
+        if (rev <= 0) return 0;
+        const cogsCategory = cfoState.categoryBreakdown?.find((c: any) =>
+            c.category?.toLowerCase().includes('cogs') ||
+            c.category?.toLowerCase().includes('cost of goods') ||
+            c.category?.toLowerCase().includes('hosting') ||
+            c.category?.toLowerCase().includes('infrastructure')
+        );
+        const cogs = cogsCategory ? cogsCategory.amount : 0;
+        const margin = ((rev - cogs) / rev) * 100;
+        return Math.max(0, Math.min(100, Math.round(margin)));
+    })();
+
     // Derive metrics from CFOState
     const metrics = cfoState ? {
         netBurnRate: cfoState.summary.netBurn,
@@ -219,7 +266,7 @@ export default function InvestorReadinessPage() {
         burnMultiple: cfoState.summary.monthlyRevenue > 0 ? cfoState.summary.netBurn / cfoState.summary.monthlyRevenue : 0,
         revenueGrowthRate: cfoState.summary.revenueTrend === 'growing' ? 15 : cfoState.summary.revenueTrend === 'stable' ? 0 : -5,
         runwayQualityScore: readiness?.score || 0,
-        grossMargin: 65, // Default average SaaS margin
+        grossMargin,
     } : null;
     const metricsLoading = cfoLoading;
     const readinessLoading = cfoLoading;
@@ -282,7 +329,7 @@ export default function InvestorReadinessPage() {
 
     const handleEnableInvestorMode = () => {
         setInvestorModeEnabled(true);
-        // Generate a mock shareable link
+        // Generate data room shareable link
         setDataRoomLink(`https://foundercfo.app/dataroom/${Date.now().toString(36)}`);
         setSelectedDocs(documentTemplates.map(d => d.type)); // Select all docs
     };
@@ -304,8 +351,8 @@ export default function InvestorReadinessPage() {
         );
     }
 
-    const m = metrics || mockMetrics;
-    const r = readiness || mockReadiness;
+    const m = metrics || EMPTY_METRICS;
+    const r = readiness || EMPTY_READINESS;
 
     const goalOptions: { id: PrimaryGoal; label: string; icon: any }[] = [
         { id: 'raise_capital', label: 'Raise Capital', icon: TrendingUp },
@@ -430,14 +477,24 @@ export default function InvestorReadinessPage() {
                                             'Projected Runway'}
                                 </p>
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl font-black text-white">{r.timeToReadiness?.expected || 4.2}</span>
-                                    <span className="text-sm text-slate-400">months (expected)</span>
+                                    <span className="text-2xl font-black text-white">
+                                        {r.timeToReadiness ? (r.timeToReadiness.expected > 0 ? r.timeToReadiness.expected : 'Ready') : '-'}
+                                    </span>
+                                    <span className="text-sm text-slate-400">
+                                        {r.timeToReadiness ? (r.timeToReadiness.expected > 0 ? 'months (expected)' : 'to raise') : 'N/A'}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-3 mt-1 text-[10px]">
-                                    <span className="text-emerald-400">Best: {r.timeToReadiness?.bestCase || 2.8}mo</span>
-                                    <span className="text-slate-600">|</span>
-                                    <span className="text-amber-400">Worst: {r.timeToReadiness?.worstCase || 7.5}mo</span>
-                                </div>
+                                {r.timeToReadiness ? (
+                                    <div className="flex items-center gap-3 mt-1 text-[10px]">
+                                        <span className="text-emerald-400">Best: {r.timeToReadiness.bestCase}mo</span>
+                                        <span className="text-slate-600">|</span>
+                                        <span className="text-amber-400">Worst: {r.timeToReadiness.worstCase}mo</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3 mt-1 text-[10px]">
+                                        <span className="text-slate-500">Timeline unconfigured</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -619,10 +676,10 @@ export default function InvestorReadinessPage() {
                         },
                         {
                             label: 'Gross Margin',
-                            value: `${m.grossMargin}%`,
+                            value: m.grossMargin && m.grossMargin > 0 ? `${m.grossMargin}%` : '-',
                             icon: PiggyBank,
-                            color: m.grossMargin >= 60 ? 'emerald' : m.grossMargin >= 40 ? 'amber' : 'rose',
-                            desc: m.grossMargin >= 60 ? 'Healthy' : 'Needs Work',
+                            color: m.grossMargin >= 60 ? 'emerald' : m.grossMargin >= 40 ? 'amber' : m.grossMargin > 0 ? 'rose' : 'slate',
+                            desc: m.grossMargin >= 60 ? 'Healthy' : m.grossMargin > 0 ? 'Needs Work' : 'Unconfigured',
                             benchmark: benchmarks['Gross Margin'],
                         },
                         {

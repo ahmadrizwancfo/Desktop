@@ -360,6 +360,8 @@ export interface TrustWarning {
 }
 
 export interface CFOState {
+    organizationId?: string;
+    lastUpdatedAt?: string;
     companyStatus: CompanyStatus;
     dashboardMode: 'STABLE' | 'WARNING' | 'CRITICAL';
     isFirstTimeUser?: boolean;
@@ -516,8 +518,9 @@ export interface CFOState {
         };
     };
 
-    // v4.0 Execution Engine
-    founderPersona?: 'disciplined' | 'reactive' | 'chaotic' | 'scaling';
+    // v11 Progressive Engine
+    isPartialState?: boolean;
+    processingMessage?: string | null;
 }
 
 // ── Zustand Store ─────────────────────────────────────────────────────────────
@@ -528,12 +531,27 @@ export interface CfoStateStore {
     isTaxBufferUnlocked: boolean;
     isInvestorMode: boolean;
     isSimpleMode: boolean;
+    isPartialState: boolean;
+    processingMessage: string | null;
+    activeDecisions: any[];
+    topPriority: any | null;
+    projectedState: any | null;
+    pendingActions: any[];
     victoryEvent: { amount: number; points: number; title: string; type: 'MILESTONE' | 'MICRO' } | null;
+    sseStatus: 'connected' | 'reconnecting' | 'disconnected';
+    sseLastUpdated: Date | null;
+    setSseStatus: (status: 'connected' | 'reconnecting' | 'disconnected') => void;
+    setSseLastUpdated: (date: Date) => void;
     setStateData: (data: CFOState) => void;
     setResolutionPath: (path: 'mna' | 'service' | 'shutdown' | 'bridge' | null) => void;
     toggleTaxBuffer: () => void;
     setInvestorMode: (val: boolean) => void;
     setSimpleMode: (val: boolean) => void;
+    setQuickUpdateMessage: (msg: string) => void;
+    applyPartialStateUpdate: (payload: { monthlyBurn?: number; monthlyRevenue?: number }) => void;
+    applyFinalState: (data: CFOState) => void;
+    setIsPartialState: (val: boolean) => void;
+    applyLiveStateSnapshot: (snapshot: any) => void;
     triggerVictory: (amount: number, points: number, title: string, type?: 'MILESTONE' | 'MICRO') => void;
     clearVictory: () => void;
     clear: () => void;
@@ -545,18 +563,56 @@ export const useCfoStateStore = create<CfoStateStore>((set) => ({
     isTaxBufferUnlocked: false,
     isInvestorMode: false,
     isSimpleMode: false,
+    isPartialState: false,
+    processingMessage: null,
+    activeDecisions: [],
+    topPriority: null,
+    projectedState: null,
+    pendingActions: [],
     victoryEvent: null,
-    setStateData: (data) => set({ state: data }),
+    sseStatus: 'disconnected',
+    sseLastUpdated: null,
+    setSseStatus: (status) => set({ sseStatus: status }),
+    setSseLastUpdated: (date) => set({ sseLastUpdated: date }),
+    setStateData: (data) => set({ state: data, isPartialState: data.isPartialState ?? false }),
     setInvestorMode: (val) => set({ isInvestorMode: val }),
     setSimpleMode: (val) => set({ isSimpleMode: val }),
     setResolutionPath: (path) => set({ resolutionPath: path }),
     toggleTaxBuffer: () => set((s) => ({ isTaxBufferUnlocked: !s.isTaxBufferUnlocked })),
+    setQuickUpdateMessage: (msg) => set({ processingMessage: msg, isPartialState: true }),
+    applyLiveStateSnapshot: (snapshot) => set({
+        state: snapshot.financialState || null,
+        activeDecisions: snapshot.decisions || [],
+        topPriority: snapshot.topPriority || null,
+        projectedState: snapshot.projectedState || null,
+        pendingActions: snapshot.actions || [],
+        isPartialState: snapshot.isPartialState ?? false,
+        processingMessage: snapshot.processingMessage || null,
+    }),
+    applyPartialStateUpdate: (payload) => set((s) => {
+        if (!s.state) return s;
+        return {
+            isPartialState: true,
+            processingMessage: 'Updating burn & revenue...',
+            state: {
+                ...s.state,
+                summary: {
+                    ...s.state.summary,
+                    monthlyExpenses: payload.monthlyBurn ?? s.state.summary.monthlyExpenses,
+                    monthlyRevenue: payload.monthlyRevenue ?? s.state.summary.monthlyRevenue,
+                    netBurn: Math.max(0, (payload.monthlyBurn ?? s.state.summary.monthlyExpenses) - (payload.monthlyRevenue ?? s.state.summary.monthlyRevenue)),
+                },
+            },
+        };
+    }),
+    applyFinalState: (data) => set({ state: data, isPartialState: false, processingMessage: null }),
+    setIsPartialState: (val) => set({ isPartialState: val }),
     triggerVictory: (amount, points, title, type = 'MICRO') => {
         set({ victoryEvent: { amount, points, title, type } });
         setTimeout(() => set({ victoryEvent: null }), type === 'MILESTONE' ? 8000 : 4000);
     },
     clearVictory: () => set({ victoryEvent: null }),
-    clear: () => set({ state: null, resolutionPath: null, isTaxBufferUnlocked: false, isSimpleMode: false, victoryEvent: null }),
+    clear: () => set({ state: null, resolutionPath: null, isTaxBufferUnlocked: false, isSimpleMode: false, isPartialState: false, processingMessage: null, victoryEvent: null }),
 }));
 
 // ── React Query Hook ──────────────────────────────────────────────────────────

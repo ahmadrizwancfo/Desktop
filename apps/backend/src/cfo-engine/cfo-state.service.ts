@@ -2446,7 +2446,7 @@ export class CfoStateService {
             const revenue = metrics.monthlyRevenue || 1;
             const burnRatio = metrics.netBurn / revenue;
             const cash = metrics.cashBalance;
-            const peakCash = profile.highestCashBuffer || cash;
+            const peakCash = profile?.highestCashBuffer || cash;
             const erosion = peakCash > 0 ? (peakCash - cash) / peakCash : 0;
 
             if (metrics.netBurn > 0 && (burnRatio > 0.15 || runwayMonths < 12)) {
@@ -2492,6 +2492,10 @@ export class CfoStateService {
 
         // 2. 🔁 HYSTERESIS LAYER (v2.1)
         // Principle: Stability of narrative > responsiveness to noise
+        if (!profile) {
+            return { mode: suggestedMode, explanation: buildExplanation(suggestedMode) };
+        }
+
         const currentMode = profile.lastDashboardMode || 'STABLE';
         const stagingCount = profile.modeStagingCount || 0;
         const now = new Date();

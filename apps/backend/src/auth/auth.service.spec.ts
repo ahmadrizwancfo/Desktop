@@ -14,6 +14,10 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      update: jest.fn(),
+    },
+    organization: {
+      create: jest.fn(),
     },
   };
 
@@ -36,6 +40,18 @@ describe('AuthService', () => {
 
     // Reset mocks
     jest.clearAllMocks();
+
+    // Set up default resolutions for organization.create and user.update to avoid crashing register()
+    mockPrismaService.organization.create.mockResolvedValue({ id: 'org-123', name: 'Test Org' });
+    mockPrismaService.user.update.mockImplementation(async (args) => {
+      return { 
+        id: args.where.id, 
+        email: 'test@example.com', 
+        name: 'Test User', 
+        role: 'FOUNDER', 
+        ...args.data 
+      };
+    });
   });
 
   describe('register', () => {
@@ -143,7 +159,7 @@ describe('AuthService', () => {
     });
   });
 
-  describe('findOrCreateMockUser', () => {
+  describe('findOrCreateUserByOAuth', () => {
     it('should return existing user if found', async () => {
       const profile = {
         email: 'google@example.com',
@@ -156,11 +172,12 @@ describe('AuthService', () => {
         email: profile.email,
         name: profile.name,
         googleId: profile.googleId,
+        organizationId: 'org-123',
       };
 
       mockPrismaService.user.findUnique.mockResolvedValue(existingUser);
 
-      const result = await service.findOrCreateMockUser(profile);
+      const result = await service.findOrCreateUserByOAuth(profile);
 
       expect(result).toEqual(existingUser);
       expect(mockPrismaService.user.create).not.toHaveBeenCalled();
@@ -179,9 +196,10 @@ describe('AuthService', () => {
         ...profile,
         password: '',
         role: 'FOUNDER',
+        organizationId: 'org-123',
       });
 
-      const result = await service.findOrCreateMockUser(profile);
+      const result = await service.findOrCreateUserByOAuth(profile);
 
       expect(result).toHaveProperty('id', 'user-456');
       expect(mockPrismaService.user.create).toHaveBeenCalledTimes(1);

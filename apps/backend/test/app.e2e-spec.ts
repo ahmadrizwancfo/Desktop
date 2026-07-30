@@ -14,6 +14,9 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api', {
+      exclude: ['/', 'health', 'health/ready', 'auth/google', 'auth/google/callback'],
+    });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
     await app.init();
 
@@ -147,7 +150,7 @@ describe('AppController (e2e)', () => {
 
   describe('Rate Limiting', () => {
     it('should rate limit excessive login attempts', async () => {
-      const attempts = [];
+      const attempts: any[] = [];
 
       // Make 10 rapid requests
       for (let i = 0; i < 10; i++) {
@@ -158,10 +161,10 @@ describe('AppController (e2e)', () => {
         );
       }
 
-      const results = await Promise.all(attempts);
+      const results: any[] = await Promise.all(attempts);
 
       // At least one should be rate limited (429) if rate limiting is working
-      const rateLimited = results.some(r => r.status === 429);
+      const rateLimited = results.some((r: any) => r.status === 429);
       // This test may pass or fail depending on rate limit configuration
       // In production, this SHOULD eventually return 429
       expect(results.length).toBe(10);

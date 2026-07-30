@@ -110,20 +110,4 @@ export function MonthlyComparison({ currentMonth, previousMonth, metrics }: Mont
     );
 }
 
-// Default comparison with mock data
-export function DefaultMonthlyComparison() {
-    const metrics: ComparisonMetric[] = [
-        { label: 'Revenue', currentValue: 320000, previousValue: 272000, format: 'currency', goodDirection: 'up' },
-        { label: 'Burn Rate', currentValue: 240000, previousValue: 210000, format: 'currency', goodDirection: 'down' },
-        { label: 'Net Burn', currentValue: -80000, previousValue: -62000, format: 'currency', goodDirection: 'down' },
-        { label: 'Runway', currentValue: 7.2, previousValue: 8.1, format: 'number', goodDirection: 'up' },
-    ];
 
-    return (
-        <MonthlyComparison
-            currentMonth="Jan 2026"
-            previousMonth="Dec 2025"
-            metrics={metrics}
-        />
-    );
-}
