@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 export interface BusinessSystemState {
   systemId: string;
@@ -26,14 +27,10 @@ export function useBusinessHealth(organizationId?: string) {
     setError(null);
     try {
       const orgId = organizationId || '00000000-0000-0000-0000-000000000001';
-      const response = await fetch(`/api/v1/intelligence/dynamics/health?organizationId=${orgId}`);
+      const response = await apiClient.get(`/intelligence/dynamics/health?organizationId=${orgId}`);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch business health (status ${response.status})`);
-      }
-
-      const json = await response.json();
-      if (json.success && json.data) {
+      const json = response.data;
+      if (json && json.success && json.data) {
         setHealthReport({
           overallHealthScore: json.data.healthReport?.overallHealthScore ?? 80,
           healthTier: json.data.healthReport?.healthTier ?? 'GOOD',
@@ -42,10 +39,10 @@ export function useBusinessHealth(organizationId?: string) {
           executionTimeMs: json.data.executionTimeMs || 0,
         });
       } else {
-        throw new Error(json.message || 'Invalid response schema');
+        throw new Error(json?.message || 'Invalid response schema');
       }
     } catch (err: any) {
-      setError(err.message || 'Error fetching business health');
+      setError(err.response?.data?.message || err.message || 'Error fetching business health');
     } finally {
       setLoading(false);
     }
