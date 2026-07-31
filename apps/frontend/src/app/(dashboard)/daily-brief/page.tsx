@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { NextStepRecommendationBar } from '@/components/navigation/next-step-recommendation-bar';
+import { apiClient } from '@/lib/api-client';
 
 export default function DailyBriefPage() {
     const [brief, setBrief] = useState<any>(null);
@@ -18,16 +19,9 @@ export default function DailyBriefPage() {
     const fetchDailyBrief = async () => {
         setLoading(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/cfo-engine/daily-brief', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setBrief(data.brief);
+            const res = await apiClient.get('/cfo-engine/daily-brief');
+            if (res.data && res.data.brief) {
+                setBrief(res.data.brief);
             }
         } catch (err) {
             console.error('Failed to fetch daily brief:', err);
@@ -39,28 +33,20 @@ export default function DailyBriefPage() {
     const handlePrepareActionFromBrief = async () => {
         if (!brief?.recommendedAction) return;
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/cfo-engine/action-center/prepare', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            const res = await apiClient.post('/cfo-engine/action-center/prepare', {
+                sourceModule: 'Dashboard',
+                actionType: brief.recommendedAction.actionCenterType || 'INVOICE_REMINDER',
+                title: brief.recommendedAction.actionTitle,
+                urgency: 'HIGH',
+                financialImpact: '45000',
+                payload: {
+                    recipientEmail: 'client@company.com',
+                    subject: brief.recommendedAction.actionTitle,
+                    body: brief.recommendedAction.reasoning,
                 },
-                body: JSON.stringify({
-                    sourceModule: 'Dashboard',
-                    actionType: brief.recommendedAction.actionCenterType || 'INVOICE_REMINDER',
-                    title: brief.recommendedAction.actionTitle,
-                    urgency: 'HIGH',
-                    financialImpact: '45000',
-                    payload: {
-                        recipientEmail: 'client@company.com',
-                        subject: brief.recommendedAction.actionTitle,
-                        body: brief.recommendedAction.reasoning,
-                    },
-                }),
             });
 
-            if (res.ok) {
+            if (res.status === 200 || res.status === 201) {
                 router.push('/action-center');
             }
         } catch (e) {

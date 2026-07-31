@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 export function CfoCopilotPanel() {
     const [query, setQuery] = useState('');
@@ -18,19 +19,9 @@ export function CfoCopilotPanel() {
         setFeedbackGiven(null);
 
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/ai/orchestrate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({ query: q }),
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setDecision(data.decision);
+            const res = await apiClient.post('/ai/orchestrate', { query: q });
+            if (res.data) {
+                setDecision(res.data.decision);
             }
         } catch (err) {
             console.error('AI Orchestration error:', err);
@@ -44,19 +35,11 @@ export function CfoCopilotPanel() {
         setFeedbackGiven(rating);
 
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            await fetch('/api/ai/feedback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({
-                    decisionId: decision.decisionId,
-                    rating,
-                    promptText: query,
-                    responseText: decision.headline + ' | ' + decision.narrative,
-                }),
+            await apiClient.post('/ai/feedback', {
+                decisionId: decision.decisionId,
+                rating,
+                promptText: query,
+                responseText: decision.headline + ' | ' + decision.narrative,
             });
         } catch (err) {
             console.error('Feedback submission error:', err);

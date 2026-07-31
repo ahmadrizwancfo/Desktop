@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { NextStepRecommendationBar } from '@/components/navigation/next-step-recommendation-bar';
+import { apiClient } from '@/lib/api-client';
 
 export interface TimelineEvent {
     id: string;
@@ -26,16 +27,10 @@ export default function GlobalTimelinePage() {
     const fetchTimelineEvents = async () => {
         setLoading(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/cfo-engine/history', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
+            const res = await apiClient.get('/cfo-engine/history');
+            const data = res.data;
 
-            if (res.ok) {
-                const data = await res.json();
+            if (data) {
                 const formatted: TimelineEvent[] = [];
 
                 // Format Decision Events

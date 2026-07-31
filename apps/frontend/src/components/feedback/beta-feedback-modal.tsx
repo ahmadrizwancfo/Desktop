@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 export function BetaFeedbackModal() {
     const [isOpen, setIsOpen] = useState(false);
@@ -14,20 +15,12 @@ export function BetaFeedbackModal() {
         setSubmitting(true);
 
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            await fetch('/api/ai/feedback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({
-                    rating,
-                    feedbackText,
-                    promptText: 'Beta In-Product Feedback Modal',
-                    responseText: 'User submitted beta feedback during testing session.',
-                    metadata: { path: typeof window !== 'undefined' ? window.location.pathname : '' },
-                }),
+            await apiClient.post('/ai/feedback', {
+                rating,
+                feedbackText,
+                promptText: 'Beta In-Product Feedback Modal',
+                responseText: 'User submitted beta feedback during testing session.',
+                metadata: { path: typeof window !== 'undefined' ? window.location.pathname : '' },
             });
 
             setSubmitted(true);

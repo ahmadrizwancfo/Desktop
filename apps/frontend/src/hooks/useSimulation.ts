@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 export type SimulationDecisionType =
   | 'HIRING'
@@ -65,33 +66,23 @@ export function useSimulation(defaultOrgId?: string) {
       setError(null);
 
       try {
-        const response = await fetch('/api/v1/intelligence/simulation/run', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            organizationId: payload.organizationId || defaultOrgId || '00000000-0000-0000-0000-000000000001',
-            decisionType: payload.decisionType,
-            value: payload.value,
-            description: payload.description,
-            params: payload.params || {},
-          }),
+        const response = await apiClient.post('/intelligence/simulation/run', {
+          organizationId: payload.organizationId || defaultOrgId || '00000000-0000-0000-0000-000000000001',
+          decisionType: payload.decisionType,
+          value: payload.value,
+          description: payload.description,
+          params: payload.params || {},
         });
 
-        if (!response.ok) {
-          throw new Error(`Simulation execution failed with status ${response.status}`);
-        }
-
-        const json = await response.json();
-        if (json.success && json.data) {
+        const json = response.data;
+        if (json && json.success && json.data) {
           setSimulatedResult(json.data);
           return json.data as SimulationResultData;
         } else {
-          throw new Error(json.message || 'Failed to parse simulation response');
+          throw new Error(json?.message || 'Failed to parse simulation response');
         }
       } catch (err: any) {
-        const msg = err.message || 'An unexpected error occurred during decision simulation';
+        const msg = err.response?.data?.message || err.message || 'An unexpected error occurred during decision simulation';
         setError(msg);
         return null;
       } finally {

@@ -117,6 +117,7 @@ import { DailyBriefWidget } from '@/components/daily-brief/daily-brief-widget';
 import { useLivingDashboard } from '@/hooks/use-living-dashboard';
 
 const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
+    const router = useRouter();
     const queryClient = useQueryClient();
     const { triggerVictory, isPartialState, processingMessage, sseStatus, sseLastUpdated } = useCfoStateStore();
     const decision = state.decisionEngine?.dailyFocus?.oneThing;
@@ -134,18 +135,12 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
     useEffect(() => {
         const fetchBrief = async () => {
             try {
-                const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-                const res = await fetch('/api/cfo-engine/daily-brief', {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                    },
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setDailyBrief(data.brief);
+                const res = await apiClient.get('/cfo-engine/daily-brief');
+                if (res.data && res.data.brief) {
+                    setDailyBrief(res.data.brief);
                 }
             } catch (e) {
+                console.error('Failed to fetch daily brief:', e);
             } finally {
                 setLoadingBrief(false);
             }
@@ -265,7 +260,7 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                     consequence={decision.consequenceExplanation || "Negative variance in next cycle"}
                     action={decision.title}
                     onExecute={handleExecute}
-                    onSimulate={() => {}}
+                    onSimulate={() => router.push('/decision-lab')}
                 />
             )}
 

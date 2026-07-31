@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 export interface DailyCashPosition {
     date: string;
@@ -39,16 +40,9 @@ export function CashflowTimelineWorkspace() {
     const fetchTimeline = async () => {
         setLoading(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/cfo-engine/cashflow-timeline', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setProjection(data);
+            const res = await apiClient.get('/cfo-engine/cashflow-timeline');
+            if (res.data) {
+                setProjection(res.data);
             }
         } catch (err) {
             console.error('Failed to fetch cashflow timeline:', err);

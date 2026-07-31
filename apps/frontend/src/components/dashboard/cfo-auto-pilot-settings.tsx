@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { useCfo } from '@/hooks/use-cfo';
 import { toast } from 'sonner';
+import { apiClient } from '@/lib/api-client';
 
 export function CfoAutoPilotSettings() {
     const { recommendations, refresh } = useCfo();
@@ -40,13 +41,15 @@ export function CfoAutoPilotSettings() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const res = await fetch('/api/cfo-engine/state/auto-pilot', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode, maxImpact: impact, delayMinutes: delay, shadowMode: true, sensitivity })
+            const res = await apiClient.patch('/cfo-engine/state/auto-pilot', {
+                mode,
+                maxImpact: impact,
+                delayMinutes: delay,
+                shadowMode: true,
+                sensitivity
             });
 
-            if (res.ok) {
+            if (res.status === 200 || res.status === 201) {
                 toast.success('Auto-Pilot settings updated');
                 refresh();
             }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { apiClient } from '@/lib/api-client';
 
 export function UniversalContextDrawer() {
     const [isOpen, setIsOpen] = useState(false);
@@ -16,27 +17,14 @@ export function UniversalContextDrawer() {
     const fetchContext = async () => {
         setLoading(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const resState = await fetch('/api/cfo-engine/state', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
-            const resTimeline = await fetch('/api/cfo-engine/cashflow-timeline', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
+            const resState = await apiClient.get('/cfo-engine/state');
+            const resTimeline = await apiClient.get('/cfo-engine/cashflow-timeline');
 
-            if (resState.ok) {
-                const dataState = await resState.json();
-                setLiveState(dataState);
+            if (resState.data) {
+                setLiveState(resState.data);
             }
-            if (resTimeline.ok) {
-                const dataTimeline = await resTimeline.json();
-                setTimeline(dataTimeline);
+            if (resTimeline.data) {
+                setTimeline(resTimeline.data);
             }
         } catch (e) {
             console.error('Failed to fetch universal context:', e);

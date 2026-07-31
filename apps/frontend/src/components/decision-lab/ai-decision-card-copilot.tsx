@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api-client';
 
 export interface DecisionCard {
     cardId: string;
@@ -68,28 +69,20 @@ export function AiDecisionCardCopilot({ card, loading }: AiDecisionCardCopilotPr
     const handlePrepareActionCenter = async () => {
         setPreparingAction(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/cfo-engine/action-center/prepare', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            const res = await apiClient.post('/cfo-engine/action-center/prepare', {
+                sourceModule: 'DecisionLab',
+                actionType: 'MARKETING_BUDGET_ADJUSTMENT',
+                title: `Execute Recommendation: ${card.safestOptionName}`,
+                urgency: card.decisionStatus === 'HIGH_RISK' ? 'CRITICAL' : 'HIGH',
+                financialImpact: card.beforeVsAfter.simulatedEndingCash.replace(/[^0-9.]/g, '') || '50000',
+                payload: {
+                    recipientEmail: 'board@company.com',
+                    subject: `Decision Lab Approval Request: ${card.safestOptionName}`,
+                    body: `Recommendation: ${card.recommendation}\nSummary: ${card.summary}\nZero Cash Date: ${card.beforeVsAfter.simulatedZeroCashDate}`,
                 },
-                body: JSON.stringify({
-                    sourceModule: 'DecisionLab',
-                    actionType: 'MARKETING_BUDGET_ADJUSTMENT',
-                    title: `Execute Recommendation: ${card.safestOptionName}`,
-                    urgency: card.decisionStatus === 'HIGH_RISK' ? 'CRITICAL' : 'HIGH',
-                    financialImpact: card.beforeVsAfter.simulatedEndingCash.replace(/[^0-9.]/g, '') || '50000',
-                    payload: {
-                        recipientEmail: 'board@company.com',
-                        subject: `Decision Lab Approval Request: ${card.safestOptionName}`,
-                        body: `Recommendation: ${card.recommendation}\nSummary: ${card.summary}\nZero Cash Date: ${card.beforeVsAfter.simulatedZeroCashDate}`,
-                    },
-                }),
             });
 
-            if (res.ok) {
+            if (res.status === 200 || res.status === 201) {
                 router.push('/action-center');
             }
         } catch (e) {

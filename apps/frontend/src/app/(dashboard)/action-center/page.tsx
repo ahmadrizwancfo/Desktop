@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActionCard, FounderActionItem } from '@/components/action-center/action-card';
 import { ActionModal } from '@/components/action-center/action-modal';
+import { apiClient } from '@/lib/api-client';
 
 export default function ActionCenterPage() {
     const [tab, setTab] = useState<'URGENT' | 'SCHEDULED' | 'COMPLETED'>('URGENT');
@@ -18,17 +19,10 @@ export default function ActionCenterPage() {
     const fetchActions = async () => {
         setLoading(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/cfo-engine/action-center', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setActionsData(data.actions);
-                setMetrics(data.metrics);
+            const res = await apiClient.get('/cfo-engine/action-center');
+            if (res.data) {
+                setActionsData(res.data.actions);
+                setMetrics(res.data.metrics);
             }
         } catch (err) {
             console.error('Failed to fetch action center:', err);
@@ -39,25 +33,17 @@ export default function ActionCenterPage() {
 
     const handlePrepareNewAction = async (type: string, title: string, impact: string, urgency: string) => {
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            await fetch('/api/cfo-engine/action-center/prepare', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            await apiClient.post('/cfo-engine/action-center/prepare', {
+                sourceModule: 'Dashboard',
+                actionType: type,
+                title,
+                urgency,
+                financialImpact: impact,
+                payload: {
+                    recipientEmail: 'client@example.com',
+                    subject: title,
+                    body: `This is an AI prepared execution draft for ${title}.`,
                 },
-                body: JSON.stringify({
-                    sourceModule: 'Dashboard',
-                    actionType: type,
-                    title,
-                    urgency,
-                    financialImpact: impact,
-                    payload: {
-                        recipientEmail: 'client@example.com',
-                        subject: title,
-                        body: `This is an AI prepared execution draft for ${title}.`,
-                    },
-                }),
             });
             fetchActions();
         } catch (err) {
@@ -67,14 +53,7 @@ export default function ActionCenterPage() {
 
     const handleApprove = async (id: string) => {
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            await fetch(`/api/cfo-engine/action-center/${id}/approve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
+            await apiClient.post(`/cfo-engine/action-center/${id}/approve`);
             fetchActions();
         } catch (err) {
             console.error('Failed to approve action:', err);
@@ -83,14 +62,7 @@ export default function ActionCenterPage() {
 
     const handleReject = async (id: string) => {
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            await fetch(`/api/cfo-engine/action-center/${id}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
+            await apiClient.post(`/cfo-engine/action-center/${id}/reject`);
             fetchActions();
         } catch (err) {
             console.error('Failed to reject action:', err);
@@ -99,14 +71,7 @@ export default function ActionCenterPage() {
 
     const handleSnooze = async (id: string) => {
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            await fetch(`/api/cfo-engine/action-center/${id}/snooze`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
+            await apiClient.post(`/cfo-engine/action-center/${id}/snooze`);
             fetchActions();
         } catch (err) {
             console.error('Failed to snooze action:', err);
@@ -115,15 +80,7 @@ export default function ActionCenterPage() {
 
     const handleSaveAndApprove = async (id: string, updatedTitle: string, updatedPayload: any) => {
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            await fetch(`/api/cfo-engine/action-center/${id}/edit`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({ title: updatedTitle, payload: updatedPayload }),
-            });
+            await apiClient.patch(`/cfo-engine/action-center/${id}/edit`, { title: updatedTitle, payload: updatedPayload });
             await handleApprove(id);
             setSelectedActionForEdit(null);
         } catch (err) {

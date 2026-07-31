@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 export default function BetaCommandCenterPage() {
     const [data, setData] = useState<any>(null);
@@ -15,16 +16,9 @@ export default function BetaCommandCenterPage() {
     const fetchCommandCenterData = async () => {
         setLoading(true);
         try {
-            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const res = await fetch('/api/cfo-engine/beta-command-center', {
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-            });
-            if (res.ok) {
-                const result = await res.json();
-                setData(result.data);
+            const res = await apiClient.get('/cfo-engine/beta-command-center');
+            if (res.data) {
+                setData(res.data.data);
             }
         } catch (err) {
             console.error('Failed to fetch beta command center data:', err);
