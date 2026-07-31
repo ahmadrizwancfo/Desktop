@@ -43,5 +43,5 @@ ENV PORT=3000
 # Expose port
 EXPOSE 3000
 
-# Run migrations and start server (migrations are non-blocking)
-CMD ["sh", "-c", "npx prisma migrate deploy || echo 'Migration skipped' && node dist/src/main.js"]
+# Start the server directly (DB schema is already pushed and verified)
+CMD ["node", "dist/src/main.js"]
