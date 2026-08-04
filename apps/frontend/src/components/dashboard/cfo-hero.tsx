@@ -54,6 +54,26 @@ export function CfoHero({ state }: CfoHeroProps) {
                         </div>
                     </div>
 
+                    {/* ☕ GUIDED DAILY CFO HABIT STEPPER BAR */}
+                    <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <span className="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/30">
+                                Daily CFO Flow
+                            </span>
+                            <p className="text-xs text-slate-300 font-semibold hidden sm:block">
+                                1. Reassure $\rightarrow$ 2. Explain $\rightarrow$ 3. Decide $\rightarrow$ 4. Act $\rightarrow$ 5. Verify
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => window.location.href = '/simulator'}
+                                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold rounded-xl border border-white/10 transition"
+                            >
+                                📈 Optional Deep-Dive
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="flex flex-col gap-8">
                         {/* 1. Title & Heading */}
                         <div className="flex flex-col gap-3">

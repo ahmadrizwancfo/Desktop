@@ -15,6 +15,8 @@ interface CacheEntry {
     tokens: { input: number; output: number };
 }
 
+import { FinancialContextEngine } from '../kernel/financial-context.engine';
+
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
@@ -33,6 +35,7 @@ export class AiService {
         private stateService: CfoStateService,
         @Inject(forwardRef(() => CfoBrainService))
         private brainService: CfoBrainService,
+        private contextEngine: FinancialContextEngine,
     ) {
         this.initializeModels();
     }
@@ -287,14 +290,28 @@ export class AiService {
             })
         };
 
+        // ── CANONICAL KERNEL CONTEXT (Single Source of Truth) ──
+        const unifiedContext = this.contextEngine.compileContext({
+            organizationId,
+            cashBalance: report.summary.cashInBank || 0,
+            monthlyBurn: report.summary.netBurn || 0,
+            monthlyRevenue: report.summary.monthlyRevenue || 0,
+            gstPayable: (cfoState as any).gstPayable || 0,
+        });
+
         const context = {
-            runway: report.summary.runwayMonths,
-            burn: report.summary.netBurn,
-            cash: report.summary.cashInBank,
+            unifiedContext,
+            runway: unifiedContext.metrics.runwayMonths,
+            burn: unifiedContext.metrics.monthlyBurn,
+            cash: unifiedContext.metrics.cashBalance,
+            formattedZeroCashDate: unifiedContext.metrics.formattedZeroCashDate,
+            financialState: unifiedContext.state.currentState,
+            deterministicReasoning: unifiedContext.reasoning,
             completionRate: cfoState.decisionEngine.completionRate,
             oneThing: cfoState.decisionEngine.dailyFocus.oneThing?.title,
             memory: memory,
             userName: userName,
+            confidenceScore: Math.round(unifiedContext.confidence * 100),
             // EXPANDED DATA GROUNDING (CTO MANDATE):
             complianceScore: cfoState.behavioralAudit?.complianceScore || 100,
             activeMandates: cfoState.activeMandates || [],

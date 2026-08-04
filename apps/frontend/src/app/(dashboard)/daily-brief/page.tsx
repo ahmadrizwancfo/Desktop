@@ -92,6 +92,32 @@ export default function DailyBriefPage() {
                 </div>
             </div>
 
+            {/* ☕ 5-MINUTE MORNING CFO LOOP STEPPER */}
+            <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/30">
+                        5-Min Daily Loop
+                    </span>
+                    <p className="text-xs text-slate-300 font-semibold hidden sm:block">
+                        1. Morning Readout $\rightarrow$ 2. Execute Action $\rightarrow$ 3. Simulate Runway
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handlePrepareActionFromBrief}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition active:scale-95 flex items-center gap-1.5"
+                    >
+                        <span>⚡ Act Now</span>
+                    </button>
+                    <button
+                        onClick={() => router.push('/simulator')}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition"
+                    >
+                        📈 Simulate
+                    </button>
+                </div>
+            </div>
+
             {/* Section 1: Financial Snapshot */}
             <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl space-y-4 shadow-xl">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">1. Financial Snapshot</h3>

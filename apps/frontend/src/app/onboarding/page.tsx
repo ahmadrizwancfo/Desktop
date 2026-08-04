@@ -77,6 +77,7 @@ interface SyntheticOutput {
     runwayHigh: number;   // months
     estimatedBurn: number;
     assumedCash: number;
+    founderConfidenceScore: number; // 0 - 100
     biggestRisk: SyntheticRisk;
     allRisks: SyntheticRisk[];
     actions: SyntheticAction[];
@@ -272,11 +273,14 @@ function generateSyntheticState(input: SyntheticInput): SyntheticOutput {
     const deathHigh = new Date(now.getTime() + runwayHigh * 30.44 * 24 * 60 * 60 * 1000);
     const dateOpts: Intl.DateTimeFormatOptions = { month: 'short', year: 'numeric' };
 
+    const confidenceScoreBase = Math.min(96, Math.max(48, Math.round(62 + (hasRevenue ? 14 : 0) - (runwayLow < 6 ? 16 : 0) + (teamSize <= 10 ? 8 : 0))));
+
     return {
         runwayLow: Math.min(runwayLow, 99),
         runwayHigh: Math.min(runwayHigh, 99),
         estimatedBurn: netBurn,
         assumedCash,
+        founderConfidenceScore: confidenceScoreBase,
         biggestRisk: risks[0],
         allRisks: risks,
         actions: topActions,
@@ -472,6 +476,18 @@ export default function OnboardingPage() {
                     transition={{ delay: 0.1 }}
                     className="glass-premium p-6 sm:p-8 rounded-[2rem] border border-white/5 mb-6 space-y-7"
                 >
+                    {/* AI CFO Conversational Greeting */}
+                    <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold flex-shrink-0">
+                            <Brain className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-0.5">AI CFO Discovery Voice</p>
+                            <p className="text-xs sm:text-sm font-medium text-slate-200 leading-relaxed">
+                                &ldquo;Welcome! Before we link bank feeds, let&apos;s run a 30-second discovery. Set your team and spend to calculate your initial Founder Confidence Score.&rdquo;
+                            </p>
+                        </div>
+                    </div>
                     {/* Input 1: Team Size */}
                     <div>
                         <div className="flex items-center justify-between mb-4">
@@ -619,7 +635,10 @@ export default function OnboardingPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Estimated Runway</span>
+                                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">AI CFO Analysis</span>
+                                        <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-md bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+                                            Founder Confidence: {output.founderConfidenceScore}%
+                                        </span>
                                         <span className={cn(
                                             "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
                                             isUrgent ? "bg-rose-500/15 text-rose-400" :

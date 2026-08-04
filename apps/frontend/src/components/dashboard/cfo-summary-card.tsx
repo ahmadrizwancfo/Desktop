@@ -107,11 +107,16 @@ export function CFOSummaryCard({
                             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
                             <div className="flex justify-between items-start mb-4 relative z-10">
                                 <div className="flex items-center gap-2 text-slate-500 text-[10px] font-black uppercase tracking-[0.15em]">
-                                    <Calendar className="w-3 h-3" /> Runway Status
+                                    <Calendar className="w-3 h-3" /> Runway & Founder Confidence
                                 </div>
-                                <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border tracking-tighter", runwayMonths < 6 ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20")}>
-                                    {runwayMonths < 6 ? "CRITICAL" : "HEALTHY"}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full border border-indigo-500/20 bg-indigo-500/10 text-indigo-400">
+                                        Confidence: 84%
+                                    </span>
+                                    <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border tracking-tighter", runwayMonths < 6 ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20")}>
+                                        {runwayMonths < 6 ? "CRITICAL" : "HEALTHY"}
+                                    </span>
+                                </div>
                             </div>
                             <div className="text-5xl font-black text-white mb-1 tracking-tighter relative z-10">
                                 {runwayMonths}

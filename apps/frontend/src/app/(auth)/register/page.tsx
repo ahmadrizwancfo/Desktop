@@ -87,7 +87,26 @@ export default function RegisterPage() {
                     <p className="text-slate-400 mt-2">Start your 14-day free trial. No credit card required.</p>
                 </div>
 
-                <div className="glass-card p-8 rounded-3xl border-white/5 shadow-2xl">
+                <div className="glass-card p-8 rounded-3xl border-white/5 shadow-2xl space-y-6">
+                    {/* 1-Click Demo Sandbox Entry */}
+                    <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-center">
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Instant 5-Second Test Drive</p>
+                        <p className="text-xs text-slate-400 mb-3">Want to explore FounderCFO instantly without creating an account?</p>
+                        <button
+                            type="button"
+                            onClick={() => router.push('/onboarding')}
+                            className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs tracking-wide transition-all shadow-lg shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2"
+                        >
+                            <span>Explore Demo Sandbox Mode</span>
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <div className="h-px bg-white/10 flex-1" />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">or create account</span>
+                        <div className="h-px bg-white/10 flex-1" />
+                    </div>
+
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {error && (
                             <motion.div
