@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FinancialMath } from '../../common/math/financial-math.util';
 import { CashflowTimelineService } from '../../cfo-engine/cashflow-timeline.service';
+import { CanonicalFinancialEngine } from '../../kernel/canonical-financial-engine';
 
 export interface FinancialSummaryResult {
     organizationId: string;
@@ -149,15 +150,16 @@ export class FinancialToolsService {
         const newBurnDecimal = currentBurnDecimal.plus(totalAddedExpenses);
         const simulatedBurn = newBurnDecimal.isPositive() ? newBurnDecimal : FinancialMath.toDecimal(0);
 
-        const baseRunway = summary.runwayMonths;
-        const simulatedRunway = FinancialMath.runwayMonths(cashDecimal, simulatedBurn);
+        const baseRunway = parseFloat(summary.runwayMonths);
+        const simRunwayRes = CanonicalFinancialEngine.calculateRunway(parseFloat(summary.cashInBank), newBurnDecimal.toNumber());
+        const simulatedRunway = simRunwayRes.runwayMonths;
 
-        const delta = FinancialMath.toDecimal(simulatedRunway).minus(FinancialMath.toDecimal(baseRunway)).toFixed(2);
+        const delta = (simulatedRunway - baseRunway).toFixed(2);
 
         return {
             organizationId,
-            baseRunwayMonths: baseRunway,
-            simulatedRunwayMonths: simulatedRunway,
+            baseRunwayMonths: summary.runwayMonths,
+            simulatedRunwayMonths: String(simulatedRunway),
             runwayDeltaMonths: delta,
             simulatedNetBurn: FinancialMath.toString(simulatedBurn),
             headcountDelta,

@@ -38,9 +38,11 @@ import { ContactsModule } from './contacts/contacts.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SseModule } from './sse/sse.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
+import { KernelModule } from './kernel/kernel.module';
 
 @Module({
   imports: [
+    KernelModule,
     // Global configuration
     ConfigModule.forRoot({ isGlobal: true }),
 

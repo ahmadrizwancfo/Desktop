@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { FinancialMetric, MetricKey } from '../domain/financial-metric.schema';
+import { CanonicalFinancialEngine } from '../../kernel/canonical-financial-engine';
 
 export interface FinancialMetricInputParams {
   organizationId: string;
@@ -91,38 +92,42 @@ export class MetricsEngineService {
 
   // 3. Net Burn
   calculateNetBurn(p: FinancialMetricInputParams): FinancialMetric {
-    const burn = Math.max(0, p.monthlyExpenses - p.monthlyRevenue);
-    const val = Number(burn.toFixed(2));
+    const val = CanonicalFinancialEngine.calculateNetBurn({
+      inflows30D: p.monthlyRevenue,
+      outflows30D: p.monthlyExpenses,
+    });
     return {
       metricKey: 'NET_BURN',
       organizationId: p.organizationId,
       value: val,
       formattedValue: `₹${val.toLocaleString('en-IN')}/mo`,
-      formula: 'max(0, Monthly Expenses - Monthly Revenue)',
+      formula: 'CanonicalFinancialEngine.calculateNetBurn(outflows - inflows)',
       inputs: { monthlyExpenses: p.monthlyExpenses, monthlyRevenue: p.monthlyRevenue },
       confidence: 1.0,
       timestamp: new Date(),
-      calculationVersion: this.calculationVersion,
+      calculationVersion: CanonicalFinancialEngine.KERNEL_VERSION,
     };
   }
 
   // 4. Runway (Months)
   calculateRunway(p: FinancialMetricInputParams): FinancialMetric {
-    const netBurn = Math.max(0, p.monthlyExpenses - p.monthlyRevenue);
-    let runwayMonths = 999;
-    if (netBurn > 0) {
-      runwayMonths = Number((p.cashInBank / netBurn).toFixed(1));
-    }
+    const netBurn = CanonicalFinancialEngine.calculateNetBurn({
+      inflows30D: p.monthlyRevenue,
+      outflows30D: p.monthlyExpenses,
+    });
+    const runwayRes = CanonicalFinancialEngine.calculateRunway(p.cashInBank, netBurn);
+    const runwayMonths = runwayRes.runwayMonths;
+
     return {
       metricKey: 'RUNWAY_MONTHS',
       organizationId: p.organizationId,
       value: runwayMonths,
       formattedValue: runwayMonths >= 999 ? 'Sustainable (>99 mos)' : `${runwayMonths} mos`,
-      formula: 'Cash Balance / Net Burn',
+      formula: 'CanonicalFinancialEngine.calculateRunway(cashInBank / netBurn)',
       inputs: { cashInBank: p.cashInBank, netBurn },
       confidence: 1.0,
       timestamp: new Date(),
-      calculationVersion: this.calculationVersion,
+      calculationVersion: CanonicalFinancialEngine.KERNEL_VERSION,
     };
   }
 

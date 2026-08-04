@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CanonicalFinancialEngine } from '../kernel/canonical-financial-engine';
 
 export interface InvestorMetrics {
     burnMultiple: number;
@@ -118,8 +119,9 @@ export class InvestorMetricsService {
         // Cash Efficiency = Revenue / Cash Spent
         const cashEfficiency = monthlyExpenses > 0 ? monthlyRevenue / monthlyExpenses : 0;
 
-        // Runway in months
-        const runway = netBurn > 0 ? currentCash / netBurn : 24; // Default to 24 if profitable
+        // Runway in months via CanonicalFinancialEngine
+        const runwayRes = CanonicalFinancialEngine.calculateRunway(currentCash, netBurn);
+        const runway = runwayRes.runwayMonths;
 
         // Runway Quality Score (0-100)
         // Based on: runway length, burn trajectory, revenue growth

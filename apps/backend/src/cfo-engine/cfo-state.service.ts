@@ -6,6 +6,8 @@ import { BehavioralRiskProfile, CfoBehaviorService } from './cfo-behavior.servic
 import { AutonomousCfoService } from './autonomous-cfo.service';
 import { CfoExecutionService } from './cfo-execution.service';
 import { DecisionEngineService } from './decision-engine.service';
+import { CanonicalFinancialEngine } from '../kernel/canonical-financial-engine';
+import { ConfidenceEngine } from '../kernel/confidence.engine';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CFO STATE v2 — THE LIVING INTELLIGENCE ENGINE
@@ -2608,10 +2610,10 @@ export class CfoStateService {
     }
 
     private calculateRunwayImpact(cash: number, currentBurn: number, delta: number): number {
-        const currentRunway = currentBurn > 0 ? cash / currentBurn : 36;
+        const currentRes = CanonicalFinancialEngine.calculateRunway(cash, currentBurn);
         const newBurn = Math.max(0, currentBurn - delta);
-        const newRunway = newBurn > 0 ? cash / newBurn : 36;
-        return Number((newRunway - currentRunway).toFixed(1));
+        const newRes = CanonicalFinancialEngine.calculateRunway(cash, newBurn);
+        return Number((newRes.runwayMonths - currentRes.runwayMonths).toFixed(1));
     }
 
     /**

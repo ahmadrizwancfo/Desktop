@@ -1,6 +1,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CanonicalFinancialEngine } from '../kernel/canonical-financial-engine';
 
 @Injectable()
 export class FinancialMetricsService {
@@ -105,13 +106,11 @@ export class FinancialMetricsService {
     }
 
     private calculateRunway(cash: number, monthlyBurn: number) {
-        if (monthlyBurn <= 0) return { months: 120, status: 'HEALTHY' }; // Infinite/High runway
-
-        const months = cash / monthlyBurn;
+        const res = CanonicalFinancialEngine.calculateRunway(cash, monthlyBurn);
         let status = 'HEALTHY';
-        if (months < 3) status = 'CRITICAL';
-        else if (months < 6) status = 'LOW';
+        if (res.status === 'CRITICAL') status = 'CRITICAL';
+        else if (res.status === 'WARNING') status = 'LOW';
 
-        return { months, status };
+        return { months: res.runwayMonths, status };
     }
 }

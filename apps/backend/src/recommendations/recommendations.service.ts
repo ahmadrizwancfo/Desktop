@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CanonicalFinancialEngine } from '../kernel/canonical-financial-engine';
+import { FinancialLawsEngine } from '../kernel/financial-laws.engine';
 
 export interface CFORecommendation {
     id: string;
@@ -396,10 +398,9 @@ export class RecommendationsService {
 
     private calculateRunwayImpact(cash: number, currentBurn: number, savings: number): number {
         const newBurn = Math.max(0, currentBurn - savings);
-        if (newBurn === 0) return 999;
-        const newRunway = cash / newBurn;
-        const currentRunway = currentBurn > 0 ? cash / currentBurn : 999;
-        return newRunway - currentRunway;
+        const currentRes = CanonicalFinancialEngine.calculateRunway(cash, currentBurn);
+        const newRes = CanonicalFinancialEngine.calculateRunway(cash, newBurn);
+        return Math.round((newRes.runwayMonths - currentRes.runwayMonths) * 10) / 10;
     }
 
     private formatCurrency(amount: number): string {
