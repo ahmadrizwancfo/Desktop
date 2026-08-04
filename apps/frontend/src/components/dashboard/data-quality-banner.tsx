@@ -110,12 +110,17 @@ export function DataQualityGate({ children, featureName }: { children: React.Rea
                     <div className="bg-[#0a0f1e]/90 backdrop-blur-sm border border-amber-500/20 rounded-2xl px-8 py-6 text-center max-w-md">
                         <Shield className="w-8 h-8 text-amber-400 mx-auto mb-3" />
                         <h4 className="text-sm font-black text-white uppercase tracking-wider mb-2">
-                            {featureName || 'Advanced Insights'} Locked
+                            {featureName || 'Deep Financial Intelligence'} Ready for Calibration
                         </h4>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                            Connect higher quality data for full insights. Current data quality: {Math.round(score)}%.
-                            Upload more bank statements or sync your accounting tool to unlock this feature.
+                        <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                            Your current data confidence sits at {Math.round(score)}%. Connect your bank feed or Tally/Zoho Books data to raise confidence above 70% and unlock 90-day projections.
                         </p>
+                        <button
+                            onClick={() => window.location.href = '/integrations'}
+                            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-widest rounded-xl transition shadow-lg shadow-amber-500/20 active:scale-95"
+                        >
+                            Connect Bank or Accounting Feed
+                        </button>
                     </div>
                 </div>
             </div>

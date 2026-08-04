@@ -255,8 +255,8 @@ export default function CompliancePage() {
             <DashboardLayout>
                 <div className="flex flex-col gap-8">
                     <header>
-                        <h1 className="text-3xl font-bold text-white">Compliance Roadmap</h1>
-                        <p className="text-slate-400 mt-1">Real-time statutory health check for your organization.</p>
+                        <h1 className="text-3xl font-bold text-white">Statutory Tax & Compliance Protection</h1>
+                        <p className="text-slate-400 mt-1">Vendor tax deduction (TDS) payments are due by the 7th. Monthly GST returns (GSTR-3B) are due by the 20th.</p>
                     </header>
 
                     {/* Mandatory Disclaimer for Sandbox/Integration */}

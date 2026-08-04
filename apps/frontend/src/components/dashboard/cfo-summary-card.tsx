@@ -87,12 +87,18 @@ export function CFOSummaryCard({
                             ) : message}
                         </motion.div>
 
-                        <div className="flex gap-4">
-                            <button className="px-8 py-3.5 rounded-2xl bg-white text-[#020617] font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all text-sm">
-                                Optimize Burn
+                        <div className="flex flex-wrap gap-4">
+                            <button 
+                                onClick={() => window.location.href = '/action-center'}
+                                className="px-8 py-3.5 rounded-2xl bg-white text-[#020617] font-bold shadow-2xl hover:scale-105 active:scale-95 transition-all text-sm uppercase tracking-wider"
+                            >
+                                Execute Burn Optimization
                             </button>
-                            <button className="px-8 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-slate-300 font-semibold hover:bg-white/10 transition-all text-sm backdrop-blur-md">
-                                Ask AI CFO
+                            <button 
+                                onClick={() => window.location.href = '/ai-cfo'}
+                                className="px-8 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-slate-300 font-semibold hover:bg-white/10 transition-all text-sm backdrop-blur-md uppercase tracking-wider"
+                            >
+                                Consult AI CFO Advisor
                             </button>
                         </div>
                     </div>

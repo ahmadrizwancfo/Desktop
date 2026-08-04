@@ -546,6 +546,29 @@ export default function OnboardingPage() {
                             </div>
                             <span className="text-2xl font-black text-amber-400 tabular-nums">{fmt(monthlySpend)}</span>
                         </div>
+                        {/* 1-Tap Preset Chips */}
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {[
+                                { label: '₹2L/mo (Bootstrap)', val: 200000 },
+                                { label: '₹5L/mo (Seed)', val: 500000 },
+                                { label: '₹15L/mo (Growth)', val: 1500000 },
+                                { label: '₹30L/mo (Series A)', val: 3000000 },
+                            ].map((chip) => (
+                                <button
+                                    key={chip.val}
+                                    type="button"
+                                    onClick={() => setMonthlySpend(chip.val)}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-xl text-xs font-bold transition-all border",
+                                        monthlySpend === chip.val
+                                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-lg shadow-amber-500/10"
+                                            : "bg-white/5 text-slate-400 border-white/10 hover:bg-white/10 hover:text-white"
+                                    )}
+                                >
+                                    {chip.label}
+                                </button>
+                            ))}
+                        </div>
                         <SpendSlider value={monthlySpend} onChange={setMonthlySpend} />
                         <div className="flex justify-between text-[10px] text-slate-700 mt-1 px-0.5 tabular-nums">
                             <span>₹50K</span>

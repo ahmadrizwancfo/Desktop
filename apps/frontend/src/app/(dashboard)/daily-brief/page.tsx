@@ -59,7 +59,7 @@ export default function DailyBriefPage() {
             <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex flex-col items-center justify-center">
                 <div className="animate-pulse flex flex-col items-center gap-3">
                     <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-sm font-semibold text-slate-300">Generating Your 2-Minute Executive Daily Brief...</p>
+                    <p className="text-sm font-semibold text-slate-300">Preparing today&apos;s CFO briefing &amp; priority recommendations...</p>
                 </div>
             </div>
         );

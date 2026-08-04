@@ -72,8 +72,8 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-8 text-center">
-                    <h2 className="text-xl font-black text-white tracking-tight mb-2">Running survival diagnostics</h2>
-                    <p className="text-slate-500 text-sm">Every transaction is being analyzed for risk.</p>
+                    <h2 className="text-xl font-black text-white tracking-tight mb-2">Calculating your runway &amp; capital buffer...</h2>
+                    <p className="text-slate-500 text-sm font-medium">Reviewing cash movements, statutory tax deadlines, and top CFO recommendations.</p>
                 </motion.div>
             </div>
         );

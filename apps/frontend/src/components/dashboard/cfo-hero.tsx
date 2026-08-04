@@ -61,7 +61,7 @@ export function CfoHero({ state }: CfoHeroProps) {
                                 Daily CFO Flow
                             </span>
                             <p className="text-xs text-slate-300 font-semibold hidden sm:block">
-                                1. Reassure $\rightarrow$ 2. Explain $\rightarrow$ 3. Decide $\rightarrow$ 4. Act $\rightarrow$ 5. Verify
+                                1. Reassure &rarr; 2. Explain &rarr; 3. Decide &rarr; 4. Act &rarr; 5. Verify
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -188,10 +188,13 @@ export function CfoHero({ state }: CfoHeroProps) {
                                 className="px-8 py-4 bg-primary text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 flex items-center gap-2"
                             >
                                 <Zap className="w-4 h-4 fill-current" />
-                                Execute Action
+                                Execute Strategic Recommendation
                             </button>
-                            <button className="px-8 py-4 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-white/10 transition-all">
-                                Simulate Impact
+                            <button 
+                                onClick={() => window.location.href = '/simulator'}
+                                className="px-8 py-4 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-white/10 transition-all"
+                            >
+                                Calculate Runway Impact
                             </button>
                         </div>
                     </div>

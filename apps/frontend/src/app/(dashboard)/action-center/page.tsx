@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ActionCard, FounderActionItem } from '@/components/action-center/action-card';
 import { ActionModal } from '@/components/action-center/action-modal';
 import { apiClient } from '@/lib/api-client';
 
 export default function ActionCenterPage() {
+    const router = useRouter();
     const [tab, setTab] = useState<'URGENT' | 'SCHEDULED' | 'COMPLETED'>('URGENT');
     const [actionsData, setActionsData] = useState<any>(null);
     const [metrics, setMetrics] = useState<any>(null);
@@ -174,10 +176,22 @@ export default function ActionCenterPage() {
                     </div>
                 </div>
             ) : currentList.length === 0 ? (
-                <div className="p-12 bg-slate-900 border border-slate-800 rounded-2xl text-center text-slate-500 space-y-2">
-                    <span className="text-3xl block">🎉</span>
-                    <p className="text-sm font-semibold text-slate-300">No Pending Actions in this Queue</p>
-                    <p className="text-xs text-slate-500">Run simulations in Decision Lab or click &quot;Prepare Action&quot; above to generate execution workflows.</p>
+                <div className="p-12 bg-slate-900/80 border border-slate-800 rounded-3xl text-center space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
+                        <span className="text-xl">✅</span>
+                    </div>
+                    <h3 className="text-base font-black text-white">Your Action Queue is 100% Clean</h3>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                        Great job! You have executed all pending financial recommendations. Your capital buffer is fully optimized and safe.
+                    </p>
+                    <div className="pt-2">
+                        <button
+                            onClick={() => router.push('/simulator')}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition active:scale-95"
+                        >
+                            Simulate Next Scenario in Decision Lab
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
