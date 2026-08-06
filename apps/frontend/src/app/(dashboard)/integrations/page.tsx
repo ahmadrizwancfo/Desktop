@@ -31,7 +31,7 @@ export default function IntegrationsPage() {
     const router = useRouter();
     const queryClient = useQueryClient();
 
-    const [status, setStatus] = useState<'IDLE' | 'CONNECTING' | 'SUCCESS'>('IDLE');
+    const [status, setStatus] = useState<'IDLE' | 'CONNECTING' | 'PREVIEW' | 'SUCCESS'>('IDLE');
     const [connectionMessage, setConnectionMessage] = useState('');
 
     const [file, setFile] = useState<File | null>(null);
@@ -133,6 +133,9 @@ export default function IntegrationsPage() {
         }
     };
 
+    const [previewData, setPreviewData] = useState<any>(null);
+    const [briefData, setBriefData] = useState<any>(null);
+
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
         if (!selectedFile) return;
@@ -142,34 +145,66 @@ export default function IntegrationsPage() {
 
         setFile(selectedFile);
         setStatus('CONNECTING');
-        setConnectionMessage(`Processing ${selectedFile.name}...`);
+        setConnectionMessage(`Reviewing ${selectedFile.name}... No data has been saved yet.`);
+
+        const isXml = selectedFile.name.toLowerCase().endsWith('.xml');
+        const endpoint = isXml ? '/integrations/tally/upload-xml?preview=true' : '/integrations/upload-csv?preview=true';
 
         try {
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('importType', 'BANK_STATEMENT');
+            if (!isXml) formData.append('importType', 'BANK_STATEMENT');
 
-            const res = await apiClient.post('/integrations/upload-csv', formData, {
+            // Step 1: Pre-flight preview scan (no DB write)
+            const res = await apiClient.post(endpoint, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
             const result = res.data;
-            const msg = result?.message ?? 'File uploaded successfully!';
+            setPreviewData(result);
+            setStatus('PREVIEW');
+            setConnectionMessage(isXml 
+                ? `FounderCFO successfully understood your Tally company "${result.companyName || 'Tally Company'}". Please inspect the preview before importing.` 
+                : 'We have finished reviewing your file. Please inspect the preview before importing.');
+        } catch (err: any) {
+            console.error('Pre-flight scan failed', err);
+            toast.error(err?.response?.data?.message || 'We couldn\'t fully understand this export. Please verify the file format.');
+            setStatus('IDLE');
+        }
+    };
 
-            // Transition to SUCCESS so the UI shows the confirmation screen
+    const handleConfirmImport = async () => {
+        if (!file) return;
+
+        setStatus('CONNECTING');
+        setConnectionMessage(`Executing canonical import for ${file.name}...`);
+
+        const isXml = file.name.toLowerCase().endsWith('.xml');
+        const endpoint = isXml ? '/integrations/tally/upload-xml' : '/integrations/upload-csv';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            if (!isXml) formData.append('importType', 'BANK_STATEMENT');
+
+            const res = await apiClient.post(endpoint, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            const result = res.data;
+            setBriefData(result);
             setStatus('SUCCESS');
-            setConnectionMessage(msg);
+            setConnectionMessage('Tally Import Complete! AI CFO Executive Brief ready.');
+            toast.success(`Import Complete! Imported ${result?.importedCount || 0} vouchers/transactions.`);
 
-            // Refresh data, then return to IDLE after 2 s
+            // Refresh org financial context
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['cfo-state'] }),
                 refetchConnections(),
             ]);
-
-            setTimeout(() => setStatus('IDLE'), 2000);
-        } catch (err) {
-            console.error('Upload failed', err);
-            alert('Upload failed.');
+        } catch (err: any) {
+            console.error('Import failed', err);
+            toast.error(err?.response?.data?.message || 'Import failed. Please try again.');
             setStatus('IDLE');
         }
     };
@@ -437,7 +472,7 @@ export default function IntegrationsPage() {
                                         type="file" 
                                         id="csv-upload"
                                         className="hidden" 
-                                        accept=".csv,.xlsx,.xls"
+                                        accept=".csv,.xlsx,.xls,.xml"
                                         onChange={handleUpload}
                                     />
                                     <label 
@@ -469,41 +504,201 @@ export default function IntegrationsPage() {
 
                         </motion.div>
 
-                    ) : (
+                    ) : status === 'PREVIEW' && previewData ? (
 
-                        /* 5. Real-Time Feedback State */
+                        /* 5. Trusted Pre-Commit Inspection Card */
                         <motion.div
-                            key="loading"
+                            key="preview"
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="max-w-md mx-auto mt-12 bg-white/[0.02] border border-white/5 rounded-3xl p-8 md:p-12 text-center relative overflow-hidden"
+                            className="max-w-2xl mx-auto mt-12 bg-[#0a0f1e]/90 border border-indigo-500/30 rounded-3xl p-8 md:p-10 shadow-2xl relative overflow-hidden text-left"
                         >
-                            {status === 'SUCCESS' && (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="absolute inset-0 bg-emerald-500/10 animate-pulse"
-                                />
-                            )}
-                            
-                            <div className="relative z-10">
-                                <div className={cn(
-                                    "w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-6 transition-colors duration-500",
-                                    status === 'SUCCESS' ? "bg-emerald-500/20" : "bg-primary/20"
-                                )}>
-                                    {status === 'SUCCESS' ? (
-                                        <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-                                    ) : (
-                                        <Zap className="w-10 h-10 text-primary animate-pulse" />
-                                    )}
+                            <div className="flex items-center justify-between pb-6 border-b border-white/10 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                                        <FileText className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-white">{previewData.fileName || 'Bank Statement File'}</h3>
+                                        <p className="text-xs text-slate-400 font-medium">{connectionMessage}</p>
+                                    </div>
+                                </div>
+                                <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-black uppercase tracking-widest">
+                                    Pre-Commit Preview
+                                </span>
+                            </div>
+
+                            {/* Inspection Metrics Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">Rows Detected</span>
+                                    <span className="text-lg font-black text-white tabular-nums">{previewData.importedCount || 0}</span>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">Duplicates Skipped</span>
+                                    <span className="text-lg font-black text-amber-400 tabular-nums">{previewData.duplicateCount || 0}</span>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">Revenue Detected</span>
+                                    <span className="text-lg font-black text-emerald-400 tabular-nums">₹{(previewData.totalRevenueImported || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">Expenses Detected</span>
+                                    <span className="text-lg font-black text-rose-400 tabular-nums">₹{(previewData.totalExpenseImported || 0).toLocaleString('en-IN')}</span>
+                                </div>
+                            </div>
+
+                            {/* Impact Reassurance Box */}
+                            <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-8 space-y-2">
+                                <div className="flex items-center gap-2 text-indigo-400 text-xs font-black uppercase tracking-widest">
+                                    <Shield className="w-4 h-4" />
+                                    Estimated Business Impact
+                                </div>
+                                <p className="text-xs text-slate-300 font-semibold leading-relaxed">
+                                    Net Cashflow Impact: <span className="text-white font-bold">₹{(previewData.estimatedCashImpact || 0).toLocaleString('en-IN')}</span> • Projected Runway Extension: <span className="text-emerald-400 font-bold">+{previewData.estimatedRunwayImpactMonths || 0} Months</span>.
+                                </p>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-wrap gap-4 pt-2">
+                                <button
+                                    onClick={handleConfirmImport}
+                                    className="flex-1 py-4 bg-primary text-black font-black uppercase tracking-widest text-xs rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-2"
+                                >
+                                    <Zap className="w-4 h-4 fill-current" />
+                                    Confirm &amp; Execute Import
+                                </button>
+                                <button
+                                    onClick={() => setStatus('IDLE')}
+                                    className="px-6 py-4 bg-white/5 border border-white/10 text-slate-300 font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-white/10 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </motion.div>
+
+                    ) : (
+
+                        /* 6. Interactive AI CFO Executive Debrief */
+                        <motion.div
+                            key="brief"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="max-w-2xl mx-auto mt-12 bg-[#0a0f1e]/95 border border-emerald-500/30 rounded-3xl p-8 md:p-10 shadow-2xl relative overflow-hidden text-left"
+                        >
+                            {/* Header */}
+                            <div className="flex items-center justify-between pb-6 border-b border-white/10 mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                                        <CheckCircle2 className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white">AI CFO Debrief</h3>
+                                        <p className="text-xs text-slate-400 font-semibold">Verified truth from imported financial dataset</p>
+                                    </div>
+                                </div>
+                                <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+                                    Confidence: {briefData?.postImportDebrief?.confidenceScore || 90}%
+                                </span>
+                            </div>
+
+                            {/* Viewport 1: Dynamic Opening & Dominant Truth */}
+                            <div className="space-y-6 mb-8">
+                                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10">
+                                    <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">CFO Executive Summary</h4>
+                                    <p className="text-base font-bold text-white leading-relaxed">
+                                        "{briefData?.postImportDebrief?.openingSentence || briefData?.message || 'I have finished reviewing your financial activity.'}"
+                                    </p>
                                 </div>
 
-                                <h2 className={cn(
-                                    "text-2xl font-black mb-2 transition-colors",
-                                    status === 'SUCCESS' ? "text-emerald-400" : "text-white"
-                                )}>
-                                    {status === 'SUCCESS' ? "Connection Successful" : connectionMessage}
-                                </h2>
+                                {/* Headline Verified Truth Card */}
+                                {briefData?.postImportDebrief?.dominantTruth && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-indigo-400 block mb-1">Liquid Cash Balance</span>
+                                            <span className="text-2xl font-black text-white tabular-nums">₹{(briefData.postImportDebrief.dominantTruth.cashInBank || 0).toLocaleString('en-IN')}</span>
+                                        </div>
+                                        <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 block mb-1">Verified Runway</span>
+                                            <span className="text-2xl font-black text-emerald-300 tabular-nums">
+                                                {briefData.postImportDebrief.dominantTruth.actualRunway} Months
+                                            </span>
+                                            {briefData.postImportDebrief.dominantTruth.deltaRunway && briefData.postImportDebrief.dominantTruth.deltaRunway > 0 && (
+                                                <span className="text-[10px] font-bold text-emerald-400 block mt-1">
+                                                    (+{briefData.postImportDebrief.dominantTruth.deltaRunway}M vs estimate)
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Today's #1 Priority Decision */}
+                                {briefData?.postImportDebrief?.todayPriority && (
+                                    <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 block mb-1">Today's #1 Priority Action</span>
+                                        <p className="text-sm font-bold text-white leading-relaxed mb-3">
+                                            {briefData.postImportDebrief.todayPriority.action}
+                                        </p>
+                                        <button
+                                            onClick={() => router.push('/action-center')}
+                                            className="px-4 py-2.5 bg-amber-400 text-black font-black uppercase tracking-widest text-[10px] rounded-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5"
+                                        >
+                                            <Zap className="w-3.5 h-3.5 fill-current" />
+                                            Review Action Plan
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Progressive Disclosure: Discoveries */}
+                                {briefData?.postImportDebrief?.topDiscoveries?.length > 0 && (
+                                    <div className="space-y-3 pt-2">
+                                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Key Findings &amp; Discoveries</h4>
+                                        <div className="space-y-2">
+                                            {briefData.postImportDebrief.topDiscoveries.map((disc: any, idx: number) => (
+                                                <div key={idx} className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between text-xs">
+                                                    <span className="font-semibold text-slate-200">{disc.title}</span>
+                                                    {disc.metric && <span className="font-black text-primary tabular-nums">{disc.metric}</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Conversational Continuation */}
+                                <div className="pt-4 border-t border-white/10">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">What would you like to understand next?</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {(briefData?.postImportDebrief?.suggestedQuestions || [
+                                            "Why did my runway calculation change?",
+                                            "Where can I free up cash fastest?",
+                                            "What statutory GST or TDS payments are due next?"
+                                        ]).map((q: string, idx: number) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => router.push(`/ai-cfo?q=${encodeURIComponent(q)}`)}
+                                                className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-primary/40 text-xs font-semibold text-slate-300 hover:text-white transition-all text-left"
+                                            >
+                                                "{q}"
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Final Navigation Bar */}
+                            <div className="flex flex-wrap gap-3 pt-2">
+                                <button
+                                    onClick={() => router.push('/dashboard')}
+                                    className="flex-1 py-3.5 bg-primary text-black font-black uppercase tracking-widest text-xs rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20"
+                                >
+                                    View Dashboard
+                                </button>
+                                <button
+                                    onClick={() => setStatus('IDLE')}
+                                    className="px-5 py-3.5 bg-white/5 border border-white/10 text-slate-400 font-bold uppercase tracking-widest text-xs rounded-xl hover:bg-white/10 transition-all"
+                                >
+                                    Done
+                                </button>
                             </div>
                         </motion.div>
                     )}

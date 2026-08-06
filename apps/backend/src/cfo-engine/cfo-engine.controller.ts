@@ -57,6 +57,13 @@ export class CfoEngineController {
         private readonly cashflowTimelineService: CashflowTimelineService,
     ) { }
 
+    @Get('continuous-brief')
+    async getContinuousBrief(@Request() req: any) {
+        const orgId = req.user.organizationId;
+        const userId = req.user.id;
+        return await this.brainService.getContinuousCfoBrief(userId, orgId);
+    }
+
     @Get('cashflow-timeline')
     async getCashflowTimeline(@Request() req: any) {
         const orgId = req.user.organizationId;

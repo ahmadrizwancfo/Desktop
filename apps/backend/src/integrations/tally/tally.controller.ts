@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Request, UseGuards, UseInterceptors, UploadedFile, Query, BadRequestException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { TallyConnectorService } from './tally-connector.service';
 import { TallyConfig } from './interfaces/tally-config.interface';
 
@@ -31,5 +32,22 @@ export class TallyController {
       enabled: true,
     };
     return await this.tallyService.syncTallyVouchers(orgId, config);
+  }
+
+  @Post('upload-xml')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadXml(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('preview') preview: string,
+    @Request() req: any
+  ) {
+    if (!file) {
+      throw new BadRequestException('No Tally XML file uploaded');
+    }
+    const xmlContent = file.buffer.toString('utf-8');
+    const isPreview = preview === 'true' || preview === '1';
+    const orgId = req.user?.organizationId || 'demo-org';
+    const userId = req.user?.id || 'demo-user';
+    return await this.tallyService.processTallyXmlUpload(xmlContent, orgId, userId, isPreview);
   }
 }

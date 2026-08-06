@@ -38,14 +38,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'AI CFO', href: '/ai-cfo', icon: BrainCircuit, premium: true },
-    { name: 'Decision Lab', href: '/decision-lab', icon: TrendingUp, premium: true },
-    { name: 'Daily Brief', href: '/daily-brief', icon: Mail },
-    { name: 'Action Center', href: '/action-center', icon: Target },
-    { name: 'Timeline & Events', href: '/timeline', icon: History },
-    { name: 'Invoices & AR/AP', href: '/invoices', icon: Receipt },
-    { name: 'Compliance & Tax', href: '/compliance', icon: ShieldCheck },
+    { name: 'Today & Agenda', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'AI CFO Co-Pilot', href: '/ai-cfo', icon: BrainCircuit, premium: true },
+    { name: 'Cashflow OS', href: '/cashflow-operating-system', icon: TrendingUp, premium: true },
     { name: 'Integrations & Data', href: '/integrations', icon: Database },
 ];
 

@@ -14,6 +14,8 @@ export interface RecordMemoryInput {
   businessState: CanonicalFinancialState;
   businessIntent: PrimaryBusinessIntent;
   actionsTaken: string[];
+  rejectedAlternatives?: string[];
+  decisionAssumptions?: Record<string, any>;
   outcome?: StrategicMemoryOutcome;
 }
 

@@ -5,6 +5,9 @@ import * as Papa from 'papaparse';
 import * as crypto from 'crypto';
 import * as XLSX from 'xlsx';
 
+import { Optional, Inject } from '@nestjs/common';
+import { CfoBrainService } from '../cfo-engine/cfo-brain.service';
+
 @Injectable()
 export class IntegrationsService {
     private readonly logger = new Logger(IntegrationsService.name);
@@ -12,10 +15,11 @@ export class IntegrationsService {
     constructor(
         private prisma: PrismaService,
         private startupProfileService: StartupProfileService,
+        @Optional() @Inject(CfoBrainService) private cfoBrain: CfoBrainService | null,
     ) { }
 
-    async processCsvUpload(file: Express.Multer.File, importType: string, organizationId: string, userId: string) {
-        this.logger.log(`Processing file upload (${importType}) for organization ${organizationId}`);
+    async processCsvUpload(file: Express.Multer.File, importType: string, organizationId: string, userId: string, previewOnly = false) {
+        this.logger.log(`Processing file upload (${importType}, previewOnly=${previewOnly}) for organization ${organizationId}`);
 
         // 1. Parse file — CSV or Excel
         const extension = file.originalname.split('.').pop()?.toLowerCase();
@@ -59,10 +63,10 @@ export class IntegrationsService {
             || (hasCol('cash', 'accounts_receivable', 'fixed_assets') && !hasCol('date', 'txn date'));
 
         // Transaction / bank-statement fingerprint
-        const DATE_SYNONYMS   = ['date', 'txn date', 'transaction date', 'value date', 'trans date', 'posting date', 'entry date'];
-        const AMOUNT_SYNONYMS = ['amount', 'value', 'net amount', 'transaction amount', 'txn amount'];
-        const DEBIT_SYNONYMS  = ['debit', 'dr', 'withdrawal', 'withdrawal amt', 'debit amount'];
-        const CREDIT_SYNONYMS = ['credit', 'cr', 'deposit', 'deposit amt', 'credit amount'];
+        const DATE_SYNONYMS   = ['date', 'txn date', 'transaction date', 'value date', 'trans date', 'posting date', 'entry date', 'tran date', 'txndate', 'booking date'];
+        const AMOUNT_SYNONYMS = ['amount', 'value', 'net amount', 'transaction amount', 'txn amount', 'net_amount'];
+        const DEBIT_SYNONYMS  = ['debit', 'dr', 'withdrawal', 'withdrawal amt', 'debit amount', 'withdrawal (dr)', 'debit (dr)', 'dr_amount', 'paid out'];
+        const CREDIT_SYNONYMS = ['credit', 'cr', 'deposit', 'deposit amt', 'credit amount', 'deposit (cr)', 'credit (cr)', 'cr_amount', 'paid in'];
 
         const hasDate   = hasCol(...DATE_SYNONYMS);
         const hasAmount = hasCol(...AMOUNT_SYNONYMS)
@@ -84,16 +88,19 @@ export class IntegrationsService {
         }
 
         // 2. Log Raw Import (Sync History)
-        const rawImport = await this.prisma.rawImport.create({
-            data: {
-                userId,
-                organizationId,
-                provider: 'CSV_MANUAL',
-                sourceType: importType,
-                rawPayload: rows as any,
-                status: 'PROCESSING',
-            }
-        });
+        let rawImport: any = null;
+        if (!previewOnly) {
+            rawImport = await this.prisma.rawImport.create({
+                data: {
+                    userId,
+                    organizationId,
+                    provider: 'CSV_MANUAL',
+                    sourceType: importType,
+                    rawPayload: rows as any,
+                    status: 'PROCESSING',
+                }
+            });
+        }
 
         // 3. Ensure a Bank Account exists for linking transactions
         let bankAccount = await this.prisma.bankAccount.findFirst({
@@ -217,23 +224,44 @@ export class IntegrationsService {
                 continue;
             }
 
-            // Save transaction
-            await this.prisma.transaction.create({
-                data: {
-                    amount: absAmount,
-                    type: finalType,
-                    category,
-                    description: rawDesc,
-                    date: parsedDate,
-                    bankAccountId: bankAccount.id,
-                    source: 'CSV_MANUAL',
-                    externalId,
-                }
-            });
+            if (!previewOnly) {
+                // Save transaction
+                await this.prisma.transaction.create({
+                    data: {
+                        amount: absAmount,
+                        type: finalType,
+                        category,
+                        description: rawDesc,
+                        date: parsedDate,
+                        bankAccountId: bankAccount.id,
+                        source: 'CSV_MANUAL',
+                        externalId,
+                    }
+                });
+            }
 
             importedCount++;
             if (finalType === 'INCOME') totalRevenueImported += absAmount;
             if (finalType === 'EXPENSE') totalExpenseImported += absAmount;
+        }
+
+        if (previewOnly) {
+            return {
+                status: 'preview',
+                previewOnly: true,
+                fileName: file.originalname,
+                totalRows: rows.length,
+                importedCount,
+                duplicateCount,
+                skippedCount,
+                failedCount,
+                totalRevenueImported,
+                totalExpenseImported,
+                estimatedCashImpact: totalRevenueImported - totalExpenseImported,
+                estimatedRunwayImpactMonths: Math.round(((totalRevenueImported - totalExpenseImported) / (totalExpenseImported || 1)) * 10) / 10,
+                confidenceScore: Math.min(95, 65 + (importedCount > 0 ? 25 : 0)),
+                message: `Parsed ${rows.length} rows. Ready to import ${importedCount} transactions (${duplicateCount} duplicates found). No data has been saved yet.`
+            };
         }
 
         // 5. Compute new StartupProfile constraints and Recompute Engine
@@ -243,16 +271,33 @@ export class IntegrationsService {
         }
 
         // Update import status
-        await this.prisma.rawImport.update({
-            where: { id: rawImport.id },
-            data: { status: 'COMPLETED' }
-        });
+        if (rawImport) {
+            await this.prisma.rawImport.update({
+                where: { id: rawImport.id },
+                data: { status: 'COMPLETED' }
+            });
+        }
 
         // Upsert connection status
         await this.upsertConnectionStatus(userId, organizationId);
 
+        let postImportDebrief: any = null;
+        if (this.cfoBrain) {
+            try {
+                postImportDebrief = await this.cfoBrain.generatePostImportDebrief(userId, organizationId, {
+                    importedCount,
+                    duplicateCount,
+                    totalRevenueImported,
+                    totalExpenseImported,
+                });
+            } catch (err) {
+                this.logger.warn(`Failed to generate post-import debrief: ${err}`);
+            }
+        }
+
         return {
             status: 'success',
+            previewOnly: false,
             message: `Processed ${rows.length} rows. Imported: ${importedCount}. Duplicates skipped: ${duplicateCount}.`,
             importedCount,
             duplicateCount,
@@ -260,7 +305,8 @@ export class IntegrationsService {
             failedCount,
             totalRevenueImported,
             totalExpenseImported,
-            finalProfileMetrics
+            finalProfileMetrics,
+            postImportDebrief,
         };
     }
 

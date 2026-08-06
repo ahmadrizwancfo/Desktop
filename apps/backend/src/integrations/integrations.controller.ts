@@ -113,6 +113,7 @@ export class IntegrationsController {
     async uploadCsv(
         @UploadedFile() file: Express.Multer.File,
         @Body('importType') importType: string,
+        @Query('preview') preview: string,
         @GetUser() user: any
     ) {
         if (!file) {
@@ -128,7 +129,8 @@ export class IntegrationsController {
             throw new BadRequestException('Invalid import type. Expected BANK_STATEMENT, REVENUE, or EXPENSE');
         }
 
-        return this.integrationsService.processCsvUpload(file, importType, user.organizationId, user.id);
+        const isPreview = preview === 'true' || preview === '1';
+        return this.integrationsService.processCsvUpload(file, importType, user.organizationId, user.id, isPreview);
     }
 
     // --- ZOHO BOOKS ENDPOINTS ---
