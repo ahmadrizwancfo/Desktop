@@ -14,10 +14,10 @@ const sizeClasses = {
 };
 
 const variantClasses = {
-    default: 'bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500/50 shadow-lg shadow-indigo-500/20',
-    outline: 'bg-transparent hover:bg-white/5 text-white border border-white/10',
-    ghost: 'bg-transparent hover:bg-white/5 text-slate-400 hover:text-white border border-transparent',
-    destructive: 'bg-rose-600 hover:bg-rose-500 text-white border border-rose-500/50 shadow-lg shadow-rose-500/20',
+    default: 'bg-white text-[#09090B] hover:bg-slate-200 border border-white/20 font-bold active:scale-[0.98] transition-all',
+    outline: 'bg-[#18181B] hover:bg-[#202124] text-white border border-white/[0.06] font-medium transition-all',
+    ghost: 'bg-transparent hover:bg-white/[0.04] text-slate-300 hover:text-white transition-all',
+    destructive: 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-bold transition-all',
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(

@@ -37,16 +37,22 @@ export class StatementsController {
             );
         }
 
-        // v4.1 TOUGH DATA: Validate Standard CSV Headers
+        // Self-Healing Fuzzy CSV Header Normalization for Indian Bank Exports
         if (extension === 'csv') {
             const csvContent = file.buffer.toString();
             const firstLine = csvContent.split('\n')[0].toLowerCase();
-            const requiredHeaders = ['date', 'description', 'amount', 'type'];
-            const hasAllHeaders = requiredHeaders.every(h => firstLine.includes(h));
+            
+            const dateHeaders = ['date', 'txn date', 'transaction date', 'value date', 'dt'];
+            const descHeaders = ['description', 'narration', 'particulars', 'remarks', 'details', 'txn details'];
+            const amountHeaders = ['amount', 'withdrawal', 'deposit', 'dr', 'cr', 'debit', 'credit', 'amt'];
 
-            if (!hasAllHeaders) {
+            const hasDate = dateHeaders.some(h => firstLine.includes(h));
+            const hasDesc = descHeaders.some(h => firstLine.includes(h));
+            const hasAmount = amountHeaders.some(h => firstLine.includes(h));
+
+            if (!hasDate || !hasDesc || !hasAmount) {
                 throw new BadRequestException(
-                    'Invalid CSV format. Please use the FounderCFO Standard Template with headers: Date, Description, Amount, Type (IN/OUT).'
+                    'Unrecognized CSV format. Upload a standard bank statement (HDFC, ICICI, Axis, SBI, Kotak) containing Date, Description/Narration, and Amount/Debit/Credit columns.'
                 );
             }
         }

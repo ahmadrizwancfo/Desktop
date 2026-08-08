@@ -43,14 +43,11 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6 relative overflow-hidden">
-            {/* Background Decor */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-indigo-500/10 blur-[100px] rounded-full" />
-
+        <div className="min-h-screen bg-[#111111] flex items-center justify-center p-6 relative overflow-hidden">
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
                 className="w-full max-w-md"
             >
                 <div className="text-center mb-8">
@@ -58,10 +55,10 @@ export default function LoginPage() {
                         <Logo size="lg" />
                     </Link>
                     <h1 className="text-3xl font-bold text-white tracking-tight">Welcome Back</h1>
-                    <p className="text-slate-400 mt-2">Sign in to manage your financial autopilot.</p>
+                    <p className="text-slate-400 mt-2 text-sm font-medium">Sign in to your continuous financial operating system.</p>
                 </div>
 
-                <div className="glass-card p-8 rounded-3xl border-white/5 shadow-2xl relative overflow-hidden">
+                <div className="p-8 rounded-3xl bg-[#18181B] border border-white/[0.06] shadow-none">
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {error && (
                             <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-medium">

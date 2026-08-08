@@ -64,17 +64,13 @@ export default function DashboardPage() {
 
     if (isLoading) {
         return (
-            <div className="h-screen w-full bg-[#020617] flex flex-col items-center justify-center">
-                <div className="relative">
-                    <div className="absolute inset-0 bg-rose-500/20 blur-3xl rounded-full scale-150 animate-pulse" />
-                    <div className="w-20 h-20 bg-[#0a0f1e] border-2 border-rose-500/30 rounded-2xl shadow-2xl flex items-center justify-center relative z-10">
-                        <Skull className="w-8 h-8 text-rose-400 animate-pulse" />
-                    </div>
+            <div className="h-screen w-full bg-[#111111] flex flex-col items-center justify-center space-y-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-xs font-mono tabular-nums uppercase tracking-widest text-slate-400">
+                        Verifying ground-truth cash balance &amp; runway buffer...
+                    </span>
                 </div>
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-8 text-center">
-                    <h2 className="text-xl font-black text-white tracking-tight mb-2">Calculating your runway &amp; capital buffer...</h2>
-                    <p className="text-slate-500 text-sm font-medium">Reviewing cash movements, statutory tax deadlines, and top CFO recommendations.</p>
-                </motion.div>
             </div>
         );
     }

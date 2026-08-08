@@ -85,20 +85,20 @@ export function CfoHero({ state }: CfoHeroProps) {
                     </div>
 
                     {/* ☕ THE LIVING CFO VIEWPORT 1 EXPERIENCE */}
-                    <div className="mb-6 p-6 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 space-y-4">
+                    <div className="mb-6 p-6 rounded-2xl bg-[#18181B] border border-white/[0.06] space-y-4">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-indigo-400 font-black text-xs uppercase tracking-widest">
-                                <Shield className="w-4 h-4" />
+                            <div className="flex items-center gap-2 text-slate-300 font-bold text-xs uppercase tracking-widest">
+                                <Shield className="w-4 h-4 text-emerald-400" />
                                 {continuousBrief?.livingCfoBrief?.greeting || continuousBrief?.founderGreeting || 'Good morning, Founder. I reviewed everything that changed since yesterday.'}
                             </div>
-                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                                 {continuousBrief?.livingCfoBrief?.companyIntelligence?.companyChapter || '🚀 GROWTH & EXPANSION PHASE'}
                             </span>
                         </div>
 
                         {/* ⚙️ "WHILE I WAS WORKING..." SILENT ACCOMPLISHMENTS */}
                         <div className="space-y-1.5 pt-1">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">While I was working...</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">While I was working...</span>
                             <div className="flex flex-wrap gap-2 text-[10px] font-bold text-slate-300">
                                 {(continuousBrief?.livingCfoBrief?.whileIWasWorking || [
                                     "Reviewed 146 transactions",
@@ -107,7 +107,7 @@ export function CfoHero({ state }: CfoHeroProps) {
                                     "Monitored receivables",
                                     "Updated cash forecast"
                                 ]).map((item: string, i: number) => (
-                                    <span key={i} className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1.5">
+                                    <span key={i} className="px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center gap-1.5">
                                         <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                                         {item}
                                     </span>
@@ -117,14 +117,14 @@ export function CfoHero({ state }: CfoHeroProps) {
 
                         {/* 🏆 SILENT WINS CELEBRATION BLOCK */}
                         {continuousBrief?.livingCfoBrief?.silentWins?.length > 0 && (
-                            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-1.5">
-                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
-                                    <Sparkles className="w-3.5 h-3.5" />
+                            <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-1.5">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5" />
                                     Yesterday's Silent Wins
                                 </span>
                                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-white">
                                     {continuousBrief.livingCfoBrief.silentWins.map((win: string, idx: number) => (
-                                        <span key={idx} className="bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1 rounded-lg text-emerald-300">
+                                        <span key={idx} className="bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg text-emerald-300">
                                             ✓ {win}
                                         </span>
                                     ))}

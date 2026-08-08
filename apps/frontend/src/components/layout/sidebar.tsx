@@ -139,7 +139,7 @@ export function Sidebar({ className, onItemClick }: { className?: string; onItem
                 <button
                     onClick={handleForceSync}
                     disabled={syncing}
-                    className="w-full group mt-6 flex items-center justify-between px-4 py-3 rounded-[1.25rem] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 transition-all font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                    className="w-full group mt-6 flex items-center justify-between px-4 py-3 rounded-xl bg-[#18181B] border border-white/[0.06] text-emerald-400 hover:bg-[#202124] transition-all font-bold text-[10px] uppercase tracking-widest disabled:opacity-50"
                 >
                     <div className="flex items-center gap-3">
                         <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />

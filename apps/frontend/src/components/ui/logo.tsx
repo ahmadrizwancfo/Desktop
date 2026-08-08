@@ -33,7 +33,7 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
     if (iconOnly) {
         return (
             <div className={cn(
-                'bg-[#A78BFA] rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-[#A78BFA]/20',
+                'bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center font-mono font-bold text-emerald-400',
                 iconSizeMap[size],
                 className
             )}>
@@ -49,18 +49,18 @@ export function Logo({ size = 'md', className, iconOnly = false }: LogoProps) {
             className
         )}>
             <span className="text-white">Founder</span>
-            <span className="text-[#A78BFA]">CFO</span>
+            <span className="text-emerald-400">CFO</span>
         </span>
     );
 }
 
 /**
- * Icon-only logo mark — a purple square with "F" in white
+ * Icon-only logo mark — clean emerald mark
  */
 export function LogoMark({ size = 'md', className }: Omit<LogoProps, 'iconOnly'>) {
     return (
         <div className={cn(
-            'bg-[#A78BFA] rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-[#A78BFA]/20',
+            'bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center font-mono font-bold text-emerald-400',
             iconSizeMap[size],
             className
         )}>
