@@ -26,13 +26,8 @@ export function OnboardingFlow() {
     const [visible, setVisible] = useState(false);
 
     useEffect(() => {
-        if (!state) return;
-        const done = localStorage.getItem(ONBOARDING_KEY);
-        if (!done) {
-            // Small delay so dashboard renders first
-            const timer = setTimeout(() => setVisible(true), 1200);
-            return () => clearTimeout(timer);
-        }
+        // Obey Executive Interruption Rule: Never auto-popup over Viewport 1 Agenda
+        setVisible(false);
     }, [state]);
 
     const handleComplete = () => {

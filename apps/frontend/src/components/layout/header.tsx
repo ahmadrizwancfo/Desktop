@@ -58,22 +58,22 @@ export function Header() {
             <div className="flex items-center gap-3 md:gap-6 ml-auto">
                 {/* SSE Connection Status & Relative Timestamp Badge */}
                 <div className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all",
-                    sseStatus === 'connected' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                    sseStatus === 'reconnecting' ? "bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse" :
-                    "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                    "flex items-center gap-1.5 px-3 py-1 rounded-full border text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all",
+                    sseStatus === 'connected' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" :
+                    sseStatus === 'reconnecting' ? "bg-amber-500/10 border-amber-500/20 text-amber-300" :
+                    "bg-white/[0.04] border-white/[0.08] text-slate-300"
                 )}>
                     <span className={cn(
-                        "w-2 h-2 rounded-full",
-                        sseStatus === 'connected' ? "bg-emerald-400 animate-pulse" :
-                        sseStatus === 'reconnecting' ? "bg-amber-400 animate-ping" :
-                        "bg-rose-400"
+                        "w-1.5 h-1.5 rounded-full",
+                        sseStatus === 'connected' ? "bg-emerald-400" :
+                        sseStatus === 'reconnecting' ? "bg-amber-300 animate-ping" :
+                        "bg-slate-400"
                     )} />
-                    <span className="font-black">
-                        {sseStatus === 'connected' ? 'Live Stream' :
-                         sseStatus === 'reconnecting' ? 'Reconnecting (<2s)' : 'Disconnected'}
+                    <span className="font-mono text-[9px] lowercase">
+                        {sseStatus === 'connected' ? 'live stream' :
+                         sseStatus === 'reconnecting' ? 'reconnecting' : 'verified'}
                     </span>
-                    {sseLastUpdated && sseStatus === 'connected' && (
+                    {sseLastUpdated && (
                         <span className="text-slate-400 font-mono text-[9px] lowercase ml-1">
                             • {timeAgo(sseLastUpdated.toISOString())}
                         </span>

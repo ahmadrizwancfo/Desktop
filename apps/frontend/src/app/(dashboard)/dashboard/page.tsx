@@ -214,17 +214,17 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                         <span className="text-xs font-semibold text-slate-400">SSE Stream:</span>
                         <span className={cn(
                             "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border",
-                            sseStatus === 'connected' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" :
-                            sseStatus === 'reconnecting' ? "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse" :
-                            "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                            sseStatus === 'connected' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                            sseStatus === 'reconnecting' ? "bg-amber-500/10 text-amber-300 border-amber-500/20" :
+                            "bg-white/[0.04] text-slate-300 border-white/[0.08]"
                         )}>
                             <span className={cn(
                                 "w-1.5 h-1.5 rounded-full mr-1.5",
-                                sseStatus === 'connected' ? "bg-emerald-400 animate-pulse" :
-                                sseStatus === 'reconnecting' ? "bg-amber-400 animate-ping" :
-                                "bg-rose-400"
+                                sseStatus === 'connected' ? "bg-emerald-400" :
+                                sseStatus === 'reconnecting' ? "bg-amber-300 animate-ping" :
+                                "bg-slate-400"
                             )} />
-                            {sseStatus === 'connected' ? 'Live Stream' : sseStatus === 'reconnecting' ? 'Reconnecting (<2s)' : 'Disconnected'}
+                            {sseStatus === 'connected' ? 'Live Stream' : sseStatus === 'reconnecting' ? 'Reconnecting (<2s)' : 'Verified'}
                         </span>
                     </div>
                 </div>
