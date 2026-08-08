@@ -372,7 +372,15 @@ function SpendSlider({
 export default function OnboardingPage() {
     const router = useRouter();
     const user = useAuthStore((s) => s.user);
+    const profile = useStartupProfileStore((s) => s.profile);
     const setProfile = useStartupProfileStore((s) => s.setProfile);
+
+    // If founder already completed onboarding, redirect directly to dashboard
+    useEffect(() => {
+        if (profile) {
+            router.replace('/dashboard');
+        }
+    }, [profile, router]);
 
     // ── Input state ──────────────────────────────────────────────────────────
     const [teamSize, setTeamSize] = useState(5);

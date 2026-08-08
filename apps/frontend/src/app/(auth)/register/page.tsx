@@ -52,8 +52,8 @@ export default function RegisterPage() {
             localStorage.setItem('auth_token', access_token);
             setAuth(user, access_token);
 
-            // Redirect to dashboard
-            router.push('/dashboard');
+            // Direct navigation to onboarding (30-second financial discovery) with zero route flicker
+            router.push('/onboarding');
         } catch (err: any) {
             const message = err.response?.data?.message;
             if (message?.includes('Unique constraint') || message?.includes('already exists')) {
