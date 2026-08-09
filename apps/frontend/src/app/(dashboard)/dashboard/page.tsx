@@ -184,46 +184,14 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
             <VictoryConfetti />
                 <OnboardingFlow />
 
-            {/* Data Trust Indicator Header */}
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 px-4 py-2 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center space-x-2">
-                        <span className="text-xs font-semibold text-slate-400">Data Trust State:</span>
-                        {isPartialState ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 animate-pulse">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mr-1.5 animate-ping" />
-                                🟡 Live (processing...) {processingMessage ? `— ${processingMessage}` : ''}
-                            </span>
-                        ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5" />
-                                🟢 Finalized (Matches DB Truth)
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <span className="text-xs font-semibold text-slate-400">SSE Stream:</span>
-                        <span className={cn(
-                            "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border",
-                            sseStatus === 'connected' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                            sseStatus === 'reconnecting' ? "bg-amber-500/10 text-amber-300 border-amber-500/20" :
-                            "bg-white/[0.04] text-slate-300 border-white/[0.08]"
-                        )}>
-                            <span className={cn(
-                                "w-1.5 h-1.5 rounded-full mr-1.5",
-                                sseStatus === 'connected' ? "bg-emerald-400" :
-                                sseStatus === 'reconnecting' ? "bg-amber-300 animate-ping" :
-                                "bg-slate-400"
-                            )} />
-                            {sseStatus === 'connected' ? 'Live Stream' : sseStatus === 'reconnecting' ? 'Reconnecting (<2s)' : 'Verified'}
-                        </span>
-                    </div>
+            {/* Top Status Header */}
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-slate-400 border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Continuous Financial Operating System</span>
                 </div>
                 <div className="text-[11px] text-slate-500 font-mono flex items-center gap-2">
-                    {sseLastUpdated && sseStatus === 'connected' && (
-                        <span>Last updated {Math.max(0, Math.floor((Date.now() - sseLastUpdated.getTime()) / 1000))}s ago •</span>
-                    )}
-                    <span>Reconciled: {state.lastUpdatedAt ? new Date(state.lastUpdatedAt).toLocaleTimeString() : 'Just now'}</span>
+                    <span>Reconciled: {state.lastUpdatedAt ? new Date(state.lastUpdatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Just now'}</span>
                 </div>
             </div>
 

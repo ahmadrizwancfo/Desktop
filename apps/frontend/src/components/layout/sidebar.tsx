@@ -143,7 +143,7 @@ export function Sidebar({ className, onItemClick }: { className?: string; onItem
                 >
                     <div className="flex items-center gap-3">
                         <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />
-                        <span>{syncing ? 'Synchronizing...' : 'Force Intelligence Sync'}</span>
+                        <span>{syncing ? 'Verifying...' : 'Verify Financial Model'}</span>
                     </div>
                 </button>
             </nav>
