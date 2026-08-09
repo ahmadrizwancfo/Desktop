@@ -470,10 +470,10 @@ export default function OnboardingPage() {
                         <Logo size="xl" />
                     </div>
                     <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-[1.1] mb-3">
-                        Let&apos;s estimate your <span className="text-gradient">survival time</span>
+                        30-Second <span className="text-gradient">Baseline Financial Builder</span>
                     </h1>
-                    <p className="text-slate-500 text-sm sm:text-base font-medium">
-                        This takes 10 seconds. No data connection needed.
+                    <p className="text-slate-400 text-sm sm:text-base font-medium">
+                        Instant runway trajectory &amp; extension insights. No bank password required.
                     </p>
                 </motion.header>
 
@@ -492,7 +492,7 @@ export default function OnboardingPage() {
                         <div className="flex-1">
                             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-0.5">AI CFO Discovery Voice</p>
                             <p className="text-xs sm:text-sm font-medium text-slate-200 leading-relaxed">
-                                &ldquo;Welcome! Before we link bank feeds, let&apos;s run a 30-second discovery. Set your team and spend to calculate your initial Founder Confidence Score.&rdquo;
+                                &ldquo;Welcome! I&apos;ve initialized your baseline financial model. Select your team size and stage below to calculate your estimated survival outlook.&rdquo;
                             </p>
                         </div>
                     </div>

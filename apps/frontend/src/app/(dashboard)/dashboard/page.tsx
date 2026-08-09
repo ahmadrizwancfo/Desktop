@@ -14,6 +14,7 @@ import {
 } from '@/store/cfo-state-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 
@@ -39,6 +40,8 @@ import { ExecutiveMandateHero } from '@/components/dashboard/executive-mandate-h
 import { Skull, Wallet, Clock, TrendingDown, BarChart3, AlertTriangle, Share2, Download, Copy, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
+import { DailyBriefWidget } from '@/components/daily-brief/daily-brief-widget';
+import { useLivingDashboard } from '@/hooks/use-living-dashboard';
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -98,9 +101,6 @@ export default function DashboardPage() {
 // Zone 4: Deep Dive (collapsible) — gated behind DataQualityGate if < 70
 // Zone 5: Professional Disclaimer
 // ═══════════════════════════════════════════════════════════════════════════════
-
-import { DailyBriefWidget } from '@/components/daily-brief/daily-brief-widget';
-import { useLivingDashboard } from '@/hooks/use-living-dashboard';
 
 const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
     const router = useRouter();
@@ -181,7 +181,7 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
     return (
         <div className="text-slate-200 selection:bg-primary/30">
             <VictoryConfetti />
-            <OnboardingFlow />
+                <OnboardingFlow />
 
             {/* Data Trust Indicator Header */}
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 px-4 py-2 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md">
@@ -224,6 +224,31 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                     )}
                     <span>Reconciled: {state.lastUpdatedAt ? new Date(state.lastUpdatedAt).toLocaleTimeString() : 'Just now'}</span>
                 </div>
+            </div>
+
+            {/* Ground-Truth Provenance Banner */}
+            <div className="mb-6 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
+                    <div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                            {state.isDemo ? "Level 1 — Estimated Baseline Model" : "Level 2 — Verified Evidence Ingested"}
+                        </span>
+                        <p className="text-xs text-slate-200 font-medium mt-0.5">
+                            {state.isDemo
+                                ? "Model initialized from 30-second onboarding context. Upload a bank statement or Tally XML for penny-exact verification."
+                                : "Financial model grounded in verified bank vouchers & accounting records."}
+                        </p>
+                    </div>
+                </div>
+                {state.isDemo && (
+                    <Link
+                        href="/integrations"
+                        className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition-all shrink-0"
+                    >
+                        Upgrade to Verified
+                    </Link>
+                )}
             </div>
 
             {/* Zone 1: Executive Command Center Hero (Concept A — Answers 4 Questions Immediately) */}
