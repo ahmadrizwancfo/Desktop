@@ -37,6 +37,7 @@ import { DataQualityBanner, DataQualityGate } from '@/components/dashboard/data-
 import { OnboardingFlow } from '@/components/dashboard/onboarding-flow';
 import { ComplianceAlerts } from '@/components/dashboard/compliance-alerts';
 import { ExecutiveMandateHero } from '@/components/dashboard/executive-mandate-hero';
+import { ExecutiveOperationsFeed } from '@/components/dashboard/executive-operations-feed';
 import { Skull, Wallet, Clock, TrendingDown, BarChart3, AlertTriangle, Share2, Download, Copy, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
@@ -249,6 +250,16 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                         Upgrade to Verified
                     </Link>
                 )}
+            </div>
+
+            {/* Executive Operations Feed (Proves work already completed) */}
+            <div className="mb-6">
+                <ExecutiveOperationsFeed 
+                    isDemo={state.isDemo}
+                    hasVouchers={!state.isDemo || (state.trust?.transactionCount || 0) > 0}
+                    voucherCount={state.trust?.transactionCount || 0}
+                    lastUpdatedAt={state.lastUpdatedAt}
+                />
             </div>
 
             {/* Zone 1: Executive Command Center Hero (Concept A — Answers 4 Questions Immediately) */}
