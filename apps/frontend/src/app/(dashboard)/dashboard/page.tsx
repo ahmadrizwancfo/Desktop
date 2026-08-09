@@ -258,22 +258,10 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                 runwayMonths={state.summary.runwayMonths}
                 primaryRisk={state.primaryRisk?.message || "Uncollected Accounts Receivable (DSO 263D) violating Law: Revenue Is Not Cash."}
                 oneThingAction={decision?.title || "Preserve cash: Delay hiring 2 senior engineers until Q3 AR collections hit 80%."}
-                followConsequence={decision?.consequenceExplanation || "+4.9 months runway buffer retained (Zero Cash Date pushed to late 2027)."}
-                ignoreConsequence="-4.9 months runway accelerated (-21% liquidity margin)."
+                followConsequence={decision?.consequenceExplanation || "Retains runway buffer & delays cash exhaustion."}
+                ignoreConsequence="Accelerates burn (-21% liquidity margin)."
                 onExecute={handleExecute}
             />
-
-            {/* Zone 1: Decision Strip (Behavior Engine) */}
-            {decision && (
-                <DecisionStrip 
-                    title={decision.title}
-                    urgency={decision.urgency === 'critical' ? 'CRITICAL: Act in 24h' : `Urgent: Act in ${decision.deadline || '7 days'}`}
-                    consequence={decision.consequenceExplanation || "Negative variance in next cycle"}
-                    action={decision.title}
-                    onExecute={handleExecute}
-                    onSimulate={() => router.push('/decision-lab')}
-                />
-            )}
 
             <div className="max-w-[1400px] mx-auto py-6">
                 {/* Zone 2: Cash Position + Runway (PROMINENT — top of dashboard) */}

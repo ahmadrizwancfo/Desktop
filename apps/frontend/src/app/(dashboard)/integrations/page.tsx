@@ -226,11 +226,10 @@ export default function IntegrationsPage() {
                     className="text-center mb-12"
                 >
                     <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight mb-4">
-                        Let’s replace your estimates with <br className="hidden md:block"/>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-primary">real numbers</span>
+                        Connect your <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-primary">financial records</span>
                     </h1>
                     <p className="text-lg text-slate-400 font-medium">
-                        You’re currently seeing projections. Connect your data to make them accurate.
+                        Verify your baseline model with real bank cash movements &amp; accounting vouchers.
                     </p>
                 </motion.header>
 
@@ -253,247 +252,116 @@ export default function IntegrationsPage() {
                                 <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-400">
                                     <span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-indigo-400" /> 256-Bit AES Encryption</span>
                                     <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> DPDP Act Compliant</span>
-                                    <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Read-Only Data Feeds</span>
+                                    <span className="flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-amber-400" /> Read-Only Data Verification</span>
                                     <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-indigo-400" /> Zero Data Selling</span>
                                 </div>
                             </div>
 
-                            {/* 2. Current vs Future State Lockup */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Left: Estimated */}
-                                <div className="p-6 md:p-8 rounded-[2rem] bg-amber-500/[0.02] border border-amber-500/10 relative overflow-hidden group">
-                                    <h3 className="text-[11px] font-black text-amber-500/70 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500/50" />
-                                        Your CFO (Estimated)
-                                    </h3>
-                                    
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between py-2 border-b border-white/5 disabled opacity-60">
-                                            <span className="text-sm font-bold text-slate-400">Runway</span>
-                                            <span className="text-sm font-black text-amber-400/80">4–6 months</span>
-                                        </div>
-                                        <div className="flex items-center justify-between py-2 border-b border-white/5 opacity-60">
-                                            <span className="text-sm font-bold text-slate-400">Confidence</span>
-                                            <span className="text-sm font-medium text-slate-500 bg-white/5 px-2 py-0.5 rounded-md">Low</span>
-                                        </div>
-                                        <div className="flex items-center justify-between py-2 opacity-60">
-                                            <span className="text-sm font-bold text-slate-400">Based on</span>
-                                            <span className="text-sm font-medium text-slate-500">Manual inputs</span>
-                                        </div>
-                                    </div>
+                            {/* 2. Primary Ground-Truth Sources (Indian Startup Focus) */}
+                            <div className="space-y-6">
+                                <div className="text-left">
+                                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.3em] block mb-1">Recommended Verification Method</span>
+                                    <h2 className="text-xl font-black text-white">1. Choose your bank &amp; verify statement</h2>
                                 </div>
 
-                                {/* Right: Real */}
-                                <div className="p-6 md:p-8 rounded-[2rem] bg-emerald-500/[0.04] border border-emerald-500/20 relative shadow-[0_0_40px_-15px_rgba(16,185,129,0.15)] overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none" />
-                                    
-                                    <h3 className="text-[11px] font-black text-emerald-400 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
-                                        Your CFO (Real)
-                                    </h3>
-                                    
-                                    <div className="space-y-4 relative z-10">
-                                        <div className="flex items-center justify-between py-2 border-b border-emerald-500/10">
-                                            <span className="text-sm font-bold text-white">Runway</span>
-                                            <span className="text-sm font-black text-emerald-400">Exact, updated daily</span>
+                                {/* 2-Step Bank Selector */}
+                                <div className="p-6 md:p-8 rounded-[2rem] bg-white/[0.03] border border-white/10 space-y-6 text-left">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Step 1: Select your primary Indian bank</p>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                                            {['HDFC', 'ICICI', 'Axis', 'SBI', 'Kotak'].map((bank) => (
+                                                <button
+                                                    key={bank}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const fileInput = document.getElementById('csv-upload');
+                                                        if (fileInput) fileInput.click();
+                                                    }}
+                                                    className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/10 text-white font-black text-sm transition-all text-center flex flex-col items-center justify-center gap-2 group cursor-pointer"
+                                                >
+                                                    <Building2 className="w-5 h-5 text-slate-400 group-hover:text-emerald-400 transition-colors" />
+                                                    <span>{bank}</span>
+                                                    <span className="text-[9px] text-slate-500 font-medium">NetBanking CSV</span>
+                                                </button>
+                                            ))}
                                         </div>
-                                        <div className="flex items-center justify-between py-2 border-b border-emerald-500/10">
-                                            <span className="text-sm font-bold text-white">Burn</span>
-                                            <span className="text-sm font-black text-emerald-400">Auto-detected</span>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                        <div>
+                                            <p className="text-sm font-bold text-white mb-0.5">Step 2: Upload raw statement CSV export</p>
+                                            <p className="text-xs text-slate-400 font-medium">Self-healing parser auto-detects date, narration &amp; transaction columns.</p>
                                         </div>
-                                        <div className="flex items-center justify-between py-2 border-b border-emerald-500/10">
-                                            <span className="text-sm font-bold text-white">Risks</span>
-                                            <span className="text-sm font-black text-rose-400">Live alerts</span>
-                                        </div>
-                                        <div className="flex items-center justify-between py-2">
-                                            <span className="text-sm font-bold text-white">Actions</span>
-                                            <span className="text-sm font-black text-primary">Personalized weekly</span>
-                                        </div>
+                                        <input 
+                                            type="file" 
+                                            id="csv-upload"
+                                            className="hidden" 
+                                            accept=".csv,.xlsx,.xls,.xml"
+                                            onChange={handleUpload}
+                                        />
+                                        <label 
+                                            htmlFor="csv-upload"
+                                            className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider cursor-pointer transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-emerald-500/20"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            Verify Statement
+                                        </label>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 3. Connection Options */}
-                            <div className="space-y-6">
-                                <h2 className="text-lg font-black text-white text-center">Connect your financial sources</h2>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {/* Bank */}
-                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all group flex flex-col h-full">
-                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-5 shrink-0">
-                                            <Building2 className="w-6 h-6 text-indigo-400" />
+                            {/* 3. Accounting Software Sources */}
+                            <div className="space-y-6 pt-4">
+                                <div className="text-left">
+                                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] block mb-1">Accounting Source of Truth</span>
+                                    <h2 className="text-xl font-black text-white">2. Connect accounting records</h2>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                                    {/* Tally Prime XML */}
+                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-primary/40 transition-all flex flex-col justify-between">
+                                        <div>
+                                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-4 font-black">
+                                                XML
+                                            </div>
+                                            <h3 className="text-base font-black text-white mb-1">Tally Prime XML Export</h3>
+                                            <p className="text-xs text-slate-400 font-medium mb-4">Export DayBook or Voucher XML from Tally Prime for instant multi-year audit verification.</p>
                                         </div>
-                                        <h3 className="text-lg font-black text-white mb-2">Bank Account</h3>
-                                        <p className="text-sm font-medium text-slate-400 mb-6 flex-1">Track real cash flow and runway</p>
-                                        <button 
-                                            onClick={() => handleConnectIntegration('Bank Account')}
-                                            className="w-full py-3.5 rounded-xl bg-white text-[#0a0f1e] font-black text-[11px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
+                                        <input 
+                                            type="file" 
+                                            id="tally-upload"
+                                            className="hidden" 
+                                            accept=".xml"
+                                            onChange={handleUpload}
+                                        />
+                                        <label 
+                                            htmlFor="tally-upload"
+                                            className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-black text-[11px] uppercase tracking-widest text-center cursor-pointer transition-all block"
                                         >
-                                            Connect Bank
-                                        </button>
-                                    </div>
-
-                                    {/* Razorpay */}
-                                    <div className={cn(
-                                        "p-6 rounded-2xl bg-white/[0.02] border transition-all group flex flex-col h-full",
-                                        razorpayConn?.status === 'connected' 
-                                            ? "border-emerald-500/20 bg-emerald-500/[0.01]" 
-                                            : "border-white/5 hover:bg-white/[0.04] hover:border-white/10"
-                                    )}>
-                                        <div className="flex justify-between items-start mb-5">
-                                            <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center shrink-0 overflow-hidden">
-                                                <img src="https://www.vectorlogo.zone/logos/razorpay/razorpay-icon.svg" alt="Razorpay" className="w-8 h-8 object-contain" />
-                                            </div>
-                                            {razorpayConn?.status === 'connected' ? (
-                                                <span className="flex items-center gap-1 text-[10px] font-black text-emerald-400 uppercase bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                    Connected
-                                                </span>
-                                            ) : (
-                                                <span className="text-[10px] font-black text-slate-500 uppercase bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
-                                                    Disconnected
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <h3 className="text-lg font-black text-white mb-1">Razorpay</h3>
-                                        <p className="text-xs font-medium text-slate-400 flex-1">Automatically track revenue and transaction history</p>
-
-                                        {razorpayConn?.status === 'connected' && (
-                                            <div className="my-4 py-3 px-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1.5 text-left">
-                                                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                                                    <span>Transactions imported</span>
-                                                    <span className="text-white">{razorpayConn.transactionCount || 0}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                                                    <span>Sync Status</span>
-                                                    <span className="text-sky-400 font-black uppercase tracking-wider">{razorpayConn.syncStatus || 'idle'}</span>
-                                                </div>
-                                                <div className="text-[9px] text-slate-500 mt-1">
-                                                    Last Synced: {razorpayConn.lastSyncedAt ? new Date(razorpayConn.lastSyncedAt).toLocaleString('en-IN') : 'Never'}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="flex gap-2 mt-auto">
-                                            {razorpayConn?.status === 'connected' ? (
-                                                <>
-                                                    <button 
-                                                        onClick={() => syncMutation.mutate('Razorpay')}
-                                                        disabled={syncMutation.isPending || razorpayConn.syncStatus === 'syncing'}
-                                                        className="flex-1 py-3.5 rounded-xl bg-white text-[#0a0f1e] font-black text-[11px] uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                                                    >
-                                                        <RefreshCw className={cn("w-3.5 h-3.5", (syncMutation.isPending || razorpayConn.syncStatus === 'syncing') && "animate-spin")} />
-                                                        {razorpayConn.syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => {
-                                                            if (confirm('Are you sure you want to disconnect Razorpay?')) {
-                                                                disconnectMutation.mutate('Razorpay');
-                                                            }
-                                                        }}
-                                                        disabled={disconnectMutation.isPending}
-                                                        className="px-3.5 py-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-black text-[11px] uppercase tracking-widest border border-rose-500/20 transition-all"
-                                                        title="Disconnect"
-                                                    >
-                                                        Disconnect
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => handleConnectIntegration('Razorpay')}
-                                                    className="w-full py-3.5 rounded-xl bg-white/10 text-white font-black text-[11px] uppercase tracking-widest hover:bg-white/15 transition-all"
-                                                >
-                                                    Connect Razorpay
-                                                </button>
-                                            )}
-                                        </div>
+                                            Verify Tally XML
+                                        </label>
                                     </div>
 
                                     {/* Zoho Books */}
-                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all group flex flex-col h-full">
-                                        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center mb-5 shrink-0 overflow-hidden p-1.5">
-                                            <img src="https://www.vectorlogo.zone/logos/zoho/zoho-icon.svg" alt="Zoho" className="w-full h-full object-contain" />
+                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-primary/40 transition-all flex flex-col justify-between">
+                                        <div>
+                                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center mb-4 p-1.5 shrink-0 overflow-hidden">
+                                                <img src="https://www.vectorlogo.zone/logos/zoho/zoho-icon.svg" alt="Zoho" className="w-full h-full object-contain" />
+                                            </div>
+                                            <h3 className="text-base font-black text-white mb-1">Zoho Books API</h3>
+                                            <p className="text-xs text-slate-400 font-medium mb-4">Direct OAuth connection to sync customer invoices, vendor bills, and bank accounts.</p>
                                         </div>
-                                        <h3 className="text-lg font-black text-white mb-2">Zoho Books</h3>
-                                        <p className="text-sm font-medium text-slate-400 mb-6 flex-1">Import your financial history</p>
                                         <button 
                                             onClick={() => handleConnectIntegration('Zoho Books')}
-                                            className="w-full py-3.5 rounded-xl bg-white/10 text-white font-black text-[11px] uppercase tracking-widest hover:bg-white/15 transition-all"
+                                            className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-black text-[11px] uppercase tracking-widest transition-all"
                                         >
-                                            Connect Zoho
-                                        </button>
-                                    </div>
-
-                                    {/* QuickBooks - Coming Soon */}
-                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 transition-all group flex flex-col h-full opacity-60">
-                                        <div className="w-12 h-12 rounded-xl bg-transparent flex items-center justify-center mb-5 shrink-0 overflow-hidden">
-                                            <img src="https://www.vectorlogo.zone/logos/intuit_quickbooks/intuit_quickbooks-icon.svg" alt="QuickBooks" className="w-9 h-9 object-contain grayscale" />
-                                        </div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-lg font-black text-white">QuickBooks</h3>
-                                            <span className="px-2 py-0.5 rounded-md bg-white/5 text-[9px] font-black text-slate-500 uppercase">Soon</span>
-                                        </div>
-                                        <p className="text-sm font-medium text-slate-500 mb-6 flex-1">Enterprise grade accounting sync</p>
-                                        <button 
-                                            disabled
-                                            className="w-full py-3.5 rounded-xl bg-white/5 text-slate-600 font-black text-[11px] uppercase tracking-widest cursor-not-allowed"
-                                        >
-                                            Locked
-                                        </button>
-                                    </div>
-
-                                    {/* Stripe - Coming Soon */}
-                                    <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 transition-all group flex flex-col h-full opacity-60">
-                                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-5 shrink-0 overflow-hidden">
-                                            <img src="https://api.iconify.design/logos:stripe-icon.svg" alt="Stripe" className="w-7 h-7 object-contain grayscale" />
-                                        </div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-lg font-black text-white">Stripe</h3>
-                                            <span className="px-2 py-0.5 rounded-md bg-white/5 text-[9px] font-black text-slate-500 uppercase">Soon</span>
-                                        </div>
-                                        <p className="text-sm font-medium text-slate-500 mb-6 flex-1">Global revenue & subscriptions</p>
-                                        <button 
-                                            disabled
-                                            className="w-full py-3.5 rounded-xl bg-white/5 text-slate-600 font-black text-[11px] uppercase tracking-widest cursor-not-allowed"
-                                        >
-                                            Locked
+                                            Connect Zoho Books
                                         </button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* 4. Alternative Low-Friction Path */}
-                            <div className="pt-6 border-t border-white/5 flex flex-col items-center">
-                                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-4">Or get started instantly</p>
-                                
-                                <div className="relative overflow-hidden w-full max-w-sm">
-                                    <input 
-                                        type="file" 
-                                        id="csv-upload"
-                                        className="hidden" 
-                                        accept=".csv,.xlsx,.xls,.xml"
-                                        onChange={handleUpload}
-                                    />
-                                    <label 
-                                        htmlFor="csv-upload"
-                                        className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-primary/30 cursor-pointer transition-all group"
-                                    >
-                                        <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-primary/20 transition-colors shrink-0">
-                                            <Upload className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h4 className="text-sm font-bold text-white group-hover:text-primary transition-colors">Upload Bank Statement</h4>
-                                            <p className="text-xs text-slate-500">Get insights in under 60 seconds</p>
-                                        </div>
-                                        <div className="px-4 py-2 rounded-lg bg-white/5 text-[10px] font-black text-white uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-colors">
-                                            Upload File
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            {/* 6. Trust & Safety Layer */}
+                            {/* Trust & Safety Layer */}
                             <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 pt-8 text-[11px] font-medium text-slate-500">
                                 <span className="flex items-center gap-2"><Lock className="w-3.5 h-3.5" /> Read-only access</span>
                                 <span className="hidden md:inline text-slate-700">•</span>
@@ -501,7 +369,6 @@ export default function IntegrationsPage() {
                                 <span className="hidden md:inline text-slate-700">•</span>
                                 <span className="flex items-center gap-2"><Building2 className="w-3.5 h-3.5" /> Used by startup founders</span>
                             </div>
-
                         </motion.div>
 
                     ) : status === 'PREVIEW' && previewData ? (
