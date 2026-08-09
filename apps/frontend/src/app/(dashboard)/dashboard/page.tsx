@@ -42,15 +42,7 @@ import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
 
 export default function DashboardPage() {
     const router = useRouter();
-    const { setProfile, clearProfile } = useStartupProfileStore();
-    const [profileChecked, setProfileChecked] = useState(false);
-
-    useEffect(() => {
-        apiClient.get('/startup-profile/me')
-            .then((res) => { setProfile(res.data); setProfileChecked(true); })
-            .catch(() => { clearProfile(); router.push('/onboarding'); });
-    }, [clearProfile, router, setProfile]);
-
+    const profile = useStartupProfileStore((s) => s.profile);
     const { data: cfoState, isLoading, isRefetching } = useCFOState();
     const queryClient = useQueryClient();
 
@@ -59,8 +51,6 @@ export default function DashboardPage() {
             router.replace('/get-started');
         }
     }, [cfoState?.noData, cfoState?.isDemo, isLoading, isRefetching, router]);
-
-    if (!profileChecked) return null;
 
     if (isLoading) {
         return (

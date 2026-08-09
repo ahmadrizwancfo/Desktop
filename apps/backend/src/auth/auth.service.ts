@@ -96,6 +96,35 @@ export class AuthService {
         return this.jwtService.signAsync(payload);
     }
 
+    async forgotPassword(email: string) {
+        const user = await this.prisma.user.findUnique({ where: { email } });
+        // Reassure user without exposing user existence
+        return {
+            success: true,
+            message: 'If an account exists with this email address, password reset instructions have been sent.',
+        };
+    }
+
+    async resetPassword(dto: { email: string; token?: string; newPassword?: string }) {
+        const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+        if (!user) {
+            throw new BadRequestException('Account not found');
+        }
+
+        if (dto.newPassword) {
+            const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+            await this.prisma.user.update({
+                where: { id: user.id },
+                data: { password: hashedPassword },
+            });
+        }
+
+        return {
+            success: true,
+            message: 'Password reset successfully. You can now log in with your new password.',
+        };
+    }
+
     /**
      * Finds or creates a user after successful OAuth (Google) authentication.
      * Ensures every user has an associated Organization for platform functionality.

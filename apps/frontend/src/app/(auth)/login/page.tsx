@@ -8,6 +8,7 @@ import { ArrowRight, Mail, Lock, Loader2 } from 'lucide-react';
 import { Logo } from '@/components/ui/logo';
 import { apiClient } from '@/lib/api-client';
 import { useAuthStore } from '@/store/auth-store';
+import { appBootstrapService } from '@/lib/app-bootstrap.service';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -27,7 +28,14 @@ export default function LoginPage() {
             const { user, access_token } = response.data;
             localStorage.setItem('auth_token', access_token);
             setAuth(user, access_token);
-            router.push('/dashboard');
+
+            // Execute Unified App Boot Handshake to route cleanly
+            const boot = await appBootstrapService.bootstrap();
+            if (boot.state === 'READY' && boot.context?.hasProfile) {
+                router.push('/dashboard');
+            } else {
+                router.push('/onboarding');
+            }
         } catch (err: any) {
             const message = err.response?.data?.message;
             if (err.code === 'ERR_NETWORK') {
@@ -84,7 +92,28 @@ export default function LoginPage() {
                         <div className="space-y-2">
                             <div className="flex justify-between items-center ml-1">
                                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Password</label>
-                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest cursor-not-allowed" title="Coming soon">Forgot?</span>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (!email) {
+                                            setError('Please enter your email address above to reset password.');
+                                            return;
+                                        }
+                                        setIsLoading(true);
+                                        try {
+                                            const res = await apiClient.post('/auth/forgot-password', { email });
+                                            setError('');
+                                            alert(res.data?.message || 'Password reset link sent to your email.');
+                                        } catch (err: any) {
+                                            setError(err.response?.data?.message || 'Failed to send reset link.');
+                                        } finally {
+                                            setIsLoading(false);
+                                        }
+                                    }}
+                                    className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-widest transition-colors"
+                                >
+                                    Forgot?
+                                </button>
                             </div>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />

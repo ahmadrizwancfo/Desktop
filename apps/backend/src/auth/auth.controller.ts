@@ -28,6 +28,18 @@ export class AuthController {
         return this.authService.register(registerDto);
     }
 
+    @Post('forgot-password')
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
+    async forgotPassword(@Body('email') email: string) {
+        return this.authService.forgotPassword(email);
+    }
+
+    @Post('reset-password')
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
+    async resetPassword(@Body() dto: { email: string; token?: string; newPassword?: string }) {
+        return this.authService.resetPassword(dto);
+    }
+
     @Get('me')
     @UseGuards(JwtAuthGuard)
     @SkipThrottle()
