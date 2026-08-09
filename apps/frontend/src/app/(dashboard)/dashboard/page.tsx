@@ -38,6 +38,9 @@ import { OnboardingFlow } from '@/components/dashboard/onboarding-flow';
 import { ComplianceAlerts } from '@/components/dashboard/compliance-alerts';
 import { ExecutiveMandateHero } from '@/components/dashboard/executive-mandate-hero';
 import { ExecutiveOperationsFeed } from '@/components/dashboard/executive-operations-feed';
+import { FinancialConfidenceCard } from '@/components/dashboard/financial-confidence-card';
+import { ComplianceRadarCard } from '@/components/dashboard/compliance-radar-card';
+import { BottomInsightBanner } from '@/components/dashboard/bottom-insight-banner';
 import { Skull, Wallet, Clock, TrendingDown, BarChart3, AlertTriangle, Share2, Download, Copy, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FinancialDisclaimer } from '@/components/ui/financial-disclaimer';
@@ -220,164 +223,62 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                 )}
             </div>
 
-            {/* Executive Operations Feed (Proves work already completed) */}
-            <div className="mb-6">
-                <ExecutiveOperationsFeed 
-                    isDemo={state.isDemo}
-                    hasVouchers={!state.isDemo || (state.trust?.transactionCount || 0) > 0}
-                    voucherCount={state.trust?.transactionCount || 0}
-                    lastUpdatedAt={state.lastUpdatedAt}
+            {/* Main 3-Column Dashboard Layout matching reference visual direction */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8 text-left">
+                {/* Left / Middle Column (8 Columns): Hero + Operations Feed + Key Metrics */}
+                <div className="lg:col-span-8 space-y-8">
+                    {/* Executive Summary Hero Box */}
+                    <ExecutiveMandateHero 
+                        isDemo={state.isDemo}
+                        healthScore={confidenceScore > 0 ? Math.round(confidenceScore) : 57}
+                        cashBalance={state.summary.cashInBank}
+                        runwayMonths={state.summary.runwayMonths}
+                        monthlyBurn={state.summary.netBurn}
+                        operatingDays={24}
+                        primaryRisk={state.primaryRisk?.message || "Uncollected Accounts Receivable (DSO 263D) violating Law: Revenue Is Not Cash."}
+                        oneThingAction={decision?.title || "Preserve cash: Delay hiring 2 senior engineers until Q3 AR collections hit 80%."}
+                        followConsequence={decision?.consequenceExplanation || "+4.9 months"}
+                        onExecute={handleExecute}
+                    />
+
+                    {/* What I've Already Done (Executive Operations Feed) */}
+                    <ExecutiveOperationsFeed 
+                        isDemo={state.isDemo}
+                        hasVouchers={!state.isDemo || (state.trust?.transactionCount || 0) > 0}
+                        voucherCount={state.trust?.transactionCount || 0}
+                        lastUpdatedAt={state.lastUpdatedAt}
+                    />
+
+                    {/* 4-Metrics Strip */}
+                    <KeyMetrics state={state} />
+                </div>
+
+                {/* Right Column (4 Columns): Financial Confidence + Compliance Radar */}
+                <div className="lg:col-span-4 space-y-8">
+                    {/* Financial Confidence Donut Card */}
+                    <FinancialConfidenceCard 
+                        isDemo={state.isDemo}
+                        confidenceScore={confidenceScore > 0 ? Math.round(confidenceScore) : 68}
+                    />
+
+                    {/* Compliance Radar Card */}
+                    <ComplianceRadarCard />
+                </div>
+            </div>
+
+            {/* Bottom AI CFO Insight Banner */}
+            <div className="mb-10">
+                <BottomInsightBanner 
+                    insight={state.primaryRisk?.message || "Your collections slowdown is the primary risk to your cash runway."}
+                    actionHint="Focus on enterprise accounts receivable follow-ups."
                 />
             </div>
 
-            {/* Zone 1: Executive Command Center Hero (Concept A — Answers 4 Questions Immediately) */}
-            <ExecutiveMandateHero 
-                healthScore={confidenceScore > 0 ? Math.round(confidenceScore) : 57}
-                cashBalance={state.summary.cashInBank}
-                runwayMonths={state.summary.runwayMonths}
-                primaryRisk={state.primaryRisk?.message || "Uncollected Accounts Receivable (DSO 263D) violating Law: Revenue Is Not Cash."}
-                oneThingAction={decision?.title || "Preserve cash: Delay hiring 2 senior engineers until Q3 AR collections hit 80%."}
-                followConsequence={decision?.consequenceExplanation || "Retains runway buffer & delays cash exhaustion."}
-                ignoreConsequence="Accelerates burn (-21% liquidity margin)."
-                onExecute={handleExecute}
-            />
-
             <div className="max-w-[1400px] mx-auto py-6">
-                {/* Zone 2: Cash Position + Runway (PROMINENT — top of dashboard) */}
-                <motion.section
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-10"
-                >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {/* Cash Position — Hero Metric */}
-                        <div className="bg-[#0a0f1e]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-                            <div className="flex items-center gap-2 mb-3">
-                                <Wallet className="w-4 h-4 text-emerald-400" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cash Position</span>
-                            </div>
-                            <h2 className="text-4xl font-black text-white tabular-nums">
-                                {formatCurrencyStore(state.summary.cashInBank)}
-                            </h2>
-                            <p className="text-[10px] text-slate-500 font-bold mt-2 flex flex-wrap gap-x-2 gap-y-1">
-                                <span>Available Liquidity ({Math.round(confidenceScore)}% confidence)</span>
-                                {state.trust?.lastSyncedAt && (
-                                    <>
-                                        <span className="text-slate-600">•</span>
-                                        <span className="text-slate-600 font-medium">Synced: {new Date(state.trust.lastSyncedAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</span>
-                                    </>
-                                )}
-                            </p>
-                        </div>
-
-                        {/* True Runway — Hero Metric */}
-                        <div className={cn(
-                            "backdrop-blur-xl border rounded-3xl p-8 relative overflow-hidden",
-                            isSustainable ? "bg-emerald-500/5 border-emerald-500/20" :
-                            state.summary.runwayMonths > 6 ? "bg-[#0a0f1e]/80 border-white/10" :
-                            state.summary.runwayMonths > 3 ? "bg-amber-500/5 border-amber-500/20" :
-                            "bg-rose-500/5 border-rose-500/20"
-                        )}>
-                            <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-slate-400" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">True Runway</span>
-                                </div>
-                                <button
-                                    onClick={() => setShowShareModal(true)}
-                                    className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 hover:text-white transition-all flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider relative z-20"
-                                >
-                                    <Share2 className="w-3 h-3 text-primary" />
-                                    Share
-                                </button>
-                            </div>
-                            <h2 className="text-4xl font-black text-white tabular-nums">
-                                {isSustainable ? '> 36' : state.summary.runwayMonths.toFixed(1)}
-                                <span className="text-lg font-bold text-slate-500 ml-2">months</span>
-                            </h2>
-                            <div className="h-1.5 w-full bg-white/5 rounded-full mt-4 overflow-hidden">
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${Math.min(100, (state.summary.runwayMonths / 36) * 100)}%` }}
-                                    transition={{ duration: 1.2, ease: 'easeOut' }}
-                                    className={cn(
-                                        "h-full rounded-full",
-                                        isSustainable || state.summary.runwayMonths > 12 ? "bg-emerald-500" :
-                                        state.summary.runwayMonths > 4 ? "bg-amber-500" : "bg-rose-500"
-                                    )}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Burn Rate — Hero Metric */}
-                        <div className="bg-[#0a0f1e]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-3xl pointer-events-none" />
-                            <div className="flex items-center gap-2 mb-3">
-                                <TrendingDown className="w-4 h-4 text-rose-400" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Net Burn</span>
-                            </div>
-                            <h2 className="text-4xl font-black text-white tabular-nums">
-                                {formatCurrencyStore(state.summary.netBurn)}
-                            </h2>
-                            <p className="text-[10px] text-slate-500 font-bold mt-2">
-                                per month · {state.summary.burnTrend === 'increasing' ? '↑ Rising' : state.summary.burnTrend === 'decreasing' ? '↓ Falling' : '→ Stable'}
-                            </p>
-                        </div>
-
-                        {/* Compliance & Risk Status — Hero Metric */}
-                        <div className={cn(
-                            "backdrop-blur-xl border rounded-3xl p-8 relative overflow-hidden",
-                            state.behavioralAudit?.riskProfile === 'CHAOTIC' ? "bg-rose-500/5 border-rose-500/20" :
-                            state.behavioralAudit?.riskProfile === 'REACTIONARY' ? "bg-amber-500/5 border-amber-500/20" :
-                            "bg-emerald-500/5 border-emerald-500/20"
-                        )}>
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-                            <div className="flex items-center gap-2 mb-3">
-                                <AlertTriangle className="w-4 h-4 text-slate-400" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">CFO Risk Status</span>
-                            </div>
-                            <h2 className={cn(
-                                "text-4xl font-black uppercase tracking-tight tabular-nums",
-                                state.behavioralAudit?.riskProfile === 'CHAOTIC' ? "text-rose-400" :
-                                state.behavioralAudit?.riskProfile === 'REACTIONARY' ? "text-amber-400" :
-                                "text-emerald-400"
-                            )}>
-                                {state.behavioralAudit?.riskProfile || 'PROACTIVE'}
-                            </h2>
-                            <p className="text-[10px] text-slate-500 font-bold mt-2">
-                                {state.behavioralAudit?.riskProfile === 'CHAOTIC' ? 'Critical Risk Active' :
-                                 state.behavioralAudit?.riskProfile === 'REACTIONARY' ? 'Defensive Strategy' :
-                                 'Optimal Efficiency'}
-                            </p>
-                        </div>
-                    </div>
-                </motion.section>
-
                 {/* Data Quality Banner */}
                 <DataQualityBanner />
 
-                {/* Zone 3: CFO Brain (6:4 Grid) */}
-                <div className="grid grid-cols-1 lg:grid-cols-10 gap-12 items-start">
-                    <div className="lg:col-span-6 flex flex-col gap-12">
-                        <CfoHero state={state} />
-                        
-                        {/* Ghost Alerts remain as non-blocking primary risks */}
-                        {state.criticalAlerts?.filter(a => a.id.startsWith('ghost_')).map(alert => (
-                            <GhostInterventionCard 
-                                key={alert.id} 
-                                alert={alert} 
-                                onAcknowledged={() => queryClient.invalidateQueries({ queryKey: ['cfo-state'] })}
-                            />
-                        ))}
-                    </div>
-
-                    <div className="lg:col-span-4 flex flex-col gap-6">
-                        <ComplianceAlerts />
-                    </div>
-                </div>
-
-                {/* Zone 4: Deep Dive Tabs (Collapsed by default, gated if quality < 70) */}
+                {/* Deep Dive Tabs */}
                 <DataQualityGate featureName="Deep Intelligence Audit">
                     <DeepDiveTabs 
                         metrics={<KeyMetrics state={state} />}
@@ -398,7 +299,7 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                     />
                 </DataQualityGate>
 
-                {/* Zone 5: Professional Disclaimer */}
+                {/* Professional Disclaimer */}
                 <FinancialDisclaimer />
             </div>
 
