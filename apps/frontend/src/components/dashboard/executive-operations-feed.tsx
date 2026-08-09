@@ -24,8 +24,8 @@ export const ExecutiveOperationsFeed: React.FC<OperationsFeedProps> = ({
             icon: CheckCircle2,
             iconColor: 'text-emerald-400',
             title: isDemo 
-                ? 'Baseline financial model created from onboarding context.' 
-                : 'Financial model grounded in verified bank vouchers.',
+                ? 'Prepared your baseline model from company context.' 
+                : 'Verified model with imported bank statement vouchers.',
             time: 'Session Start',
             status: 'COMPLETED',
         },
@@ -33,7 +33,7 @@ export const ExecutiveOperationsFeed: React.FC<OperationsFeedProps> = ({
             id: '2',
             icon: FileCheck2,
             iconColor: 'text-indigo-400',
-            title: 'Tax & statutory reserve estimates prepared for current cycle.',
+            title: 'Prepared your payroll buffer and statutory tax reserve estimates.',
             time: 'Auto-calculated',
             status: 'COMPLETED',
         },
@@ -42,8 +42,8 @@ export const ExecutiveOperationsFeed: React.FC<OperationsFeedProps> = ({
             icon: ShieldCheck,
             iconColor: 'text-emerald-400',
             title: isDemo
-                ? 'Initial runway sensitivity scenarios calculated.'
-                : `Reconciled ${voucherCount.toLocaleString('en-IN')} transactions from imported statement.`,
+                ? 'Stress-tested your runway against slower collections.'
+                : `Reconciled ${voucherCount.toLocaleString('en-IN')} transactions from bank records.`,
             time: lastUpdatedAt ? new Date(lastUpdatedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Just now',
             status: 'COMPLETED',
         },
@@ -52,8 +52,8 @@ export const ExecutiveOperationsFeed: React.FC<OperationsFeedProps> = ({
             icon: Clock,
             iconColor: hasVouchers ? 'text-emerald-400' : 'text-amber-400',
             title: hasVouchers
-                ? 'Continuous cash monitoring active.'
-                : 'Waiting for financial records to verify baseline estimates.',
+                ? 'Watching for unexpected cash movements.'
+                : 'Waiting for financial records to replace baseline estimates.',
             time: 'Active',
             status: hasVouchers ? 'OPERATING' : 'WAITING',
         },

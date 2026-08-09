@@ -38,42 +38,39 @@ export function ExecutiveMandateHero({
       <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none" />
 
-      {/* Top Banner Tag */}
+      {/* Top Banner: Single CFO Reassurance Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 border-b border-white/10 pb-4">
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Executive Command Center • 2026 Strategy Engine
-          </span>
+        <div className="flex items-center gap-3">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <h2 className="text-lg md:text-xl font-black text-white tracking-tight">
+            {runwayMonths >= 12 ? `You're safe today. ${runwayMonths.toFixed(1)} months of runway.` : `Attention required today. Runway buffer at ${runwayMonths.toFixed(1)} months.`}
+          </h2>
         </div>
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <span className="text-slate-400">Health Score:</span>
-          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
-            {healthScore}/100 (MODERATE)
-          </span>
+        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+          <span>No immediate liquidity crisis</span>
         </div>
       </div>
 
       {/* Question 3 & 4 Grid: The Single Most Important Action & What Happens */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Question 3 & 2 */}
+        {/* Left Column: Risk & Single Action */}
         <div className="lg:col-span-7 space-y-6">
-          {/* Question 2: Biggest Risk */}
+          {/* Biggest Risk */}
           <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3">
             <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
             <div>
               <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 block mb-1">
-                Question 2: Biggest Risk Flagged Today
+                Primary Risk Flagged
               </span>
               <p className="text-xs text-rose-200 font-semibold leading-relaxed">{primaryRisk}</p>
             </div>
           </div>
 
-          {/* Question 3: Single Most Important Action */}
+          {/* Single Most Important Action */}
           <div className="space-y-2">
             <span className="text-[11px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
               <Zap className="w-4 h-4 text-emerald-400" />
-              Question 3: Today&apos;s Single Mandatory CFO Action
+              Today&apos;s Single CFO Action
             </span>
             <h1 className="text-xl md:text-2xl font-black text-white leading-tight tracking-tight">
               {oneThingAction}
@@ -87,14 +84,14 @@ export function ExecutiveMandateHero({
               className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4" />
-              Approve & Execute Action
+              Approve Action
             </button>
             <Link
               href="/decision-lab"
               className="px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2"
             >
               <TrendingUp className="w-4 h-4 text-indigo-400" />
-              Simulate Alternatives in Decision Lab
+              See why
             </Link>
           </div>
         </div>

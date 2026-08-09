@@ -28,10 +28,10 @@ export function DeepDiveTabs({ metrics, trends, mandates, history }: DeepDiveTab
     const isLowQuality = dq.confidenceScore < 70;
 
     const tabs = [
-        { id: 'metrics', label: 'Metrics', icon: BarChart3 },
-        { id: 'trends', label: 'Trends', icon: TrendingUp },
-        { id: 'mandates', label: 'Mandates', icon: ListChecks, gated: isLowQuality },
-        { id: 'history', label: 'History', icon: History },
+        { id: 'metrics', label: 'What Changed', icon: BarChart3 },
+        { id: 'trends', label: 'Why It Changed', icon: TrendingUp },
+        { id: 'mandates', label: 'Financial Memory', icon: ListChecks, gated: isLowQuality },
+        { id: 'history', label: 'Past Decisions', icon: History },
     ] as const;
 
     return (
