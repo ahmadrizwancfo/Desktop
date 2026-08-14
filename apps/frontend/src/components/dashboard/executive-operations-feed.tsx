@@ -62,10 +62,15 @@ export const ExecutiveOperationsFeed: React.FC<OperationsFeedProps> = ({
     return (
         <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-4 text-left">
             <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Executive Operations Feed
-                </span>
+                <div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        WHAT I&apos;VE ALREADY DONE
+                    </span>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                        Since your last visit, I&apos;ve been working on your numbers.
+                    </p>
+                </div>
                 <span className="text-[10px] text-slate-500 font-mono">
                     {feedItems.filter(i => i.status === 'COMPLETED').length} tasks completed
                 </span>

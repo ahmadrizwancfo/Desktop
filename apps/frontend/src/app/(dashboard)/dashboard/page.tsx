@@ -36,7 +36,7 @@ import { CriticalInterventionOverlay } from '@/components/dashboard/critical-int
 import { DataQualityBanner, DataQualityGate } from '@/components/dashboard/data-quality-banner';
 import { OnboardingFlow } from '@/components/dashboard/onboarding-flow';
 import { ComplianceAlerts } from '@/components/dashboard/compliance-alerts';
-import { ExecutiveMandateHero } from '@/components/dashboard/executive-mandate-hero';
+import { ExecutiveMandateHero, ExecutiveReassuranceHeader, ExecutiveDecisionCard } from '@/components/dashboard/executive-mandate-hero';
 import { ExecutiveOperationsFeed } from '@/components/dashboard/executive-operations-feed';
 import { FinancialConfidenceCard } from '@/components/dashboard/financial-confidence-card';
 import { ComplianceRadarCard } from '@/components/dashboard/compliance-radar-card';
@@ -223,25 +223,17 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                 )}
             </div>
 
-            {/* Main 3-Column Dashboard Layout matching reference visual direction */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8 text-left">
-                {/* Left / Middle Column (8 Columns): Hero + Operations Feed + Key Metrics */}
-                <div className="lg:col-span-8 space-y-8">
-                    {/* Executive Summary Hero Box */}
-                    <ExecutiveMandateHero 
+            {/* Sprint D — Morning Executive Briefing Fold 1 Information Architecture */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8 text-left">
+                {/* Main Column (8 Columns): 1. Reassurance -> 2. Work Done -> 3. Single Decision -> 5. Core Numbers */}
+                <div className="lg:col-span-8 space-y-6">
+                    {/* 1. Immediate Reassurance ("Am I okay?") */}
+                    <ExecutiveReassuranceHeader 
                         isDemo={state.isDemo}
-                        healthScore={confidenceScore > 0 ? Math.round(confidenceScore) : 57}
-                        cashBalance={state.summary.cashInBank}
                         runwayMonths={state.summary.runwayMonths}
-                        monthlyBurn={state.summary.netBurn}
-                        operatingDays={24}
-                        primaryRisk={state.primaryRisk?.message || "Uncollected Accounts Receivable (DSO 263D) violating Law: Revenue Is Not Cash."}
-                        oneThingAction={decision?.title || "Preserve cash: Delay hiring 2 senior engineers until Q3 AR collections hit 80%."}
-                        followConsequence={decision?.consequenceExplanation || "+4.9 months"}
-                        onExecute={handleExecute}
                     />
 
-                    {/* What I've Already Done (Executive Operations Feed) */}
+                    {/* 2. Work Already Completed ("Here's what I reviewed for you") */}
                     <ExecutiveOperationsFeed 
                         isDemo={state.isDemo}
                         hasVouchers={!state.isDemo || (state.trust?.transactionCount || 0) > 0}
@@ -249,19 +241,26 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                         lastUpdatedAt={state.lastUpdatedAt}
                     />
 
-                    {/* 4-Metrics Strip */}
+                    {/* 3. One Decision Requiring Founder Attention ("What is the only decision I need to make?") */}
+                    <ExecutiveDecisionCard 
+                        oneThingAction={decision?.title || "Preserve cash: Delay hiring 2 senior engineers until Q3 AR collections hit 80%."}
+                        followConsequence={decision?.consequenceExplanation || "+4.9 months"}
+                        onExecute={handleExecute}
+                    />
+
+                    {/* 5. Core Financial Numbers ("What are my core cash & burn numbers?") */}
                     <KeyMetrics state={state} />
                 </div>
 
-                {/* Right Column (4 Columns): Financial Confidence + Compliance Radar */}
-                <div className="lg:col-span-4 space-y-8">
-                    {/* Financial Confidence Donut Card */}
+                {/* Right Column (4 Columns): 4. Supporting Evidence & Compliance */}
+                <div className="lg:col-span-4 space-y-6">
+                    {/* 4. Supporting Evidence ("Why should I trust this recommendation?") */}
                     <FinancialConfidenceCard 
                         isDemo={state.isDemo}
                         confidenceScore={confidenceScore > 0 ? Math.round(confidenceScore) : 68}
                     />
 
-                    {/* Compliance Radar Card */}
+                    {/* Supporting Compliance Radar */}
                     <ComplianceRadarCard />
                 </div>
             </div>
