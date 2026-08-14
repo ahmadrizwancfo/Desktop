@@ -68,6 +68,8 @@ export interface FounderDailyBriefResult {
 @Injectable()
 export class DailyBriefService {
     private readonly logger = new Logger(DailyBriefService.name);
+    private briefCache = new Map<string, { brief: FounderDailyBriefResult; stateHash: string; cachedAt: number }>();
+    private static BRIEF_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     constructor(
         private readonly prisma: PrismaService,
@@ -78,12 +80,22 @@ export class DailyBriefService {
     /**
      * Generates a 2-minute channel-agnostic Founder Daily Brief.
      * Uses deterministic LiveState, cashflow timeline projection, and database aggregations.
+     * Memoized by (orgId, stateHash) so identical financial state never recomputes expensive briefings.
      */
     async generateDailyBrief(organizationId: string): Promise<FounderDailyBriefResult> {
-        this.logger.log(`Generating Founder Daily Brief for Org ${organizationId}`);
-
         // 1. Fetch SSOT Financial LiveState & 90-Day Projection
         const liveState = await this.liveStateService.getState(organizationId);
+        
+        // Generate state hash
+        const stateHash = `${liveState.cashBalance}_${liveState.monthlyBurn}_${liveState.monthlyRevenue}_${liveState.runwayDays}_${liveState.taxExposure}`;
+        const cached = this.briefCache.get(organizationId);
+
+        if (cached && cached.stateHash === stateHash && (Date.now() - cached.cachedAt < DailyBriefService.BRIEF_CACHE_TTL_MS)) {
+            this.logger.debug(`DailyBrief cache HIT for Org ${organizationId} (stateHash: ${stateHash})`);
+            return cached.brief;
+        }
+
+        this.logger.log(`Generating fresh Founder Daily Brief for Org ${organizationId} (stateHash: ${stateHash})`);
         const projection = await this.cashflowTimelineService.getProjection(organizationId);
 
         const runwayMonths = Math.round(liveState.runwayDays / 30);
@@ -202,7 +214,7 @@ export class DailyBriefService {
 
         const todayFormatted = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
 
-        return {
+        const result: FounderDailyBriefResult = {
             organizationId,
             date: new Date().toISOString().split('T')[0],
             formattedDate: todayFormatted,
@@ -231,5 +243,13 @@ export class DailyBriefService {
             },
             generatedAt: new Date().toISOString(),
         };
+
+        this.briefCache.set(organizationId, {
+            brief: result,
+            stateHash,
+            cachedAt: Date.now()
+        });
+
+        return result;
     }
 }

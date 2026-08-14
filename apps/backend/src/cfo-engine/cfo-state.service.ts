@@ -492,6 +492,12 @@ export interface CFOState {
         revenueTrend: 'growing' | 'declining' | 'stable' | 'unknown';
         prevMonthlyRevenue: number;
         prevNetBurn: number;
+        statutoryBuffer?: {
+            gst: number;
+            tds: number;
+            total: number;
+            spendableCash: number;
+        };
     };
     insights: CfoBrainReport['insights'];
     tone: 'urgent' | 'cautious' | 'strategic';
@@ -565,6 +571,11 @@ export class CfoStateService {
 
     async getState(organizationId: string, userId?: string): Promise<CFOState> {
         const cached = this.cache.get(organizationId);
+        if (cached && cached.expiresAt > Date.now()) {
+            this.logger.debug(`CFOState cache HIT for org ${organizationId}`);
+            return cached.state;
+        }
+
         const startupProfile = await this.prisma.startupProfile.findFirst({
             where: { organizationId }
         });
@@ -598,11 +609,6 @@ export class CfoStateService {
                     'UNRECOGNIZED_TRANSACTION'
                 );
             }
-        }
-
-        if (cached && cached.expiresAt > Date.now()) {
-            this.logger.debug(`CFOState cache HIT for org ${organizationId}`);
-            return cached.state;
         }
 
         const org = await this.prisma.organization.findUnique({
@@ -920,9 +926,15 @@ export class CfoStateService {
             actionPlan: engine.actionPlan,
             secondaryWarnings: engine.secondaryWarnings,
             emotionalLine,
-            categoryBreakdown,
-            summary: s,
-            insights: brainReport.insights,
+            summary: {
+                ...s,
+                statutoryBuffer: {
+                    gst: Math.round(s.cashInBank * 0.18),
+                    tds: Math.round(s.cashInBank * 0.10),
+                    total: Math.round(s.cashInBank * 0.28),
+                    spendableCash: Math.max(0, Math.round(s.cashInBank * 0.72)),
+                }
+            },
             tone: engine.tone,
             changeDrivers,
             versionId,

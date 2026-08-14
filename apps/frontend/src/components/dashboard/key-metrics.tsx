@@ -18,12 +18,15 @@ export function KeyMetrics({ state }: KeyMetricsProps) {
 
     const isCrisis = summary.runwayMonths < 3 && summary.runwayMonths > 0;
     
-    // Statutory Logic (18% GST + 10% TDS)
-    const gstBuffer = summary.cashInBank * 0.18;
-    const tdsBuffer = summary.cashInBank * 0.10;
-    const totalStatutoryBuffer = gstBuffer + tdsBuffer;
+    // Backend SSOT Statutory Buffer (18% GST + 10% TDS)
+    const statutory = summary.statutoryBuffer || {
+        gst: Math.round(summary.cashInBank * 0.18),
+        tds: Math.round(summary.cashInBank * 0.10),
+        total: Math.round(summary.cashInBank * 0.28),
+        spendableCash: Math.max(0, Math.round(summary.cashInBank * 0.72))
+    };
     
-    const spendableCash = isTaxBufferUnlocked ? summary.cashInBank : (summary.cashInBank - totalStatutoryBuffer);
+    const spendableCash = isTaxBufferUnlocked ? summary.cashInBank : statutory.spendableCash;
     const displayedRunwayMonths = isTaxBufferUnlocked ? (summary.runwayMonths / 0.72) : summary.runwayMonths;
 
     const fmt = formatCurrency;
@@ -61,7 +64,7 @@ export function KeyMetrics({ state }: KeyMetricsProps) {
         {
             label: isTaxBufferUnlocked ? 'UNLOCKED CASH' : 'SPENDABLE CASH',
             value: fmt(spendableCash),
-            subValue: isTaxBufferUnlocked ? 'Statutory Protection: OFF' : `GOI Reserves: ${fmt(totalStatutoryBuffer)}`,
+            subValue: isTaxBufferUnlocked ? 'Statutory Protection: OFF' : `GOI Reserves: ${fmt(statutory.total)}`,
             subValueColor: isTaxBufferUnlocked ? 'text-rose-500 font-black' : 'text-indigo-400',
             icon: Wallet,
             trend: cashForecast?.next30Days || [70, 68, 65, 60, 58, 55, 52], 
@@ -158,11 +161,11 @@ export function KeyMetrics({ state }: KeyMetricsProps) {
                                             <div className="space-y-2 font-mono text-[10px]">
                                                 <div className="flex justify-between">
                                                     <span className="text-slate-400">GST (18%)</span>
-                                                    <span className="text-white">{fmt(gstBuffer)}</span>
+                                                    <span className="text-white">{fmt(statutory.gst)}</span>
                                                 </div>
                                                 <div className="flex justify-between">
                                                     <span className="text-slate-400">TDS (10%)</span>
-                                                    <span className="text-white">{fmt(tdsBuffer)}</span>
+                                                    <span className="text-white">{fmt(statutory.tds)}</span>
                                                 </div>
                                                 <div className="h-px bg-white/5 my-2" />
                                                 <div className="text-[8px] text-slate-600 leading-relaxed uppercase italic">

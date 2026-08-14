@@ -483,6 +483,12 @@ export interface CFOState {
         prevMonthlyRevenue: number;
         prevNetBurn: number;
         avgBurn30d?: number;
+        statutoryBuffer?: {
+            gst: number;
+            tds: number;
+            total: number;
+            spendableCash: number;
+        };
     };
     insights: CfoBrainInsight[];
     tone: 'urgent' | 'cautious' | 'strategic';

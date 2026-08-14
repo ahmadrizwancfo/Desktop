@@ -5,8 +5,9 @@ import * as Papa from 'papaparse';
 import * as crypto from 'crypto';
 import * as XLSX from 'xlsx';
 
-import { Optional, Inject } from '@nestjs/common';
+import { Optional, Inject, forwardRef } from '@nestjs/common';
 import { CfoBrainService } from '../cfo-engine/cfo-brain.service';
+import { CfoStateService } from '../cfo-engine/cfo-state.service';
 
 @Injectable()
 export class IntegrationsService {
@@ -16,6 +17,7 @@ export class IntegrationsService {
         private prisma: PrismaService,
         private startupProfileService: StartupProfileService,
         @Optional() @Inject(CfoBrainService) private cfoBrain: CfoBrainService | null,
+        @Optional() @Inject(forwardRef(() => CfoStateService)) private cfoStateService: CfoStateService | null,
     ) { }
 
     async processCsvUpload(file: Express.Multer.File, importType: string, organizationId: string, userId: string, previewOnly = false) {
@@ -515,6 +517,9 @@ export class IntegrationsService {
             monthlyExpenses: monthlyExpenses,
             cashInBank: effectiveCash,
         });
+
+        // Event-Driven Invalidation: Ensure fresh state on next fetch
+        this.cfoStateService?.invalidateCache(organizationId);
 
         return {
             monthlyRevenue,
