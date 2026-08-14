@@ -218,7 +218,7 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
                         href="/integrations"
                         className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition-all shrink-0"
                     >
-                        Upgrade to Verified
+                        Verify your numbers
                     </Link>
                 )}
             </div>
