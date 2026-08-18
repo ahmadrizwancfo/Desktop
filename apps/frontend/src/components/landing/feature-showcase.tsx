@@ -1,16 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
     Users, 
     Briefcase, 
     TrendingUp, 
-    ArrowRight, 
-    AlertTriangle, 
     CheckCircle2, 
     Scale,
-    ShieldAlert
+    Quote
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +49,7 @@ const scenarios = [
         runwayAfter: "16.2",
         delta: "-2.3 months",
         burnDelta: "+₹3,50,000 / mo",
-        analysis: "Spendable cash reserves remain healthy above ₹30L. The company has sufficient liquidity buffer to absorb this CAC test for 90 days.",
+        analysis: "Spendable cash reserves remain healthy above ₹30L. The company has sufficient liquidity buffer to absorb this customer acquisition test for 90 days.",
         mitigation: "Set an automated stop-loss gate: If CAC exceeds ₹4,200 by Day 45, automatically roll back monthly budget to baseline."
     }
 ];
@@ -61,16 +59,17 @@ export function FeatureShowcase() {
     const active = scenarios[selectedIdx];
 
     return (
-        <section id="decision-lab" className="py-24 px-6 max-w-6xl mx-auto">
+        <section id="decision-lab" className="py-24 px-6 max-w-6xl mx-auto border-t border-white/5">
+            {/* Section Header */}
             <div className="text-center max-w-3xl mx-auto mb-16">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400 mb-4">
-                    <span>THE DECISION LAB</span>
+                    <span>THE EMOTIONAL CENTERPIECE: DECISION LAB</span>
                 </div>
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-6">
                     Ask difficult questions. Get deterministic answers.
                 </h2>
                 <p className="text-base sm:text-lg text-slate-400 leading-relaxed font-normal">
-                    Before sending that hiring offer or committing to an annual vendor contract, see the exact mathematical consequence on your runway.
+                    Before sending that hiring offer or committing to an annual vendor agreement, see the exact mathematical consequence on your runway.
                 </p>
             </div>
 
@@ -103,7 +102,7 @@ export function FeatureShowcase() {
             </div>
 
             {/* The Simulation Consequence Card */}
-            <div className="rounded-2xl bg-[#0a0f1e] border border-white/10 p-6 sm:p-9 relative overflow-hidden backdrop-blur-xl shadow-2xl">
+            <div className="rounded-2xl bg-[#0a0f1e] border border-white/10 p-6 sm:p-9 relative overflow-hidden backdrop-blur-xl shadow-2xl mb-16">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/5">
                     <div>
                         <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-1">
@@ -159,6 +158,29 @@ export function FeatureShowcase() {
                             {active.mitigation}
                         </p>
                     </div>
+                </div>
+            </div>
+
+            {/* THE SINGLE PROOF STORY: One Founder. One Decision. One Outcome. */}
+            <div className="rounded-2xl bg-[#0a0f1e] border border-white/5 p-8 sm:p-10 relative overflow-hidden">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-3">
+                    REAL DECISION RECORD • BENGALURU, 2026
+                </div>
+                <h4 className="text-xl font-bold text-white tracking-tight mb-4">
+                    One founder. One decision. One outcome.
+                </h4>
+                <p className="text-sm text-slate-300 leading-relaxed max-w-3xl font-sans mb-6">
+                    A seed-stage SaaS founder with ₹55L in bank balances prepared to send offer letters to two senior engineers. The simulation revealed a 5.1-month runway contraction colliding directly with advance tax obligations in September. 
+                </p>
+                <p className="text-sm text-slate-300 leading-relaxed max-w-3xl font-sans mb-6">
+                    Guided by the analysis, the founder engaged one specialist on a 90-day milestone contract until enterprise receivables cleared. Three months later, cash reserves crossed ₹80L, and the full-time hires were made with 14 months of verified runway intact.
+                </p>
+                <div className="flex flex-wrap items-center gap-6 font-mono text-xs text-slate-400 pt-4 border-t border-white/5">
+                    <div>Avoided: <span className="text-rose-400">Premature ₹70L/yr fixed payroll</span></div>
+                    <div>•</div>
+                    <div>Preserved: <span className="text-emerald-400">+5.1 months safety runway</span></div>
+                    <div>•</div>
+                    <div>Outcome: <span className="text-white font-bold">Clean Series A trajectory</span></div>
                 </div>
             </div>
         </section>

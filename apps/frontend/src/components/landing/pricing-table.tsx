@@ -17,7 +17,7 @@ export function PricingTable() {
                     What does one bad financial decision cost?
                 </h2>
                 <p className="text-base sm:text-lg text-slate-400 leading-relaxed font-normal">
-                    One premature senior hire costs ₹15 Lakhs. A surprise GST penalty costs 18% plus compliance freeze. FounderCFO is insurance for your runway.
+                    One premature senior hire costs ₹15 Lakhs. A surprise GST penalty costs 18% plus compliance freeze. Continuous financial oversight is decision insurance for your runway.
                 </p>
             </div>
 

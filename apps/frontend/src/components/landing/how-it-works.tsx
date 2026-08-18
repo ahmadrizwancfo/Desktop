@@ -33,7 +33,7 @@ export function HowItWorks() {
                     We never ask for your bank passwords.
                 </h2>
                 <p className="text-base sm:text-lg text-slate-400 leading-relaxed font-normal">
-                    Trust is not built with flashy security badges. It is built through transparent behavior. You upload standard statements you already export; FounderCFO verifies the math.
+                    Trust is not built with flashy security badges. It is built through transparent behavior. You upload standard statements you already export; the engine verifies the numbers.
                 </p>
             </div>
 
