@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as XLSX from 'xlsx';
 import * as Papa from 'papaparse';
+import * as xml2js from 'xml2js';
 import { ParsedDocument, ParsedTransaction, ParsingIssue, ParsingQuality } from './parsed-document.interface';
 import { createWorker, Worker } from 'tesseract.js';
 import sharp from 'sharp';
@@ -81,6 +82,9 @@ export class UniversalParserService {
                 break;
             case 'csv':
                 doc = await this.parseCsv(buffer);
+                break;
+            case 'xml':
+                doc = await this.parseXml(buffer);
                 break;
             case 'jpg': case 'jpeg': case 'png': case 'gif':
             case 'webp': case 'tiff': case 'tif': case 'bmp':
@@ -407,6 +411,61 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
             });
         });
     }
+
+    private async parseXml(buffer: Buffer): Promise<ParsedDocument> {
+        const xmlContent = buffer.toString('utf-8');
+        const parser = new xml2js.Parser();
+        const result = await parser.parseStringPromise(xmlContent);
+
+        const vouchers: ParsedTransaction[] = [];
+        const findVouchers = (obj: any) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.VOUCHER) {
+                const list = Array.isArray(obj.VOUCHER) ? obj.VOUCHER : [obj.VOUCHER];
+                for (const v of list) {
+                    const dateStr = v.DATE?.[0] || v.$.DATE || '';
+                    const entries = v['ALLLEDGERENTRIES.LIST'] || [];
+                    const amountList = Array.isArray(entries) ? entries : [entries];
+                    const numAmounts = amountList
+                        .map((e: any) => Math.abs(parseFloat(e.AMOUNT?.[0] || e.AMOUNT || 0)))
+                        .filter((a: number) => !isNaN(a) && a > 0);
+                    const amount = numAmounts.length > 0 ? Math.max(...numAmounts) : 0;
+
+                    const rawType = v.VOUCHERTYPENAME?.[0] || v.$.VOUCHERTYPENAME || 'Payment';
+                    const isDebit = ['payment', 'purchase'].includes(rawType.toLowerCase());
+
+                    let formattedDate = new Date().toISOString().split('T')[0];
+                    if (dateStr && dateStr.length === 8) {
+                        formattedDate = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+                    }
+
+                    vouchers.push({
+                        date: formattedDate,
+                        description: v.NARRATION?.[0] || `Tally ${rawType} Voucher`,
+                        debit: isDebit ? amount : null,
+                        credit: !isDebit ? amount : null,
+                        balance: null,
+                        category: isDebit ? 'Expense' : 'Income',
+                    });
+                }
+            }
+            for (const key in obj) {
+                if (obj.hasOwnProperty(key) && typeof obj[key] === 'object') {
+                    findVouchers(obj[key]);
+                }
+            }
+        };
+
+        findVouchers(result);
+
+        return {
+            type: 'csv', // Standard structured transaction type
+            rawText: xmlContent.slice(0, 5000),
+            transactions: vouchers,
+            metadata: { parserUsed: 'tally-xml-v2' },
+        };
+    }
+
 
     // ═══════════════════════════════════════════════════════════════════════════
     // POST-PROCESSING: Validation, Quality Scoring, Transaction Extraction

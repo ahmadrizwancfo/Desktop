@@ -32,6 +32,7 @@ import { InvestorMetricsModule } from './investor-metrics/investor-metrics.modul
 import { UnitEconomicsModule } from './unit-economics/unit-economics.module';
 import { StartupProfileModule } from './startup-profile/startup-profile.module';
 import { CfoEngineModule } from './cfo-engine/cfo-engine.module';
+import { ReliabilityLabModule } from './reliability-lab/reliability-lab.module';
 import { AiExplainerModule } from './ai-explainer/ai-explainer.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { ContactsModule } from './contacts/contacts.module';
@@ -108,6 +109,7 @@ import { KernelModule } from './kernel/kernel.module';
     UnitEconomicsModule,
     StartupProfileModule,
     CfoEngineModule,
+    ReliabilityLabModule,
     AiExplainerModule,
     IntegrationsModule,
     ContactsModule,
