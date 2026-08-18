@@ -50,6 +50,8 @@ import { DailyBriefService } from './daily-brief.service';
 import { DailyBriefController } from './daily-brief.controller';
 import { BetaCommandCenterService } from './beta-command-center.service';
 import { BetaCommandCenterController } from './beta-command-center.controller';
+import { FounderDiscoveryService } from './founder-discovery.service';
+import { DecisionValidationService } from './decision-validation.service';
 
 @Module({
     imports: [
@@ -98,6 +100,8 @@ import { BetaCommandCenterController } from './beta-command-center.controller';
         ActionCenterService,
         DailyBriefService,
         BetaCommandCenterService,
+        FounderDiscoveryService,
+        DecisionValidationService,
     ],
     exports: [
         CfoEngineService, 
@@ -105,6 +109,8 @@ import { BetaCommandCenterController } from './beta-command-center.controller';
         CfoStateService, 
         CfoMetricsService, 
         CfoBriefService, 
+        FounderDiscoveryService,
+        DecisionValidationService, 
         ReconciliationWorker,
         ClassificationWorker,
         RunwayWorker,

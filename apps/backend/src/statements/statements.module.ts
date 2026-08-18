@@ -10,6 +10,6 @@ import { ConfigModule } from '@nestjs/config';
   imports: [AiModule, ConfigModule],
   controllers: [StatementsController],
   providers: [StatementsService, UniversalParserService, FinancialAnalyzerService],
-  exports: [StatementsService],
+  exports: [StatementsService, UniversalParserService],
 })
 export class StatementsModule { }

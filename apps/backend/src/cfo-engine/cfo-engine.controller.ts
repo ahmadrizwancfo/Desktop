@@ -32,6 +32,12 @@ import { CashflowTimelineService } from './cashflow-timeline.service';
 import { FinancialMath } from '../common/math/financial-math.util';
 import { FinancialLineageEngine } from '../common/lineage/financial-lineage.engine';
 import { StateCertificationEngine } from '../common/certification/state-certification.engine';
+import { 
+    FounderDiscoveryService, 
+    RecommendationLifecycleEvent, 
+    ScreenInteractionEvent, 
+    FounderRecommendationFeedback 
+} from './founder-discovery.service';
 
 class UpdateStatusDto {
     @IsEnum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED'])
@@ -58,6 +64,7 @@ export class CfoEngineController {
         private readonly resolutionService: CfoResolutionService,
         private readonly liveStateEngine: LiveStateEngineService,
         private readonly cashflowTimelineService: CashflowTimelineService,
+        private readonly founderDiscoveryService: FounderDiscoveryService,
     ) { }
 
     @Get('continuous-brief')
@@ -761,10 +768,54 @@ export class CfoEngineController {
                 { component: 'Decision Determinism', score: 100.0, status: 'PASS', tests: '10/10' },
                 { component: 'Financial Lineage Traceability', score: 100.0, status: 'PASS', tests: '8/8' },
             ],
-            goldenDatasetsCount: 4,
+            goldenDatasetsCount: 6,
             activeInvariants: 6,
         };
     }
+
+    /**
+     * FOUNDER DISCOVERY INFRASTRUCTURE: Recommendation Lifecycle Tracking
+     * Records stage progression: SHOWN -> READ -> ACCEPTED -> EXECUTED -> OUTCOME_VERIFIED
+     */
+    @Post('discovery/lifecycle')
+    async recordLifecycleEvent(@Body() event: RecommendationLifecycleEvent, @Request() req: any) {
+        event.organizationId = req.user?.organizationId || event.organizationId;
+        this.founderDiscoveryService.recordLifecycleEvent(event);
+        return { success: true, stage: event.stage };
+    }
+
+    /**
+     * FOUNDER DISCOVERY INFRASTRUCTURE: Screen Interaction Instrumentation
+     * Records dwell time, navigation patterns, and action abandonment.
+     */
+    @Post('discovery/interaction')
+    async recordScreenInteraction(@Body() interaction: ScreenInteractionEvent, @Request() req: any) {
+        interaction.organizationId = req.user?.organizationId || interaction.organizationId;
+        this.founderDiscoveryService.recordScreenInteraction(interaction);
+        return { success: true };
+    }
+
+    /**
+     * FOUNDER DISCOVERY INFRASTRUCTURE: Lightweight Founder Feedback Capture
+     * Captures founder feedback, perceived clarity, and rejection reasons.
+     */
+    @Post('discovery/feedback')
+    async recordFeedback(@Body() feedback: FounderRecommendationFeedback, @Request() req: any) {
+        feedback.organizationId = req.user?.organizationId || feedback.organizationId;
+        this.founderDiscoveryService.recordFeedback(feedback);
+        return { success: true, clarity: feedback.perceivedClarity };
+    }
+
+    /**
+     * FOUNDER DISCOVERY INFRASTRUCTURE: Internal Judgment Quality Dashboard
+     * Answers: Does FounderCFO's judgment consistently change better financial decisions in real companies?
+     */
+    @Get('discovery/judgment-quality')
+    async getJudgmentQualityDashboard(@Request() req: any) {
+        const orgId = req.user?.organizationId;
+        return this.founderDiscoveryService.getJudgmentQualityReport(orgId);
+    }
 }
+
 
 
