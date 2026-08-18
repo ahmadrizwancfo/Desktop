@@ -2365,7 +2365,7 @@ export class CfoStateService {
             // Create new snapshot
             await this.prisma.cfoStateSnapshot.create({
                 data: {
-                    organizationId,
+                    organization: { connect: { id: organizationId } },
                     companyStatus: state.companyStatus,
                     runwayMonths: state.summary.runwayMonths,
                     daysLeft: state.deathClock.daysLeft,

@@ -4,231 +4,183 @@ import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
-    Zap, 
+    ShieldCheck, 
     ArrowRight, 
-    PlayCircle, 
-    DollarSign, 
+    CheckCircle2, 
     TrendingUp, 
-    LineChart, 
-    Calculator,
-    CheckCircle2
+    Wallet, 
+    Lock,
+    Sparkles,
+    FileSpreadsheet,
+    Building2,
+    CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// --- Variants ---
 const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
         opacity: 1,
         transition: {
-            staggerChildren: 0.15,
-            delayChildren: 0.3,
+            staggerChildren: 0.12,
+            delayChildren: 0.2,
         },
     },
 };
 
 const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 16 },
     visible: { 
         opacity: 1, 
         y: 0,
-        transition: { duration: 0.8, ease: "easeOut" as any }
+        transition: { duration: 0.7, ease: "easeOut" as any }
     },
 };
 
 export function HeroSection() {
     return (
-        <section className="relative min-h-[85vh] flex flex-col items-center justify-center pt-28 pb-12 overflow-hidden">
-            {/* Core Content Container */}
-            <div className="w-full flex flex-col items-center z-20">
-                {/* Mid Layer: Floating AI Chips */}
-                <div className="hidden lg:block absolute inset-0 pointer-events-none z-10 max-w-[1600px] mx-auto">
-                    <FloatingChip icon={DollarSign} text="Runway +2.4 Mo" color="emerald" top="10%" left="12%" delay={0.2} />
-                    <FloatingChip icon={TrendingUp} text="Burn Optimized" color="indigo" top="42%" right="10%" delay={0.3} flicker />
-                    <FloatingChip icon={LineChart} text="Q3 Projection" color="violet" bottom="30%" left="15%" delay={0.4} />
-                    <FloatingChip icon={Calculator} text="Tax Ready" color="teal" top="15%" right="18%" delay={0.5} />
-                </div>
+        <section className="relative min-h-[90vh] flex flex-col items-center justify-start pt-32 pb-20 overflow-hidden">
+            {/* Background Structural Accent */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[450px] bg-gradient-to-b from-indigo-500/10 via-primary/5 to-transparent blur-3xl pointer-events-none -z-10" />
 
-                {/* Foreground Layer: Content */}
+            <div className="w-full max-w-5xl mx-auto px-6 text-center z-10 flex flex-col items-center">
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
-                    className="max-w-7xl mx-auto text-center relative z-20 w-full px-6"
+                    className="w-full flex flex-col items-center"
                 >
-                    {/* Badge */}
+                    {/* Category Label */}
                     <motion.div 
                         variants={itemVariants}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.02] border border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-6 hover:bg-white/[0.05] transition-colors cursor-default backdrop-blur-md relative overflow-hidden group"
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/10 text-[11px] font-mono uppercase tracking-[0.2em] text-slate-300 mb-8 backdrop-blur-md"
                     >
-                        <Zap className="w-3 h-3 fill-primary" />
-                        <span>Trusted by 100+ Early Stage Teams</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>The Financial Operating Partner for Founders</span>
                     </motion.div>
 
                     {/* Headline */}
                     <motion.h1 
                         variants={itemVariants}
-                        className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tighter mb-4 text-editorial leading-[1.0] text-white"
+                        className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white max-w-4xl mx-auto leading-[1.08] mb-6"
                     >
-                        Your AI CFO <br className="hidden md:block" />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-400 to-violet-400">
-                            for Runway, Burn & Decisions
-                        </span>
+                        The financial partner you wish sat beside you on Day 1.
                     </motion.h1>
 
-                    {/* Subheadline & Supporting Lines */}
-                    <motion.div variants={itemVariants} className="mb-8 relative z-10 w-full max-w-2xl mx-auto flex flex-col gap-3">
-                        <p className="text-lg md:text-xl text-slate-300 leading-relaxed font-medium">
-                            See your runway, control burn, and know exactly what to do next — instantly.
-                        </p>
-                        <p className="text-sm md:text-base text-slate-500 font-medium">
-                            Built on your real financial data — not generic AI answers.
-                        </p>
-                        <p className="text-[11px] md:text-xs text-slate-500/60 italic font-light max-w-lg mx-auto leading-relaxed">
-                            "Most startups don’t fail because of bad ideas — they run out of cash without realizing it."
-                        </p>
-                    </motion.div>
+                    {/* Subheadline */}
+                    <motion.p 
+                        variants={itemVariants}
+                        className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10 font-normal"
+                    >
+                        Every morning before you open your laptop, FounderCFO quietly audits your cash movements, stress-tests your runway, and prepares one clear decision for your day.
+                    </motion.p>
 
-                    {/* CTAs */}
-                    <div className="flex flex-col items-center justify-center w-full mb-12">
-                        {/* Button Row */}
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-5 w-full mb-6">
-                            {/* Primary Button */}
-                            <div className="relative group/btn w-full sm:w-auto">
-                                <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-blue-600 rounded-2xl blur-lg opacity-40 group-hover/btn:opacity-70 transition duration-500" />
-                                <Link
-                                    href="/register"
-                                    className="relative flex items-center justify-center gap-3 px-10 h-[60px] rounded-xl bg-gradient-to-b from-violet-600 to-blue-600 text-white font-bold hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 w-full sm:w-auto overflow-hidden group/link"
-                                >
-                                    <span className="text-lg tracking-wide whitespace-nowrap relative z-10">See My Runway Now →</span>
-                                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover/link:translate-x-full transition-transform duration-1000" />
-                                </Link>
-                            </div>
-
-                            {/* Secondary Button */}
-                            <Link
-                                href="#demo"
-                                className="group px-8 h-[60px] rounded-xl bg-[#0f172a]/40 border border-white/10 text-white font-semibold hover:bg-white/[0.06] hover:-translate-y-0.5 transition-all flex items-center gap-2 w-full sm:w-auto justify-center backdrop-blur-md"
-                            >
-                                <PlayCircle className="w-5 h-5 text-slate-300 group-hover:text-primary transition-colors" />
-                                See How It Works
-                            </Link>
-                        </div>
-
-                        {/* Centered Microcopy */}
-                        <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 1.2 }}
-                            className="text-[10px] text-slate-500/60 font-bold tracking-[0.15em] uppercase whitespace-nowrap"
-                        >
-                            No setup required • Works with CSV, Zoho, QuickBooks
-                        </motion.div>
-                    </div>
-
-                    {/* Ticks Row (Feature Validation) */}
+                    {/* CTA Group */}
                     <motion.div 
                         variants={itemVariants}
-                        className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 mb-8 opacity-60 hover:opacity-100 transition-opacity duration-500"
+                        className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto mb-4"
                     >
-                        <FeatureTick text="Runway in real-time" />
-                        <FeatureTick text="Burn & cost insights" />
-                        <FeatureTick text="Hiring & fundraising decisions" />
-                        <FeatureTick text="Weekly CFO reports" />
+                        <Link
+                            href="/register"
+                            className="w-full sm:w-auto px-8 h-13 rounded-xl bg-white text-[#0a0f1e] font-semibold hover:bg-slate-100 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-xl shadow-white/10 text-base"
+                        >
+                            <span>Verify Your Runway</span>
+                            <ArrowRight className="w-4 h-4" />
+                        </Link>
+
+                        <Link
+                            href="#proof"
+                            className="w-full sm:w-auto px-7 h-13 rounded-xl bg-white/[0.04] border border-white/10 text-slate-300 font-medium hover:bg-white/[0.08] hover:text-white transition-all flex items-center justify-center gap-2 text-base backdrop-blur-md"
+                        >
+                            See Today's Briefing Proof
+                        </Link>
                     </motion.div>
 
-                    {/* Positioning & Loop Signal */}
-                    <motion.div variants={itemVariants} className="flex flex-col gap-2 relative z-10">
-                        <p className="text-sm text-slate-400 font-medium">
-                            Built for founders and startups who need a CFO but don’t have one.
-                        </p>
-                        <p className="text-xs text-primary/80 font-semibold tracking-wide uppercase">
-                            Get a weekly AI CFO brief — what changed, what matters, what to do next.
-                        </p>
+                    {/* Trust Microcopy */}
+                    <motion.div 
+                        variants={itemVariants}
+                        className="text-xs text-slate-500 font-mono tracking-wide mb-14"
+                    >
+                        No bank passwords required • Works with HDFC, ICICI, Axis, SBI & Tally XML
+                    </motion.div>
+
+                    {/* FOLD 1 PROOF: THE MORNING BRIEFING CARD */}
+                    <motion.div 
+                        id="proof"
+                        variants={itemVariants}
+                        className="w-full max-w-3xl text-left rounded-2xl bg-[#0a0f1e] border border-white/10 shadow-2xl p-6 sm:p-8 relative overflow-hidden backdrop-blur-xl group hover:border-white/20 transition-all duration-300"
+                    >
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-indigo-500 to-emerald-500" />
+                        
+                        {/* Card Header: Reassurance */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
+                                        MORNING EXECUTIVE BRIEFING
+                                    </span>
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        AUDITED 08:30 AM
+                                    </span>
+                                </div>
+                                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                                    You're safe for now. <span className="text-emerald-400 font-mono">18.5 months</span> of runway.
+                                </h3>
+                            </div>
+                            <div className="text-left sm:text-right font-mono">
+                                <div className="text-xs text-slate-500">SPENDABLE CASH</div>
+                                <div className="text-lg font-bold text-white">₹42,85,000</div>
+                            </div>
+                        </div>
+
+                        {/* Card Body: Work Already Completed */}
+                        <div className="py-5 border-b border-white/5 space-y-2.5">
+                            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
+                                WHAT FOUNDERCFO REVIEWED WHILE YOU SLEPT
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-300 font-sans">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    <span>Reconciled 412 bank vouchers across 2 accounts</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    <span>Locked ₹3.8L in statutory GST buffer</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    <span>Flagged ₹14.2L delayed enterprise invoice (DSO: 48d)</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    <span>Stress-tested next 60 days of payroll</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Card Action: Today's Single Decision */}
+                        <div className="pt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                                <div className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 font-bold">
+                                    TODAY'S SINGLE CFO ACTION
+                                </div>
+                                <p className="text-sm font-medium text-white">
+                                    Preserve cash: Delay hiring 2 senior backend engineers until Q3 collections arrive.
+                                </p>
+                                <p className="text-xs text-slate-400 font-mono">
+                                    Impact: <span className="text-emerald-400">+4.9 months runway preserved</span>
+                                </p>
+                            </div>
+                            <Link
+                                href="/register"
+                                className="px-4 py-2.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-mono font-medium transition-colors shrink-0 text-center"
+                            >
+                                Simulate In Decision Lab →
+                            </Link>
+                        </div>
                     </motion.div>
                 </motion.div>
             </div>
-
-            {/* Continuous System Glow Trail */}
-            <motion.div 
-                animate={{ 
-                    y: [0, 8, 0],
-                    opacity: [0.2, 0.4, 0.2]
-                }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-30"
-            >
-                <div className="w-[1px] h-12 bg-gradient-to-b from-primary/60 to-transparent" />
-            </motion.div>
         </section>
-    );
-}
-
-function FeatureTick({ text }: { text: string }) {
-    return (
-        <div className="flex items-center gap-2 group/tick cursor-default">
-            <div className="flex-shrink-0 w-4 h-4 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 group-hover/tick:border-emerald-500/40 transition-colors">
-                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
-            </div>
-            <span className="text-[11px] md:text-xs font-medium tracking-tight text-slate-300">{text}</span>
-        </div>
-    );
-}
-
-function FloatingChip({ icon: Icon, text, color, top, left, right, bottom, delay, flicker }: any) {
-    const colorClasses: any = {
-        emerald: "bg-[#060b1e]/60 text-emerald-300 border-emerald-500/20",
-        indigo: "bg-[#060b1e]/60 text-indigo-300 border-indigo-500/20",
-        violet: "bg-[#060b1e]/60 text-violet-300 border-violet-500/20",
-        teal: "bg-[#060b1e]/60 text-teal-300 border-teal-500/20",
-    };
-
-    const dotColorClasses: any = {
-        emerald: "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]",
-        indigo: "bg-indigo-400 shadow-[0_0_12px_rgba(129,140,248,0.9)]",
-        violet: "bg-violet-400 shadow-[0_0_12px_rgba(167,139,250,0.9)]",
-        teal: "bg-teal-400 shadow-[0_0_12px_rgba(45,212,191,0.9)]",
-    };
-
-    // Random drift offsets
-    const driftX = Math.sin(delay * 10) * 15;
-    const driftY = Math.cos(delay * 10) * 15;
-    const duration = 8 + (delay * 4);
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 15, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.8, delay, ease: "easeOut" }}
-            className="absolute z-20"
-            style={{ top, left, right, bottom }}
-        >
-            <motion.div
-                animate={{ 
-                    x: [-driftX, driftX, -driftX],
-                    y: [-driftY, driftY, -driftY],
-                    opacity: [0.85, 1, 0.85]
-                }}
-                transition={{ duration, repeat: Infinity, ease: "easeInOut" }}
-                className={cn(
-                    "px-4 py-2.5 rounded-2xl border backdrop-blur-xl flex items-center gap-2.5 text-[11px] font-black group cursor-default transition-all duration-300 hover:scale-[1.05] hover:border-white/20 relative overflow-hidden",
-                    colorClasses[color]
-                )}
-            >
-                <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-30 pointer-events-none" />
-                
-                {flicker && (
-                    <motion.div 
-                        animate={{ opacity: [1, 0.4, 1, 0.7, 1] }} 
-                        transition={{ duration: 0.2, repeat: Infinity, repeatDelay: Math.random() * 5 }}
-                        className={cn("w-1.5 h-1.5 rounded-full relative z-10", dotColorClasses[color])} 
-                    />
-                )}
-                {!flicker && <div className={cn("w-1.5 h-1.5 rounded-full relative z-10", dotColorClasses[color])} />}
-                
-                <Icon className={cn("w-3.5 h-3.5 relative z-10 transition-transform duration-300 group-hover:scale-110")} />
-                <span className="uppercase tracking-[0.15em] relative z-10">{text}</span>
-            </motion.div>
-        </motion.div>
     );
 }

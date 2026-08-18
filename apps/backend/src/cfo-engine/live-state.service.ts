@@ -212,7 +212,7 @@ export class LiveStateService implements OnModuleInit, OnModuleDestroy {
 
         await this.prisma.cfoStateSnapshot.create({
             data: {
-                organizationId,
+                organization: { connect: { id: organizationId } },
                 companyStatus: runwayMonthsVal < 3 ? 'CRITICAL' : runwayMonthsVal < 6 ? 'AT_RISK' : 'STABLE',
                 runwayMonths: runwayMonthsVal,
                 daysLeft: liveState.runwayDays,
