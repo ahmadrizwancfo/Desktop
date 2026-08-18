@@ -6,6 +6,7 @@ import { ParsedDocument, ParsedTransaction, ParsingIssue, ParsingQuality } from 
 import { createWorker, Worker } from 'tesseract.js';
 import sharp from 'sharp';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { HeaderDetectionScanner } from './header-detection.scanner';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INDIAN CONTEXT CATEGORY MAPPING (CTO Mandate #2)
@@ -374,10 +375,14 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
 
     private async parseCsv(buffer: Buffer): Promise<ParsedDocument> {
         return new Promise((resolve, reject) => {
-            const csvText = buffer.toString('utf-8');
+            const rawCsvText = buffer.toString('utf-8');
 
-            Papa.parse(csvText, {
+            // FCF v1.1 Header Detection Scanner (Auto-skips disclaimer rows)
+            const scanResult = HeaderDetectionScanner.scanAndSanitize(rawCsvText);
+
+            Papa.parse(scanResult.sanitizedCsvText, {
                 header: true,
+                skipEmptyLines: true,
                 complete: (results) => {
                     const rows = results.data;
                     const rawText = rows.map(row =>
@@ -388,7 +393,12 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
                         type: 'csv',
                         rows: rows as any[],
                         rawText,
-                        metadata: { parserUsed: 'papaparse' },
+                        metadata: { 
+                            parserUsed: 'papaparse_v2_fcf',
+                            skippedDisclaimerRows: scanResult.skippedRows,
+                            headerDetectionConfidence: scanResult.confidenceScore,
+                            detectedColumns: scanResult.detectedColumns,
+                        },
                     });
                 },
                 error: (error) => {

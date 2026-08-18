@@ -51,5 +51,9 @@ export interface ParsedDocument {
         parserUsed?: string;              // Which parser in the chain succeeded
         ocrConfidence?: number;           // OCR confidence if applicable
         visionUsed?: boolean;             // Whether Gemini Vision was used
+        skippedDisclaimerRows?: number;
+        headerDetectionConfidence?: number;
+        detectedColumns?: Record<string, any>;
     };
 }
+

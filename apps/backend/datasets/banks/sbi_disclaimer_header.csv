@@ -1,0 +1,26 @@
+State Bank of India
+Account Name: FOUNDERCFO TECHNOLOGIES PRIVATE LIMITED
+Account Number: 00000041234567890
+Branch: KORAMANGALA 4TH BLOCK
+Branch Code: 04012
+IFSC Code: SBIN0004012
+CIF No: 87123456789
+MICR Code: 560002045
+Account Status: ACTIVE
+Currency: INR
+Statement From Date: 01/04/2026
+Statement To Date: 30/04/2026
+Drawing Power: 0.00
+Interest Rate(% p.a.): 3.00
+Nomination Registered: NO
+Disclaimer: This is a computer generated statement and does not require a physical signature.
+Please report any discrepancy immediately to the branch manager.
+------------------------------------------------------------------------------------------------------------------------
+Txn Date,Value Date,Description,Ref No./Cheque No.,Debit,Credit,Balance
+01/04/2026,01/04/2026,OPENING BALANCE,,0.00,0.00,5500000.00
+03/04/2026,03/04/2026,UPI/6102938471/RAZORPAY SOFTWARE/SAAS,UPI-41234,,185000.00,5685000.00
+07/04/2026,07/04/2026,SALARY APRIL 2026 BATCH 1,NEFT-SAL-01,720000.00,,4965000.00
+12/04/2026,12/04/2026,GST PAYMENT MAR 2026 CHALLAN 0021,CHLN-9921,120000.00,,4845000.00
+20/04/2026,20/04/2026,AWS CLOUD HOSTING SERVICES,IN-AWS-4921,85000.00,,4760000.00
+28/04/2026,28/04/2026,TDS 194J PROFESSIONAL FEES DEPOSIT,TDS-8812,45000.00,,4715000.00
+30/04/2026,30/04/2026,CLOSING BALANCE,,0.00,0.00,4715000.00

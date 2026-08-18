@@ -154,13 +154,14 @@ export class TallyConnectorService {
       }
 
       importedCount++;
-      if (canonicalTx.type === 'INCOME') totalInflow += canonicalTx.amount;
-      if (canonicalTx.type === 'EXPENSE') totalOutflow += canonicalTx.amount;
+      const numAmount = Number(canonicalTx.amount || 0);
+      if (canonicalTx.type === 'INCOME') totalInflow += numAmount;
+      if (canonicalTx.type === 'EXPENSE') totalOutflow += numAmount;
 
       if (!previewOnly) {
         await this.prisma.transaction.create({
           data: {
-            amount: canonicalTx.amount,
+            amount: numAmount,
             type: canonicalTx.type === 'INCOME' ? 'INCOME' : canonicalTx.type === 'EXPENSE' ? 'EXPENSE' : 'TRANSFER',
             category: canonicalTx.category || 'general',
             description: canonicalTx.narration || 'Tally Import',

@@ -20,12 +20,29 @@ export class TallyTransformerService {
    * Transforms raw Tally Voucher objects into CanonicalTransaction
    */
   public transformVoucherToCanonicalTransaction(rawVoucher: any, organizationId: string): CanonicalTransaction {
-    const amount = Math.abs(Number(rawVoucher.AMOUNT || rawVoucher.ALLLEDGERENTRIES?.AMOUNT || 0));
+    // FCF v1.1 Robust Amount Extraction (Handles Array & Object forms of ALLLEDGERENTRIES)
+    let amount = 0;
+    if (rawVoucher.AMOUNT !== undefined) {
+      amount = Math.abs(Number(rawVoucher.AMOUNT));
+    } else if (rawVoucher.ALLLEDGERENTRIES) {
+      const entries = Array.isArray(rawVoucher.ALLLEDGERENTRIES) 
+        ? rawVoucher.ALLLEDGERENTRIES 
+        : rawVoucher.ALLLEDGERENTRIES['ALLLEDGERENTRIES.LIST'] || [rawVoucher.ALLLEDGERENTRIES];
+      
+      const list = Array.isArray(entries) ? entries : [entries];
+      // Sum primary debits or take max ledger row
+      const nonZeroAmounts = list
+        .map((e: any) => Math.abs(Number(e.AMOUNT || 0)))
+        .filter((a: number) => !isNaN(a) && a > 0);
+      
+      amount = nonZeroAmounts.length > 0 ? Math.max(...nonZeroAmounts) : 0;
+    }
+
     const dateStr = rawVoucher.DATE || new Date().toISOString();
     const dateParsed = this.parseTallyDate(dateStr);
     const voucherNumber = rawVoucher.VOUCHERNUMBER || '';
 
-    let voucherId = rawVoucher.MASTERID || rawVoucher.VOUCHERKEY;
+    let voucherId = rawVoucher.MASTERID || rawVoucher.VOUCHERKEY || rawVoucher.GUID;
     if (!voucherId) {
       const hashSeed = `${organizationId}_${voucherNumber}_${amount}_${dateStr}`;
       const sha256Hash = createHash('sha256').update(hashSeed).digest('hex');

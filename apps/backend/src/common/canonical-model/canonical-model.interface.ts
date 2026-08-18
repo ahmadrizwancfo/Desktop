@@ -9,8 +9,9 @@ export interface CanonicalTransaction extends Partial<FinancialEvent> {
   organizationId: string;
   schemaVersion?: string; // Default '1.0'
 
-  amount: number;
+  amount: number | string;
   type: 'DEBIT' | 'CREDIT' | 'EXPENSE' | 'INCOME' | 'TRANSFER';
+  direction?: 'DEBIT' | 'CREDIT';
   category: string;
   originalCategory?: string; // Preserved raw category/ledger name
   normalizedCategory?: string; // Unified FounderCFO taxonomy category
@@ -119,3 +120,74 @@ export interface CanonicalLedger {
   periodStart: Date;
   periodEnd: Date;
 }
+
+/**
+ * FCS v1.1 EXTENSIONS (Law 17 — Canonical Before Intelligence)
+ */
+
+export interface CanonicalLedgerEntry {
+  voucherId: string;
+  voucherType: 'PAYMENT' | 'RECEIPT' | 'SALES' | 'PURCHASE' | 'JOURNAL' | 'CONTRA';
+  voucherDate: Date;
+  ledgerName: string;
+  ledgerGroup: 'CURRENT_ASSET' | 'CURRENT_LIABILITY' | 'DIRECT_EXPENSE' | 'INDIRECT_EXPENSE' | 'SALES' | 'BANK';
+  debitAmount: string;
+  creditAmount: string;
+  isPrimary: boolean;
+}
+
+export interface CanonicalTaxEvent {
+  id: string;
+  organizationId: string;
+  taxType: 'GST_18' | 'TDS_10' | 'ADVANCE_TAX';
+  baseAmount: string;
+  lockedBufferAmount: string;
+  effectiveDate: Date;
+  dueDate: Date;
+  status: 'LOCKED' | 'PAID' | 'RECONCILED';
+  sourceTransactionId?: string;
+}
+
+export interface CanonicalDecisionInput {
+  organizationId: string;
+  asOfDate: Date;
+  cashInBank: string;
+  spendableCash: string;
+  monthlyNetBurn: string;
+  trueRunwayMonths: string;
+  dsoDays: number;
+  statutoryReserveLocked: string;
+  activeAnomaliesCount: number;
+  companyDna: {
+    stage: 'SEED' | 'SERIES_A' | 'BOOTSTRAPPED' | 'GROWTH';
+    businessModel: 'B2B_SAAS' | 'MARKETPLACE' | 'SERVICES' | 'D2C';
+    targetRunwayFloorMonths: number;
+  };
+}
+
+export interface ExplainableConfidenceReport {
+  score: number;
+  certificationStatus: 'CERTIFIED' | 'REQUIRES_REVIEW' | 'REJECTED';
+  checks: {
+    headerMatched: boolean;
+    dateFormatMatched: boolean;
+    balanceColumnVerified: boolean;
+    debitCreditIdentified: boolean;
+    narrationConfidence: 'HIGH' | 'MEDIUM' | 'LOW';
+    unicodeNormalized: boolean;
+  };
+  skippedDisclaimerRows: number;
+  warnings: string[];
+  assumptionsMade: string[];
+}
+
+export interface CertificationScore {
+  component: string;
+  version: string;
+  certifiedScore: number;
+  certifiedDate: string;
+  status: 'CERTIFIED' | 'CONDITIONALLY_CERTIFIED' | 'FAILED';
+  testCasesPassed: number;
+  testCasesTotal: number;
+}
+
