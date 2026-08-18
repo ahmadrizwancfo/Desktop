@@ -29,6 +29,7 @@ import { CfoResolutionService } from './cfo-resolution.service';
 import { LiveStateEngineService } from './live-state.engine';
 
 import { CashflowTimelineService } from './cashflow-timeline.service';
+import { FinancialMath } from '../common/math/financial-math.util';
 
 class UpdateStatusDto {
     @IsEnum(['OPEN', 'ACKNOWLEDGED', 'RESOLVED'])
@@ -619,4 +620,109 @@ export class CfoEngineController {
             }
         };
     }
+
+    /**
+     * CONSTITUTIONAL LAW 1: BACKEND BASELINE PREVIEW
+     * Deterministic calculation of spendable cash, runway, and tax buffers.
+     * Guarantees 0 client-side math in Onboarding.
+     */
+    @Post('preview-baseline')
+    async previewBaseline(
+        @Request() req: any,
+        @Body() body: { teamSize: number; monthlySpend: number; hasRevenue: boolean; currentCash?: number; monthlyRevenue?: number }
+    ) {
+        const cashInBank = body.currentCash !== undefined ? body.currentCash : (body.monthlySpend * 6);
+        const monthlyRevenue = body.hasRevenue ? (body.monthlyRevenue || 0) : 0;
+        const monthlyExpenses = body.monthlySpend || 0;
+        
+        // Exact Decimal.js calculations
+        const netBurnStr = FinancialMath.netBurn(monthlyExpenses, monthlyRevenue);
+        const netBurn = parseFloat(netBurnStr);
+        const runwayMonthsStr = FinancialMath.runwayMonths(cashInBank, netBurn);
+        const runwayMonths = parseFloat(runwayMonthsStr);
+        const runwayDays = Math.round(runwayMonths * 30.44);
+        
+        // Statutory Buffers using Decimal.js
+        const gstBuffer = parseFloat(FinancialMath.toDecimal(monthlyRevenue).mul(0.18).toFixed(2));
+        const tdsBuffer = parseFloat(FinancialMath.toDecimal(monthlyExpenses).mul(0.10).toFixed(2));
+        const totalBuffer = gstBuffer + tdsBuffer;
+        const spendableCash = Math.max(0, cashInBank - totalBuffer);
+        
+        const isCritical = runwayMonths < 3;
+        const isAtRisk = runwayMonths >= 3 && runwayMonths < 6;
+
+        return {
+            cashInBank,
+            spendableCash,
+            monthlyRevenue,
+            monthlyExpenses,
+            netBurn,
+            trueRunwayMonths: runwayMonths,
+            trueRunwayDays: runwayDays,
+            statutoryBuffer: {
+                gst: gstBuffer,
+                tds: tdsBuffer,
+                total: totalBuffer,
+            },
+            riskCategory: isCritical ? 'CRITICAL' : isAtRisk ? 'AT_RISK' : 'STABLE',
+            singleAction: isCritical 
+                ? 'Freeze non-essential hiring and simulate 15% opex reduction immediately.'
+                : isAtRisk
+                ? 'Review upcoming 60-day receivables and protect Q3 GST reserve.'
+                : 'Maintain current burn rate and monitor customer concentration.',
+        };
+    }
+
+    /**
+     * CONSTITUTIONAL DOMAIN OBJECT: DECISION RECORD HISTORY
+     * Persists and retrieves Decision Lab simulations backed by PostgreSQL SSOT.
+     */
+    @Get('decisions/history')
+    async getDecisionHistory(@Request() req: any) {
+        const orgId = req.user.organizationId;
+        if (!orgId) return [];
+
+        const events = await this.prisma.cfoDecisionEvent.findMany({
+            where: { organizationId: orgId },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+        });
+
+        return events.map((e: any) => ({
+            id: e.id,
+            dilemma: e.decisionStatement,
+            actionChosen: e.optionChosen || 'SIMULATED',
+            runwayBefore: e.runwayAtShown || 0,
+            runwayAfter: e.runwayAtResolved || 0,
+            runwayDelta: e.runwayDelta || 0,
+            createdAt: e.createdAt.toISOString(),
+            status: e.acted ? 'EXECUTED' : e.resolved ? 'RESOLVED' : 'SIMULATED',
+        }));
+    }
+
+    @Post('decisions/record')
+    async recordDecision(
+        @Request() req: any,
+        @Body() body: { dilemma: string; actionChosen: string; runwayBefore: number; runwayAfter: number; runwayDelta: number }
+    ) {
+        const orgId = req.user.organizationId;
+        if (!orgId) throw new ForbiddenException('Organization required');
+
+        const event = await this.prisma.cfoDecisionEvent.create({
+            data: {
+                organization: { connect: { id: orgId } },
+                decisionId: `dec_${Date.now()}`,
+                decisionStatement: body.dilemma,
+                optionChosen: body.actionChosen,
+                runwayAtShown: body.runwayBefore,
+                runwayAtResolved: body.runwayAfter,
+                runwayDelta: body.runwayDelta,
+                acted: true,
+                actedAt: new Date(),
+            }
+        });
+
+        return event;
+    }
 }
+

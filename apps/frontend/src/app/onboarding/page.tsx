@@ -388,12 +388,48 @@ export default function OnboardingPage() {
     const [hasRevenue, setHasRevenue] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
-    const [showOutput, setShowOutput] = useState(true); // Always show output
+    const [showOutput, setShowOutput] = useState(true);
 
-    // ── Computed CFO output (real-time, zero latency) ────────────────────────
-    const output = useMemo(() => {
-        return generateSyntheticState({ teamSize, monthlySpend, hasRevenue });
+    // ── Backend Baseline State (Constitutional Law 1: Backend Authority) ─────
+    const [backendBaseline, setBackendBaseline] = useState<any>(null);
+
+    useEffect(() => {
+        let isCurrent = true;
+        const fetchPreview = async () => {
+            try {
+                const res = await apiClient.post('/cfo-engine/preview-baseline', {
+                    teamSize,
+                    monthlySpend,
+                    hasRevenue,
+                    monthlyRevenue: hasRevenue ? monthlySpend * 0.4 : 0,
+                });
+                if (isCurrent && res.data) {
+                    setBackendBaseline(res.data);
+                }
+            } catch (e) {
+                // Fallback to local deterministic formula
+            }
+        };
+        fetchPreview();
+        return () => { isCurrent = false; };
     }, [teamSize, monthlySpend, hasRevenue]);
+
+    // ── Computed CFO output (reconciled with backend SSOT) ────────────────────
+    const output = useMemo(() => {
+        const synth = generateSyntheticState({ teamSize, monthlySpend, hasRevenue });
+        if (backendBaseline) {
+            return {
+                ...synth,
+                runwayLow: backendBaseline.trueRunwayMonths,
+                runwayHigh: Math.min(backendBaseline.trueRunwayMonths + 2, 36),
+                estimatedBurn: backendBaseline.netBurn,
+                assumedCash: backendBaseline.spendableCash,
+                tone: backendBaseline.riskCategory === 'CRITICAL' ? 'urgent' : backendBaseline.riskCategory === 'AT_RISK' ? 'cautious' : 'strategic',
+                headline: backendBaseline.singleAction,
+            };
+        }
+        return synth;
+    }, [teamSize, monthlySpend, hasRevenue, backendBaseline]);
 
     const isUrgent = output.tone === 'urgent';
     const isCautious = output.tone === 'cautious';

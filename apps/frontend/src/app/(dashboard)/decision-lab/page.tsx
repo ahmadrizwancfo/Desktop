@@ -6,6 +6,7 @@ import { ScenarioComparisonWorkspace, MultiScenarioComparisonResult } from '@/co
 import { AiDecisionCardCopilot, DecisionCard } from '@/components/decision-lab/ai-decision-card-copilot';
 import { DecisionHistoryPanel, DecisionHistoryRecord } from '@/components/decision-lab/decision-history-panel';
 import { useSimulation, SimulationDecisionType } from '@/hooks/useSimulation';
+import { apiClient } from '@/lib/api-client';
 
 export default function DecisionLabPage() {
     const { runScenario, loading: simulationLoading } = useSimulation();
@@ -37,11 +38,29 @@ export default function DecisionLabPage() {
     const [history, setHistory] = useState<DecisionHistoryRecord[]>([]);
 
     useEffect(() => {
-        const saved = localStorage.getItem('cfo_decision_history');
-        if (saved) {
-            try { setHistory(JSON.parse(saved)); } catch (e) {}
-        }
+        fetchDecisionHistory();
     }, []);
+
+    const fetchDecisionHistory = async () => {
+        try {
+            const res = await apiClient.get('/cfo-engine/decisions/history');
+            if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+                const mapped: DecisionHistoryRecord[] = res.data.map((item: any) => ({
+                    id: item.id,
+                    name: item.dilemma || 'Simulated Decision Scenario',
+                    createdAt: item.createdAt,
+                    status: item.status || 'SIMULATED',
+                    safestOptionName: item.actionChosen,
+                    baseZeroCashDate: `${item.runwayBefore.toFixed(1)} Months`,
+                    bestZeroCashDate: `${item.runwayAfter.toFixed(1)} Months`,
+                    scenariosCount: 1,
+                }));
+                setHistory(mapped);
+            }
+        } catch (e) {
+            console.error('Failed to load decision history from backend:', e);
+        }
+    };
 
     const handleAddScenario = (newSc: ScenarioDefinition) => {
         if (scenarios.length >= 4) return;
@@ -179,20 +198,29 @@ export default function DecisionLabPage() {
                     generatedAt: new Date().toISOString(),
                 });
 
-                // Save to Decision History
-                const newRecord: DecisionHistoryRecord = {
-                    id: `rec_${Date.now()}`,
-                    name: `${scenarios.length} Decision Scenarios Simulated`,
-                    createdAt: new Date().toISOString(),
-                    status: 'SIMULATED',
-                    safestOptionName: bestSc.name,
-                    baseZeroCashDate: `${baselineRunway.toFixed(1)} Months`,
-                    bestZeroCashDate: bestSc.formattedZeroCashDate || 'Sustainable',
-                    scenariosCount: scenarios.length,
-                };
-                const updatedHistory = [newRecord, ...history].slice(0, 10);
-                setHistory(updatedHistory);
-                localStorage.setItem('cfo_decision_history', JSON.stringify(updatedHistory));
+                // Save to Decision History (Backend PostgreSQL SSOT)
+                try {
+                    await apiClient.post('/cfo-engine/decisions/record', {
+                        dilemma: `${scenarios.length} Decision Scenarios Simulated`,
+                        actionChosen: bestSc.name,
+                        runwayBefore: baselineRunway,
+                        runwayAfter: primary.financialMetricChanges?.['RUNWAY_MONTHS']?.simulatedValue ?? baselineRunway,
+                        runwayDelta: (primary.financialMetricChanges?.['RUNWAY_MONTHS']?.simulatedValue ?? baselineRunway) - baselineRunway,
+                    });
+                    fetchDecisionHistory();
+                } catch (e) {
+                    const newRecord: DecisionHistoryRecord = {
+                        id: `rec_${Date.now()}`,
+                        name: `${scenarios.length} Decision Scenarios Simulated`,
+                        createdAt: new Date().toISOString(),
+                        status: 'SIMULATED',
+                        safestOptionName: bestSc.name,
+                        baseZeroCashDate: `${baselineRunway.toFixed(1)} Months`,
+                        bestZeroCashDate: bestSc.formattedZeroCashDate || 'Sustainable',
+                        scenariosCount: scenarios.length,
+                    };
+                    setHistory([newRecord, ...history].slice(0, 10));
+                }
             }
         } catch (err) {
             console.error('Decision Lab Simulation Error:', err);
@@ -207,7 +235,6 @@ export default function DecisionLabPage() {
 
     const handleClearHistory = () => {
         setHistory([]);
-        localStorage.removeItem('cfo_decision_history');
     };
 
     return (
