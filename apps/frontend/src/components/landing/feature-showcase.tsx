@@ -8,7 +8,7 @@ import {
     TrendingUp, 
     CheckCircle2, 
     Scale,
-    Quote
+    FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -59,11 +59,11 @@ export function FeatureShowcase() {
     const active = scenarios[selectedIdx];
 
     return (
-        <section id="decision-lab" className="py-24 px-6 max-w-6xl mx-auto border-t border-white/5">
-            {/* Section Header */}
-            <div className="text-center max-w-3xl mx-auto mb-16">
+        <section id="decision-lab" className="py-28 px-6 max-w-6xl mx-auto border-t border-white/5">
+            {/* Section Header: Answers 'How does an operating partner help me decide?' */}
+            <div className="text-center max-w-3xl mx-auto mb-20">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400 mb-4">
-                    <span>THE EMOTIONAL CENTERPIECE: DECISION LAB</span>
+                    <span>THE DECISION LAB</span>
                 </div>
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white mb-6">
                     Ask difficult questions. Get deterministic answers.
@@ -83,7 +83,7 @@ export function FeatureShowcase() {
                             key={s.id}
                             onClick={() => setSelectedIdx(idx)}
                             className={cn(
-                                "text-left p-4.5 rounded-xl border transition-all text-sm font-medium flex items-center gap-3 cursor-pointer",
+                                "text-left p-5 rounded-xl border transition-all text-sm font-medium flex items-center gap-3 cursor-pointer",
                                 isSelected 
                                     ? "bg-white/[0.08] border-white/20 text-white shadow-lg" 
                                     : "bg-[#0a0f1e]/60 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
@@ -102,7 +102,7 @@ export function FeatureShowcase() {
             </div>
 
             {/* The Simulation Consequence Card */}
-            <div className="rounded-2xl bg-[#0a0f1e] border border-white/10 p-6 sm:p-9 relative overflow-hidden backdrop-blur-xl shadow-2xl mb-16">
+            <div className="rounded-2xl bg-[#0a0f1e] border border-white/10 p-7 sm:p-10 relative overflow-hidden backdrop-blur-xl shadow-2xl mb-20">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/5">
                     <div>
                         <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-1">
@@ -118,7 +118,7 @@ export function FeatureShowcase() {
                 </div>
 
                 {/* Quantitative Impact Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-6 border-b border-white/5 font-mono">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 py-7 border-b border-white/5 font-mono">
                     <div>
                         <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Current Runway</div>
                         <div className="text-xl font-bold text-white">{active.runwayBefore} mo</div>
@@ -138,7 +138,7 @@ export function FeatureShowcase() {
                 </div>
 
                 {/* Qualitative CFO Reasoning & Mitigation */}
-                <div className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="pt-7 grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                         <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-bold">
                             <Scale className="w-3.5 h-3.5 text-slate-400" />
@@ -149,7 +149,7 @@ export function FeatureShowcase() {
                         </p>
                     </div>
 
-                    <div className="space-y-2 rounded-xl bg-white/[0.02] border border-white/5 p-4.5">
+                    <div className="space-y-2 rounded-xl bg-white/[0.02] border border-white/5 p-5">
                         <div className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 font-bold">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                             RECOMMENDED SAFER ALTERNATIVE
@@ -161,26 +161,28 @@ export function FeatureShowcase() {
                 </div>
             </div>
 
-            {/* THE SINGLE PROOF STORY: One Founder. One Decision. One Outcome. */}
+            {/* LIVED OPERATING NOTES (The Proof Story) */}
             <div className="rounded-2xl bg-[#0a0f1e] border border-white/5 p-8 sm:p-10 relative overflow-hidden">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-slate-500 mb-3">
-                    REAL DECISION RECORD • BENGALURU, 2026
+                <div className="flex items-center gap-2 mb-6">
+                    <FileText className="w-4 h-4 text-slate-400" />
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
+                        OPERATING LOG • BENGALURU, 2026
+                    </span>
                 </div>
-                <h4 className="text-xl font-bold text-white tracking-tight mb-4">
-                    One founder. One decision. One outcome.
-                </h4>
-                <p className="text-sm text-slate-300 leading-relaxed max-w-3xl font-sans mb-6">
-                    A seed-stage SaaS founder with ₹55L in bank balances prepared to send offer letters to two senior engineers. The simulation revealed a 5.1-month runway contraction colliding directly with advance tax obligations in September. 
-                </p>
-                <p className="text-sm text-slate-300 leading-relaxed max-w-3xl font-sans mb-6">
-                    Guided by the analysis, the founder engaged one specialist on a 90-day milestone contract until enterprise receivables cleared. Three months later, cash reserves crossed ₹80L, and the full-time hires were made with 14 months of verified runway intact.
-                </p>
-                <div className="flex flex-wrap items-center gap-6 font-mono text-xs text-slate-400 pt-4 border-t border-white/5">
-                    <div>Avoided: <span className="text-rose-400">Premature ₹70L/yr fixed payroll</span></div>
-                    <div>•</div>
-                    <div>Preserved: <span className="text-emerald-400">+5.1 months safety runway</span></div>
-                    <div>•</div>
-                    <div>Outcome: <span className="text-white font-bold">Clean Series A trajectory</span></div>
+
+                <div className="space-y-4 max-w-3xl">
+                    <div className="text-xs font-mono text-slate-400">
+                        <span className="text-slate-200 font-bold">CONTEXT:</span> 8-person B2B SaaS • ₹55L cash balance • Preparing 2 senior engineering offers (₹70L/yr CTC).
+                    </div>
+                    <div className="text-xs font-mono text-slate-400">
+                        <span className="text-rose-400 font-bold">SIMULATION:</span> Modeled a 5.1-month runway contraction colliding directly with advance tax dues in September.
+                    </div>
+                    <div className="text-xs font-mono text-slate-400">
+                        <span className="text-indigo-300 font-bold">DECISION:</span> Engaged 1 specialist on a 90-day milestone contract until enterprise receivables cleared.
+                    </div>
+                    <div className="text-xs font-mono text-slate-400">
+                        <span className="text-emerald-400 font-bold">OUTCOME:</span> Cash balance reached ₹80L. Hires completed 90 days later with 14 months of verified runway intact.
+                    </div>
                 </div>
             </div>
         </section>

@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { 
     ArrowRight, 
-    CheckCircle2, 
-    ShieldCheck
+    CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,26 +14,26 @@ const containerVariants = {
     visible: {
         opacity: 1,
         transition: {
-            staggerChildren: 0.12,
-            delayChildren: 0.15,
+            staggerChildren: 0.1,
+            delayChildren: 0.1,
         },
     },
 };
 
 const itemVariants = {
-    hidden: { opacity: 0, y: 14 },
+    hidden: { opacity: 0, y: 12 },
     visible: { 
         opacity: 1, 
         y: 0,
-        transition: { duration: 0.6, ease: "easeOut" as any }
+        transition: { duration: 0.5, ease: "easeOut" as any }
     },
 };
 
 export function HeroSection() {
     return (
-        <section className="relative min-h-[85vh] flex flex-col items-center justify-start pt-32 pb-20 overflow-hidden">
-            {/* Ambient Background Glow */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[380px] bg-gradient-to-b from-indigo-500/8 via-white/[0.02] to-transparent blur-3xl pointer-events-none -z-10" />
+        <section className="relative min-h-[92vh] flex flex-col items-center justify-start pt-32 pb-24 overflow-hidden">
+            {/* Subtle Ambient Backing */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[420px] bg-gradient-to-b from-indigo-500/6 via-white/[0.01] to-transparent blur-3xl pointer-events-none -z-10" />
 
             <div className="w-full max-w-5xl mx-auto px-6 text-center z-10 flex flex-col items-center">
                 <motion.div
@@ -43,7 +42,7 @@ export function HeroSection() {
                     animate="visible"
                     className="w-full flex flex-col items-center"
                 >
-                    {/* Operating Posture Tag */}
+                    {/* Category Label */}
                     <motion.div 
                         variants={itemVariants}
                         className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.03] border border-white/10 text-[11px] font-mono uppercase tracking-[0.2em] text-slate-300 mb-8 backdrop-blur-md"
@@ -52,20 +51,20 @@ export function HeroSection() {
                         <span>The Financial Operating Partner</span>
                     </motion.div>
 
-                    {/* Headline */}
+                    {/* Headline: Founder's World First */}
                     <motion.h1 
                         variants={itemVariants}
                         className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-white max-w-4xl mx-auto leading-[1.08] mb-6"
                     >
-                        The financial partner you wish sat beside you on Day 1.
+                        You shouldn't have to manage runway on gut feel and delayed spreadsheets.
                     </motion.h1>
 
-                    {/* Subheadline: Private CFO tone */}
+                    {/* Subheadline: Calm CFO presence */}
                     <motion.p 
                         variants={itemVariants}
                         className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10 font-normal"
                     >
-                        Every morning before you open your laptop, cash movements are reconciled, statutory buffers are verified, and your single most important decision is prepared.
+                        Every morning before you open your laptop, cash movements are reconciled, statutory buffers are protected, and your single most important decision is prepared.
                     </motion.p>
 
                     {/* CTA Group */}
@@ -89,22 +88,22 @@ export function HeroSection() {
                         </Link>
                     </motion.div>
 
-                    {/* Trust Microcopy */}
+                    {/* Reassurance Microcopy */}
                     <motion.div 
                         variants={itemVariants}
-                        className="text-xs text-slate-500 font-mono tracking-wide mb-14"
+                        className="text-xs text-slate-500 font-mono tracking-wide mb-16"
                     >
                         No bank passwords required • Standard statement exports from HDFC, ICICI, Axis, SBI & Tally
                     </motion.div>
 
-                    {/* FOLD 1 PROOF: THE MORNING BRIEFING CARD */}
+                    {/* VISUAL CENTERPIECE: THE MORNING BRIEFING CARD */}
                     <motion.div 
                         variants={itemVariants}
-                        className="w-full max-w-3xl text-left rounded-2xl bg-[#0a0f1e] border border-white/10 shadow-2xl p-6 sm:p-8 relative overflow-hidden backdrop-blur-xl group"
+                        className="w-full max-w-3xl text-left rounded-2xl bg-[#0a0f1e] border border-white/10 shadow-2xl p-7 sm:p-9 relative overflow-hidden backdrop-blur-xl group"
                     >
                         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-indigo-500 to-emerald-500" />
                         
-                        {/* Card Header: Reassurance */}
+                        {/* 1. Am I Okay? (Reassurance First) */}
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
                             <div>
                                 <div className="flex items-center gap-2 mb-1.5">
@@ -112,7 +111,7 @@ export function HeroSection() {
                                         MORNING EXECUTIVE BRIEFING
                                     </span>
                                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                        AUDITED 08:30 AM
+                                        TODAY 08:30 AM
                                     </span>
                                 </div>
                                 <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
@@ -120,39 +119,39 @@ export function HeroSection() {
                                 </h3>
                             </div>
                             <div className="text-left sm:text-right font-mono">
-                                <div className="text-xs text-slate-500">SPENDABLE CASH</div>
-                                <div className="text-lg font-bold text-white">₹42,85,000</div>
+                                <div className="text-xs text-slate-500 uppercase">Spendable Cash</div>
+                                <div className="text-xl font-bold text-white tracking-tight">₹42,85,000</div>
                             </div>
                         </div>
 
-                        {/* Card Body: Work Already Completed */}
-                        <div className="py-5 border-b border-white/5 space-y-2.5">
+                        {/* 2. What already happened? (Work Already Done) */}
+                        <div className="py-6 border-b border-white/5 space-y-3">
                             <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
                                 COMPLETED PRIOR TO YOUR DAY
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-slate-300 font-sans">
-                                <div className="flex items-center gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-300 font-sans">
+                                <div className="flex items-center gap-2.5">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                                     <span>412 bank vouchers reconciled across accounts</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2.5">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                                     <span>₹3.8L protected in statutory tax reserve</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2.5">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                                     <span>₹14.2L delayed enterprise invoice flagged</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2.5">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                                     <span>Upcoming 60-day payroll stress-tested</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Card Action: Today's Single Decision */}
-                        <div className="pt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="space-y-1">
+                        {/* 3. What should I do? (Today's Single Decision) */}
+                        <div className="pt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                            <div className="space-y-1.5">
                                 <div className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 font-bold">
                                     TODAY'S SINGLE ACTION
                                 </div>

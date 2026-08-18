@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils';
 
 export function PricingTable() {
     return (
-        <section id="pricing" className="py-24 px-6 max-w-5xl mx-auto border-t border-white/5">
-            <div className="text-center max-w-3xl mx-auto mb-16">
+        <section id="pricing" className="py-28 px-6 max-w-5xl mx-auto border-t border-white/5">
+            <div className="text-center max-w-3xl mx-auto mb-20">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400 mb-4">
                     <span>DECISION INSURANCE</span>
                 </div>

@@ -24,8 +24,8 @@ const banks = [
 
 export function HowItWorks() {
     return (
-        <section id="trust" className="py-24 px-6 max-w-6xl mx-auto border-t border-white/5">
-            <div className="text-center max-w-3xl mx-auto mb-16">
+        <section id="trust" className="py-28 px-6 max-w-6xl mx-auto border-t border-white/5">
+            <div className="text-center max-w-3xl mx-auto mb-20">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400 mb-4">
                     <span>QUIET TRUST & PROVENANCE</span>
                 </div>

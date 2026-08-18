@@ -28,8 +28,8 @@ export function FAQAccordion() {
     const [openIdx, setOpenIdx] = useState<number | null>(0);
 
     return (
-        <section className="py-24 px-6 max-w-4xl mx-auto border-t border-white/5">
-            <div className="text-center mb-16">
+        <section className="py-28 px-6 max-w-4xl mx-auto border-t border-white/5">
+            <div className="text-center mb-20">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-slate-400 mb-4">
                     <span>CLEAR ANSWERS</span>
                 </div>
