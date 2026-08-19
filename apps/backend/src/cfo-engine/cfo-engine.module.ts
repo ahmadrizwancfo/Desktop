@@ -54,6 +54,7 @@ import { FounderDiscoveryService } from './founder-discovery.service';
 import { DecisionValidationService } from './decision-validation.service';
 import { AthenaJudgmentService } from './athena-judgment.service';
 import { HumanCfoBenchmarkService } from './human-cfo-benchmark.service';
+import { ProductionObservabilityService } from './production-observability.service';
 
 @Module({
     imports: [
@@ -106,6 +107,7 @@ import { HumanCfoBenchmarkService } from './human-cfo-benchmark.service';
         DecisionValidationService,
         AthenaJudgmentService,
         HumanCfoBenchmarkService,
+        ProductionObservabilityService,
     ],
     exports: [
         CfoEngineService, 
@@ -116,7 +118,8 @@ import { HumanCfoBenchmarkService } from './human-cfo-benchmark.service';
         FounderDiscoveryService,
         DecisionValidationService,
         AthenaJudgmentService,
-        HumanCfoBenchmarkService, 
+        HumanCfoBenchmarkService,
+        ProductionObservabilityService, 
         ReconciliationWorker,
         ClassificationWorker,
         RunwayWorker,
