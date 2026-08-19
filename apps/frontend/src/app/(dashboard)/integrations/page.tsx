@@ -51,7 +51,9 @@ export default function IntegrationsPage() {
         'Axis': 'Corporate Banking ➔ Accounts ➔ Account Statement ➔ Download CSV',
         'SBI': 'YONO / OnlineSBI ➔ My Accounts ➔ Account Statement ➔ Export CSV',
         'Kotak': 'NetBanking ➔ Banking ➔ Statements ➔ Download CSV',
-        'Tally XML': 'Tally Prime ➔ Display ➔ DayBook ➔ Alt+E (Export) ➔ Format: XML'
+        'Tally XML': 'Tally Prime ➔ Display ➔ DayBook ➔ Alt+E (Export) ➔ Format: XML',
+        'Zoho Books': 'Zoho Books ➔ Reports ➔ Day Book / General Ledger ➔ Export as CSV',
+        'Busy / Vyapar': 'Busy / Vyapar ➔ Administration ➔ Data Export ➔ Transactions CSV',
     };
 
     // Handle file selection & trigger CFO verification flow
@@ -199,8 +201,8 @@ export default function IntegrationsPage() {
                                     1. Choose your primary bank or accounting record
                                 </span>
                             </div>
-                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
-                                {['HDFC', 'ICICI', 'Axis', 'SBI', 'Kotak', 'Tally XML'].map((bank) => (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+                                {['HDFC', 'ICICI', 'Axis', 'SBI', 'Kotak', 'Tally XML', 'Zoho Books', 'Busy / Vyapar'].map((bank) => (
                                     <button
                                         key={bank}
                                         type="button"
@@ -213,7 +215,7 @@ export default function IntegrationsPage() {
                                         )}
                                     >
                                         <Building2 className={cn("w-4 h-4", selectedBank === bank ? "text-emerald-400" : "text-slate-500")} />
-                                        <span>{bank}</span>
+                                        <span className="truncate w-full text-[11px]">{bank}</span>
                                     </button>
                                 ))}
                             </div>
