@@ -274,9 +274,6 @@ const DashboardContent = React.memo(({ state }: { state: CFOState }) => {
             </div>
 
             <div className="max-w-[1400px] mx-auto py-6">
-                {/* Data Quality Banner */}
-                <DataQualityBanner />
-
                 {/* Deep Dive Tabs */}
                 <DataQualityGate featureName="Deep Intelligence Audit">
                     <DeepDiveTabs 
