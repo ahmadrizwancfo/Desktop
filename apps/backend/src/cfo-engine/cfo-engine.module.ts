@@ -52,6 +52,7 @@ import { BetaCommandCenterService } from './beta-command-center.service';
 import { BetaCommandCenterController } from './beta-command-center.controller';
 import { FounderDiscoveryService } from './founder-discovery.service';
 import { DecisionValidationService } from './decision-validation.service';
+import { AthenaJudgmentService } from './athena-judgment.service';
 
 @Module({
     imports: [
@@ -102,6 +103,7 @@ import { DecisionValidationService } from './decision-validation.service';
         BetaCommandCenterService,
         FounderDiscoveryService,
         DecisionValidationService,
+        AthenaJudgmentService,
     ],
     exports: [
         CfoEngineService, 
@@ -110,7 +112,8 @@ import { DecisionValidationService } from './decision-validation.service';
         CfoMetricsService, 
         CfoBriefService, 
         FounderDiscoveryService,
-        DecisionValidationService, 
+        DecisionValidationService,
+        AthenaJudgmentService, 
         ReconciliationWorker,
         ClassificationWorker,
         RunwayWorker,

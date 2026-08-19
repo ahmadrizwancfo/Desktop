@@ -207,6 +207,45 @@ export interface Decision {
     
     // v6.0 Investor Layer
     investorNarrative?: string; // e.g. "Burn optimization to extend liquidity"
+
+    // PROJECT ATHENA: 8-Pillar Executive Quality Framework
+    athenaProfile?: AthenaExecutiveQualityProfile;
+}
+
+export interface AthenaExecutiveQualityProfile {
+    recommendedAction: {
+        title: string;
+        steps: string[];
+    };
+    expectedFinancialImpact: {
+        runwayDeltaDays: number;
+        monthlyBurnSavings: number;
+        netCashImpact: string;
+    };
+    downsideOfDelaying: {
+        delay7d: string;
+        delay14d: string;
+        delay30d: string;
+        riskSeverity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    };
+    lowerRiskAlternative: {
+        title: string;
+        description: string;
+        tradeOff: string;
+        riskLevel: 'LOW' | 'MEDIUM';
+    };
+    assumptionsReliedUpon: string[];
+    evidenceConfidence: {
+        score: number;
+        basis: string;
+        verifiedEvidenceCount: number;
+    };
+    unknownFactors: string[];
+    opportunityCost: {
+        forgoneUpside: string;
+        strategicSacrifice: string;
+    };
+    executiveAuditPassed: boolean;
 }
 
 export interface DecisionHistoryItem {

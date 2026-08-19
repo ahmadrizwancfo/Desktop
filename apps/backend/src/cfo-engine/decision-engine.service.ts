@@ -5,6 +5,7 @@ import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import * as crypto from 'crypto';
 
 import { ExpenseIntelligenceService } from './expense-intelligence.service';
+import { AthenaJudgmentService } from './athena-judgment.service';
 
 export interface CandidateDecision {
     type: 'DEATH_CLOCK' | 'RUNWAY_RISK' | 'SPEND_SPIKE' | 'REVENUE_DROP' | 'NEGATIVE_TREND';
@@ -18,12 +19,16 @@ export interface CandidateDecision {
 @Injectable()
 export class DecisionEngineService {
     private readonly logger = new Logger(DecisionEngineService.name);
+    private readonly athenaJudgment: AthenaJudgmentService;
 
     constructor(
         private prisma: PrismaService,
         private eventEmitter: EventEmitter2,
         private expenseIntelligence: ExpenseIntelligenceService,
-    ) {}
+        athenaJudgment?: AthenaJudgmentService,
+    ) {
+        this.athenaJudgment = athenaJudgment || new AthenaJudgmentService();
+    }
 
     private readonly TRADE_OFFS: Record<StartupStage, Array<{ trigger: string; gain: string; loss: string }>> = {
         survival: [
@@ -513,6 +518,29 @@ export class DecisionEngineService {
             'BURN_SPIKE': 'Operational efficiency optimization and burn management.'
         };
 
+        const impactDays = Math.round(impactValue * 30.4);
+        const monthlySavings = params.impactBurnMonthly || 0;
+
+        // PROJECT ATHENA: 8-Pillar Executive Quality Modeling
+        const mockStateForAthena: CFOState = {
+            summary: {
+                runwayMonths: impactValue > 0 ? impactValue : 6,
+                netBurn: monthlySavings > 0 ? monthlySavings * 2 : 500000,
+                cashInBank: 2500000,
+                monthlyRevenue: 200000,
+            },
+            dynamicConfidence: { score: confidenceScore },
+            bankAccounts: [{} as any],
+        } as any;
+
+        const athenaProfile = this.athenaJudgment.generateAthenaProfile(
+            params.key,
+            params.title || 'Executive Mandate',
+            mockStateForAthena,
+            impactDays,
+            monthlySavings
+        );
+
         return {
             id,
             decisionKey: params.key,
@@ -530,6 +558,7 @@ export class DecisionEngineService {
             secondOrderEffects: secondOrderEffects || [],
             oneThingReasoning: oneThingReasoningMap[params.key] || "This action has the highest immediate impact on your survival metrics.",
             investorNarrative: investorNarrativeMap[params.key] || params.key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+            athenaProfile,
             ...params
         } as Decision;
     }

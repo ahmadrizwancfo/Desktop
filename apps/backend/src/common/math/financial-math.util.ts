@@ -56,4 +56,12 @@ export class FinancialMath {
     static toString(val: any): string {
         return FinancialMath.toDecimal(val).toFixed(2);
     }
+
+    /**
+     * Formats number to Indian numbering system (e.g. 4,00,000).
+     */
+    static formatINR(val: any): string {
+        const num = Math.round(Number(val) || 0);
+        return num.toLocaleString('en-IN');
+    }
 }
