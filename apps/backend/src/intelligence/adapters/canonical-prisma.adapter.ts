@@ -30,18 +30,20 @@ export class CanonicalPrismaAdapter {
       });
       const cashInBank = bankAccounts.reduce((acc, b) => acc + Number(b.balance || 0), 0);
 
-      // 2. Fetch Accounts Receivable (unpaid sales invoices)
+      // 2. Fetch Accounts Receivable (unpaid sales invoices with customerId)
       const unpaidInvoices = await this.prisma.invoice.findMany({
         where: {
           status: { not: 'PAID' },
+          customerId: { not: null },
         },
       });
       const accountsReceivable = unpaidInvoices.reduce((acc, inv) => acc + Number(inv.amount || 0), 0);
 
-      // 3. Fetch Accounts Payable (unpaid vendor bills)
+      // 3. Fetch Accounts Payable (unpaid vendor bills with vendorId)
       const unpaidBills = await this.prisma.invoice.findMany({
         where: {
           status: { not: 'PAID' },
+          vendorId: { not: null },
         },
       });
       const accountsPayable = unpaidBills.reduce((acc, bill) => acc + Number(bill.amount || 0), 0);

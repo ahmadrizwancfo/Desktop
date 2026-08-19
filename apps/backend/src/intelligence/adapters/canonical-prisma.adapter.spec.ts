@@ -13,10 +13,13 @@ describe('CanonicalPrismaAdapter Unit Tests', () => {
       },
       invoice: {
         findMany: jest.fn().mockImplementation(({ where }) => {
-          if (where.type === 'OUTGOING') {
+          if (where.customerId) {
             return Promise.resolve([{ amount: 400000 }]);
           }
-          return Promise.resolve([{ amount: 150000 }]);
+          if (where.vendorId) {
+            return Promise.resolve([{ amount: 150000 }]);
+          }
+          return Promise.resolve([{ amount: 400000 }]);
         }),
       },
       transaction: {

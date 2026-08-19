@@ -546,17 +546,36 @@ Important: Extract exact numbers. Do not summarize or skip any transactions.`,
 
             // Find date, description, debit, credit, balance columns by fuzzy matching
             const dateKey = keys.find((_, idx) => /date|txn.*date|value.*date|posting/i.test(lowerKeys[idx]));
-            const descKey = keys.find((_, idx) => /desc|narration|particular|remark|detail/i.test(lowerKeys[idx]));
-            const debitKey = keys.find((_, idx) => /debit|withdrawal|dr|out/i.test(lowerKeys[idx]));
-            const creditKey = keys.find((_, idx) => /credit|deposit|cr|in(?!t)/i.test(lowerKeys[idx]));
+            const descKey = keys.find((_, idx) => /desc|narration|particular|remark|detail|account/i.test(lowerKeys[idx]));
+
+            // Check if there is an Amount column + CR/DR flag column
+            const crDrFlagKey = keys.find((_, idx) => /^(cr\/dr|dr\/cr|type|flag)$/i.test(lowerKeys[idx].trim()));
+            const amountKey = keys.find((_, idx) => /^(amount|txn.*amt|net.*amount)$/i.test(lowerKeys[idx].trim()));
+
+            let debitKey = keys.find((_, idx) => !/cr\/dr|dr\/cr/i.test(lowerKeys[idx]) && /(^|\b|_)(debit|withdrawal|dr|outflow|payment)($|\b|_)/i.test(lowerKeys[idx]));
+            let creditKey = keys.find((_, idx) => !/cr\/dr|dr\/cr/i.test(lowerKeys[idx]) && /(^|\b|_)(credit|deposit|cr|inflow|receipt)($|\b|_)/i.test(lowerKeys[idx]));
             const balKey = keys.find((_, idx) => /balance|closing|running/i.test(lowerKeys[idx]));
 
             if (!dateKey && !descKey) continue; // Skip header/junk rows
 
             const rawDate = dateKey ? String(row[dateKey]).trim() : '';
             const desc = descKey ? String(row[descKey]).trim() : '';
-            const debit = debitKey ? this.parseAmount(row[debitKey]) : null;
-            const credit = creditKey ? this.parseAmount(row[creditKey]) : null;
+            let debit: number | null = null;
+            let credit: number | null = null;
+
+            if (crDrFlagKey && amountKey) {
+                const flag = String(row[crDrFlagKey] || '').toUpperCase().trim();
+                const amt = this.parseAmount(row[amountKey]);
+                if (flag === 'DR' || flag === 'DEBIT') {
+                    debit = amt;
+                } else if (flag === 'CR' || flag === 'CREDIT') {
+                    credit = amt;
+                }
+            } else {
+                debit = debitKey ? this.parseAmount(row[debitKey]) : null;
+                credit = creditKey ? this.parseAmount(row[creditKey]) : null;
+            }
+
             const balance = balKey ? this.parseAmount(row[balKey]) : null;
 
             if (!rawDate && !desc) continue;

@@ -39,6 +39,18 @@ const mockAiService = {
   getAiAnalytics: jest.fn().mockResolvedValue({}),
 };
 
+import { AiOrchestratorService } from './agent/ai-orchestrator.service';
+import { AiFeedbackService } from './feedback/ai-feedback.service';
+
+const mockAiOrchestratorService = {
+  executePlan: jest.fn().mockResolvedValue({}),
+};
+
+const mockAiFeedbackService = {
+  logFeedback: jest.fn().mockResolvedValue({ id: 'fb_123' }),
+  trackEvent: jest.fn().mockResolvedValue({ id: 'evt_123' }),
+};
+
 describe('AiController', () => {
   let controller: AiController;
   let aiService: typeof mockAiService;
@@ -48,6 +60,8 @@ describe('AiController', () => {
       controllers: [AiController],
       providers: [
         { provide: AiService, useValue: mockAiService },
+        { provide: AiOrchestratorService, useValue: mockAiOrchestratorService },
+        { provide: AiFeedbackService, useValue: mockAiFeedbackService },
       ],
     }).compile();
 

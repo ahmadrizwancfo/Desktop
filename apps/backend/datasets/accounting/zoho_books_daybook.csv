@@ -1,0 +1,7 @@
+Date,Account,Transaction Details,Reference#,Debit,Credit
+01-04-2026,HDFC Current A/c,Opening Balance,,0.00,5000000.00
+03-04-2026,Consulting Revenue,SaaS Subscription Client A,INV-2026-01,,350000.00
+07-04-2026,Salaries & Wages,Staff Salaries April 2026,PAYROLL-01,950000.00,
+12-04-2026,Duties & Taxes (GST),GST Payment Output Tax,GST-01,145000.00,
+20-04-2026,Cloud Infrastructure,AWS Services Cloud Bill,AWS-99,85000.00,
+30-04-2026,HDFC Current A/c,Closing Balance,,0.00,4170000.00

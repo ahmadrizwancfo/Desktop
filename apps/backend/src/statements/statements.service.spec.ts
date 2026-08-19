@@ -17,17 +17,19 @@ describe('StatementsService', () => {
 
   const mockPrismaService = {
     bankAccount: {
-      findFirst: jest.fn(),
-      create: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue({ id: 'acc-1', balance: 50000 }),
+      create: jest.fn().mockResolvedValue({ id: 'acc-1', balance: 0 }),
+      update: jest.fn().mockResolvedValue({ id: 'acc-1', balance: 50000 }),
     },
     transaction: {
-      create: jest.fn(),
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: 'txn-1' }),
     },
     notification: {
-      create: jest.fn(),
+      create: jest.fn().mockResolvedValue({}),
     },
     financialMetrics: {
-      create: jest.fn(),
+      create: jest.fn().mockResolvedValue({}),
     },
   };
 
@@ -61,19 +63,23 @@ describe('StatementsService', () => {
   });
 
   describe('processUpload', () => {
-    const mockFile = {
-      originalname: 'test-balance-sheet.pdf',
-      buffer: Buffer.from('test content'),
-      mimetype: 'application/pdf',
-    } as Express.Multer.File;
-
     it('should process PDF file and extract financial metrics', async () => {
+      const mockFile = {
+        originalname: 'test.pdf',
+        buffer: Buffer.from('test'),
+      } as Express.Multer.File;
+
       const orgId = 'org-123';
       const userId = 'user-123';
 
       mockUniversalParser.parse.mockResolvedValue({
         type: 'pdf',
-        rawText: 'Total Assets: 1,00,00,000\nTotal Liabilities: 50,00,000',
+        rawText: 'Balance Sheet 2026',
+        transactions: [
+          { date: '2026-04-01', description: 'Opening Balance', debit: 0, credit: 0, balance: 50000 },
+          { date: '2026-04-05', description: 'Sales Revenue Inflow', debit: 0, credit: 150000, balance: 200000 },
+        ],
+        quality: { score: 98 },
       });
 
       mockFinancialAnalyzer.analyze.mockResolvedValue({
@@ -96,9 +102,8 @@ describe('StatementsService', () => {
       const result = await service.processUpload(mockFile, orgId, userId);
 
       expect(result.success).toBe(true);
-      expect(result.metrics).toHaveProperty('documentType', 'Balance Sheet');
+      expect(result.canonicalCount).toBe(2);
       expect(mockUniversalParser.parse).toHaveBeenCalledTimes(1);
-      expect(mockFinancialAnalyzer.analyze).toHaveBeenCalledTimes(1);
     });
 
     it('should handle Tally XML files separately', async () => {

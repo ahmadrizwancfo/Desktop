@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { CfoStateService } from '../cfo-engine/cfo-state.service';
 import { CfoBrainService } from '../cfo-engine/cfo-brain.service';
 import { AiMetricsService } from './ai-metrics.service';
+import { FinancialContextEngine } from '../kernel/financial-context.engine';
 
 describe('AiService', () => {
   let service: AiService;
@@ -48,6 +49,10 @@ describe('AiService', () => {
     getCostEstimates: jest.fn(),
   };
 
+  const mockFinancialContextEngine = {
+    buildOperatingContext: jest.fn().mockResolvedValue({}),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -57,6 +62,7 @@ describe('AiService', () => {
         { provide: CfoStateService, useValue: mockCfoStateService },
         { provide: CfoBrainService, useValue: mockCfoBrainService },
         { provide: AiMetricsService, useValue: mockAiMetricsService },
+        { provide: FinancialContextEngine, useValue: mockFinancialContextEngine },
       ],
     }).compile();
 
